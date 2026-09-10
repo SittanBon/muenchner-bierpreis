@@ -1,0 +1,19 @@
+# Dependencies
+node_modules/
+
+# Local environment (keep .env.example tracked)
+.env
+.env.local
+.env.*.local
+
+# SQLite database files + WAL sidecars
+*.db
+*.db-shm
+*.db-wal
+
+# Build output
+dist/
+
+# Logs / OS
+*.log
+.DS_Store
