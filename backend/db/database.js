@@ -20,6 +20,17 @@ db.pragma('foreign_keys = ON');
 function initSchema() {
   const sql = fs.readFileSync(path.join(__dirname, 'schema.sql'), 'utf8');
   db.exec(sql);
+  migrate();
+}
+
+// CREATE TABLE IF NOT EXISTS leaves an already-existing `beers` table without new
+// columns added to schema.sql later — add them by hand, guarded so this is safe
+// to run on every boot.
+function migrate() {
+  const cols = db.prepare('PRAGMA table_info(beers)').all().map((c) => c.name);
+  if (!cols.includes('active')) {
+    db.exec('ALTER TABLE beers ADD COLUMN active INTEGER NOT NULL DEFAULT 1');
+  }
 }
 
 // Ensure tables exist before any prepared statement below is compiled.
@@ -31,9 +42,12 @@ function isEmpty() {
 
 // ─── Read helpers ────────────────────────────────────────────────────────────
 
+// Cheapest active beer first — every consumer that reads beers[0] as "the
+// headline price" (stats, map shading, sidebar cards, venue detail) gets the
+// cheapest brand for free, with no special-casing needed at the call site.
 const beersForVenue = db.prepare(
-  `SELECT brand, size_05, size_mass, updated, reports
-     FROM beers WHERE venue_id = ? ORDER BY id`
+  `SELECT id, venue_id, brand, size_05, size_mass, updated, reports
+     FROM beers WHERE venue_id = ? AND active = 1 ORDER BY size_05 ASC`
 );
 
 const venueBase = `
@@ -139,11 +153,13 @@ function getStats() {
 
 const insertSubmission = db.prepare(`
   INSERT INTO submissions
-    (id, venue_id, venue_name, is_new_venue, beer_brand, size, price,
-     visit_date, submitter_name, note, status, is_outlier, created_at)
+    (id, report_type, venue_id, venue_name, is_new_venue, beer_brand, size, price,
+     visit_date, submitter_name, note, status, is_outlier, created_at,
+     venue_type, neighbourhood_id, address, lat, lng, size_mass, photo_path)
   VALUES
-    (@id, @venue_id, @venue_name, @is_new_venue, @beer_brand, @size, @price,
-     @visit_date, @submitter_name, @note, @status, @is_outlier, @created_at)
+    (@id, @report_type, @venue_id, @venue_name, @is_new_venue, @beer_brand, @size, @price,
+     @visit_date, @submitter_name, @note, @status, @is_outlier, @created_at,
+     @venue_type, @neighbourhood_id, @address, @lat, @lng, @size_mass, @photo_path)
 `);
 
 const nextSubmissionSeq = db.prepare(
@@ -158,22 +174,178 @@ const allSubmissions = db.prepare(
 );
 const submissionById = db.prepare(`SELECT * FROM submissions WHERE id = ?`);
 const setSubmissionStatus = db.prepare(
-  `UPDATE submissions SET status = ? WHERE id = ?`
+  `UPDATE submissions SET status = @status, reject_reason = @reject_reason WHERE id = @id`
 );
+const setSubmissionVenueId = db.prepare(`UPDATE submissions SET venue_id = ? WHERE id = ?`);
+// Only price_change/new_beer rows carry a real (brand, price) pair — a 'closed'
+// or 'other_info' report has neither, so it must never show up as a history point.
 const approvedHistoryForVenue = db.prepare(`
   SELECT * FROM submissions
    WHERE venue_id = ? AND status = 'approved'
+     AND beer_brand IS NOT NULL AND price IS NOT NULL
    ORDER BY visit_date DESC
 `);
 
+// Rolls an approved submission's price into THAT SPECIFIC BRAND's row — a venue
+// can list several beers, so this must never just grab "the first beer by id".
 const updateHeadlinePrice = db.prepare(`
   UPDATE beers
      SET size_05    = CASE WHEN @size = '0.5L' THEN @price ELSE size_05 END,
          size_mass  = CASE WHEN @size = '1L'   THEN @price ELSE size_mass END,
          updated    = @visit_date,
          reports    = reports + 1
-   WHERE id = (SELECT id FROM beers WHERE venue_id = @venue_id ORDER BY id LIMIT 1)
+   WHERE venue_id = @venue_id AND brand = @brand AND active = 1
 `);
+
+// Monthly average Helles price per neighbourhood, from approved submissions —
+// powers the Price Trends chart. Each row is one (month, neighbourhood) average.
+// Grouped by v.neighbourhood_id explicitly — submissions now has its own
+// neighbourhood_id too (for new_venue proposals), so the bare column name is
+// ambiguous once both tables are joined.
+const trendsByNeighbourhood = db.prepare(`
+  SELECT strftime('%Y-%m', s.visit_date) AS month,
+         v.neighbourhood_id            AS neighbourhood_id,
+         ROUND(AVG(s.price), 2)        AS avg_price
+    FROM submissions s
+    JOIN venues v ON v.id = s.venue_id
+   WHERE s.status = 'approved' AND s.visit_date IS NOT NULL
+   GROUP BY month, v.neighbourhood_id
+   ORDER BY month
+`);
+
+// Same, collapsed across all neighbourhoods — the Munich city-wide line.
+const trendsCityWide = db.prepare(`
+  SELECT strftime('%Y-%m', s.visit_date) AS month,
+         ROUND(AVG(s.price), 2)          AS avg_price
+    FROM submissions s
+    JOIN venues v ON v.id = s.venue_id
+   WHERE s.status = 'approved' AND s.visit_date IS NOT NULL
+   GROUP BY month
+   ORDER BY month
+`);
+
+function getTrends() {
+  const byHood = trendsByNeighbourhood.all();
+  const city = trendsCityWide.all();
+
+  const months = [...new Set([...byHood.map((r) => r.month), ...city.map((r) => r.month)])].sort();
+  const series = {};
+  for (const row of byHood) {
+    (series[row.neighbourhood_id] ||= {})[row.month] = row.avg_price;
+  }
+  const cityByMonth = Object.fromEntries(city.map((r) => [r.month, r.avg_price]));
+
+  return {
+    months,
+    series,      // { [neighbourhood_id]: { [month]: avg_price } }
+    city: cityByMonth, // { [month]: avg_price }
+  };
+}
+
+// ─── Admin venue/beer management ────────────────────────────────────────────
+
+const insertVenueStmt = db.prepare(`
+  INSERT INTO venues
+    (id, name, type, neighbourhood_id, address, lat, lng, opening_hours, website,
+     description_de, description_en)
+  VALUES
+    (@id, @name, @type, @neighbourhood_id, @address, @lat, @lng, @opening_hours, @website,
+     @description_de, @description_en)
+`);
+
+const insertBeerStmt = db.prepare(`
+  INSERT INTO beers (venue_id, brand, size_05, size_mass, updated, reports, active)
+  VALUES (@venue_id, @brand, @size_05, @size_mass, @updated, 1, 1)
+`);
+
+const updateBeerPriceStmt = db.prepare(`
+  UPDATE beers SET size_05 = @size_05, size_mass = @size_mass, updated = @updated
+   WHERE id = @beer_id AND venue_id = @venue_id
+`);
+
+const beerBelongsToVenueStmt = db.prepare('SELECT id FROM beers WHERE id = ? AND venue_id = ?');
+
+function slugify(s) {
+  return String(s).toLowerCase()
+    .normalize('NFD').replace(/[̀-ͯ]/g, '') // strip accents (ä -> a etc.)
+    .replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+}
+
+function uniqueVenueId(name) {
+  const base = slugify(name) || 'venue';
+  let id = base;
+  let n = 1;
+  const exists = db.prepare('SELECT 1 FROM venues WHERE id = ?');
+  while (exists.get(id)) {
+    n += 1;
+    id = `${base}-${n}`;
+  }
+  return id;
+}
+
+// Creates a venue with one or more beers in a single transaction. `beersInput`
+// is [{ brand, size_05, size_mass }, ...] — at least one required.
+const createVenue = db.transaction((venue, beersInput) => {
+  const id = uniqueVenueId(venue.name);
+  const today = new Date().toISOString().slice(0, 10);
+
+  insertVenueStmt.run({
+    id,
+    name: venue.name,
+    type: venue.type,
+    neighbourhood_id: venue.neighbourhood_id,
+    address: venue.address || null,
+    lat: venue.lat ?? null,
+    lng: venue.lng ?? null,
+    opening_hours: venue.opening_hours || null,
+    website: venue.website || null,
+    description_de: venue.description_de || null,
+    description_en: venue.description_en || null,
+  });
+
+  for (const b of beersInput) {
+    insertBeerStmt.run({
+      venue_id: id,
+      brand: b.brand,
+      size_05: b.size_05,
+      size_mass: b.size_mass ?? null,
+      updated: today,
+    });
+  }
+
+  return id;
+});
+
+function addBeerToVenue(venue_id, beer) {
+  const today = new Date().toISOString().slice(0, 10);
+  insertBeerStmt.run({
+    venue_id,
+    brand: beer.brand,
+    size_05: beer.size_05,
+    size_mass: beer.size_mass ?? null,
+    updated: today,
+  });
+}
+
+// Returns false if the beer doesn't exist / doesn't belong to that venue.
+function updateBeerPrice(venue_id, beer_id, { size_05, size_mass }) {
+  if (!beerBelongsToVenueStmt.get(beer_id, venue_id)) return false;
+  const today = new Date().toISOString().slice(0, 10);
+  updateBeerPriceStmt.run({ beer_id, venue_id, size_05, size_mass: size_mass ?? null, updated: today });
+  return true;
+}
+
+const deleteBeerStmt = db.prepare('DELETE FROM beers WHERE id = ? AND venue_id = ?');
+const countActiveBeersStmt = db.prepare('SELECT COUNT(*) AS n FROM beers WHERE venue_id = ? AND active = 1');
+
+// Returns 'not_found' | 'last_beer' | 'ok'. A venue must always keep at least
+// one beer — deleting the last one would leave it with no price at all.
+function deleteBeer(venue_id, beer_id) {
+  if (!beerBelongsToVenueStmt.get(beer_id, venue_id)) return 'not_found';
+  if (countActiveBeersStmt.get(venue_id).n <= 1) return 'last_beer';
+  deleteBeerStmt.run(beer_id, venue_id);
+  return 'ok';
+}
 
 const countVenues = db.prepare('SELECT COUNT(*) AS n FROM venues');
 const countSubmissionsByStatus = db.prepare(
@@ -192,7 +364,12 @@ module.exports = {
   getVenue,
   getNeighbourhoods,
   getStats,
+  getTrends,
   hydrateVenue,
+  createVenue,
+  addBeerToVenue,
+  updateBeerPrice,
+  deleteBeer,
   statements: {
     insertSubmission,
     nextSubmissionSeq,
@@ -200,6 +377,7 @@ module.exports = {
     allSubmissions,
     submissionById,
     setSubmissionStatus,
+    setSubmissionVenueId,
     approvedHistoryForVenue,
     updateHeadlinePrice,
     countVenues,

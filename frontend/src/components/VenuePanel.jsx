@@ -27,12 +27,29 @@ function ConfidenceBadge({ reports }) {
 export default function VenuePanel({ neighbourhood, venues, onVenueClick, onClose, onSubmitNew }) {
   const { t, i18n } = useTranslation();
   const [sort, setSort] = useState('price');
+  const [sortDir, setSortDir] = useState('asc');
 
   const name = i18n.language === 'de' ? neighbourhood?.name_de : neighbourhood?.name_en;
 
+  // Clicking the already-active sort button flips direction; picking a new key
+  // starts it ascending. Reads `sort` directly from render scope and calls each
+  // setter independently — nesting a setSortDir call inside setSort's updater
+  // (the previous approach) gets double-invoked by StrictMode in dev, which
+  // toggled the direction twice and silently cancelled itself out.
+  const setSortKey = (key) => {
+    if (sort === key) {
+      setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setSort(key);
+      setSortDir('asc');
+    }
+  };
+
+  const price = (v) => v.beers?.[0]?.size_05 ?? Infinity;
+  const dir = sortDir === 'asc' ? 1 : -1;
   const sorted = [...venues].sort((a, b) => {
-    if (sort === 'price') return a.beers[0].size_05 - b.beers[0].size_05;
-    return a.name.localeCompare(b.name);
+    if (sort === 'price') return (price(a) - price(b)) * dir;
+    return a.name.localeCompare(b.name) * dir;
   });
 
   return (
@@ -51,11 +68,11 @@ export default function VenuePanel({ neighbourhood, venues, onVenueClick, onClos
       {/* Sort */}
       <div className="panel-sort">
         <span className="sort-label">{t('sortBy')}:</span>
-        <button className={`sort-btn ${sort === 'price' ? 'active' : ''}`} onClick={() => setSort('price')}>
-          {t('sortPrice')} ↑
+        <button className={`sort-btn ${sort === 'price' ? 'active' : ''}`} onClick={() => setSortKey('price')}>
+          {t('sortPrice')} {sort === 'price' ? (sortDir === 'asc' ? '↑' : '↓') : '↑'}
         </button>
-        <button className={`sort-btn ${sort === 'name' ? 'active' : ''}`} onClick={() => setSort('name')}>
-          {t('sortName')}
+        <button className={`sort-btn ${sort === 'name' ? 'active' : ''}`} onClick={() => setSortKey('name')}>
+          {t('sortName')} {sort === 'name' ? (sortDir === 'asc' ? '↑' : '↓') : ''}
         </button>
       </div>
 
@@ -73,15 +90,18 @@ export default function VenuePanel({ neighbourhood, venues, onVenueClick, onClos
                 <div className="vc-type">{t(`filters.types.${v.type}`)}</div>
               </div>
               <div className="vc-price-block">
-                <div className="vc-price">€{v.beers[0].size_05.toFixed(2)}</div>
+                <div className="vc-price">€{v.beers[0]?.size_05?.toFixed(2) ?? '—'}</div>
                 <div className="vc-size">0,5L</div>
               </div>
             </div>
             <div className="vc-bottom">
-              <span className="vc-brand">🍻 {v.beers[0].brand}</span>
+              <span className="vc-brand">🍻 {v.beers[0]?.brand}</span>
               <ConfidenceBadge reports={v.beers[0].reports || 1} />
               <FreshnessLight date={v.beers[0].updated} />
             </div>
+            {v.beers.length > 1 && (
+              <div className="vc-brands-count">🍺 {t('venue.brandsCount', { count: v.beers.length })}</div>
+            )}
           </div>
         ))}
       </div>

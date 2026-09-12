@@ -5,9 +5,10 @@ import MunichMap from './components/MunichMap';
 import VenuePanel from './components/VenuePanel';
 import VenueDetail from './components/VenueDetail';
 import SearchBar from './components/SearchBar';
-import SubmissionForm from './components/SubmissionForm';
+import MissingBarModal from './components/MissingBarModal';
 import AdminPage from './components/AdminPage';
 import StatsBar from './components/StatsBar';
+import PriceTrends from './components/PriceTrends';
 import FreshnessLight from './components/FreshnessLight';
 import { fetchNeighbourhoods, fetchVenues, fetchStats } from './hooks/useApi';
 
@@ -33,7 +34,8 @@ export default function App() {
   const [activeNeighbourhood, setActiveNeighbourhood] = useState(null);
   const [selectedVenue, setSelectedVenue] = useState(null);
   const [view, setView] = useState('map');
-  const [showNewVenueForm, setShowNewVenueForm] = useState(false);
+  const [showMissingBar, setShowMissingBar] = useState(false);
+  const [showTrends, setShowTrends] = useState(false);
   const [filters, setFilters] = useState({ type: '', brand: '', neighbourhood: '', min_price: '', max_price: '' });
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
@@ -100,6 +102,16 @@ export default function App() {
     setView((v) => (v === 'venue' ? 'map' : v));
   }, []);
 
+  // A global text search must always be reachable, even on mobile where the venue
+  // list lives in a collapsible bottom sheet that otherwise only opens when a
+  // neighbourhood polygon is tapped. Without this, typing a query with no
+  // neighbourhood selected updated `filteredVenues` correctly but the results were
+  // hidden behind the collapsed sheet — "search does nothing" from the user's POV.
+  const handleSearch = useCallback((val) => {
+    setSearchQuery(val);
+    if (val.trim()) setSheetOpen(true);
+  }, []);
+
   const handleVenueClick = (venue) => { setSelectedVenue(venue); setView('venue'); setSheetOpen(true); };
   const handleBack = () => { setView('map'); setSelectedVenue(null); };
 
@@ -127,6 +139,9 @@ export default function App() {
           </div>
         </div>
         <div className="nav-actions">
+          <button className="trends-link-btn" onClick={() => setShowTrends(true)}>
+            📊 {t('trends.button')}
+          </button>
           <button className="lang-btn" onClick={() => i18n.changeLanguage(i18n.language === 'de' ? 'en' : 'de')}>
             {t('nav.language')}
           </button>
@@ -159,7 +174,8 @@ export default function App() {
           </button>
 
           <SearchBar
-            onSearch={setSearchQuery}
+            onSearch={handleSearch}
+            onFocus={() => setSheetOpen(true)}
             onFilterChange={setFilters}
             filters={filters}
             onNeighbourhoodSelect={selectNeighbourhood}
@@ -175,7 +191,7 @@ export default function App() {
               venues={panelVenues}
               onVenueClick={handleVenueClick}
               onClose={() => selectNeighbourhood(null)}
-              onSubmitNew={() => setShowNewVenueForm(true)}
+              onSubmitNew={() => setShowMissingBar(true)}
             />
           ) : (
             <div className="sidebar-hint">
@@ -200,7 +216,12 @@ export default function App() {
                         .sort((a, b) => (a.beers[0]?.size_05 ?? 99) - (b.beers[0]?.size_05 ?? 99))
                         .map(v => (
                           <div key={v.id} className="av-item" onClick={() => handleVenueClick(v)}>
-                            <span className="av-name">{v.name}</span>
+                            <span className="av-name">
+                              {v.name}
+                              {v.beers.length > 1 && (
+                                <span className="av-brands-count"> · 🍺 {t('venue.brandsCount', { count: v.beers.length })}</span>
+                              )}
+                            </span>
                             <span className="av-right">
                               <FreshnessLight date={v.beers[0]?.updated} compact />
                               <span className="av-price">€{v.beers[0]?.size_05?.toFixed(2) ?? '—'}</span>
@@ -222,19 +243,28 @@ export default function App() {
               neighbourhoods={neighbourhoods}
               venues={filteredVenues}
               onNeighbourhoodClick={selectNeighbourhood}
+              onVenueClick={handleVenueClick}
               activeId={activeNeighbourhood}
               highlight={searchQuery.trim().length > 0}
             />
           )}
+          <button className="missing-bar-fab" onClick={() => setShowMissingBar(true)}>
+            <span className="missing-bar-fab-icon">🍺</span>
+            {t('missingBar.fab')}
+          </button>
         </div>
       </div>
 
-      {showNewVenueForm && (
-        <div className="modal-overlay" onClick={() => setShowNewVenueForm(false)}>
-          <div className="modal-card" onClick={e => e.stopPropagation()}>
-            <SubmissionForm isNewVenue={true} venueName="" onSuccess={() => setShowNewVenueForm(false)} onCancel={() => setShowNewVenueForm(false)} />
-          </div>
-        </div>
+      {showMissingBar && (
+        <MissingBarModal
+          allVenues={allVenues}
+          onClose={() => setShowMissingBar(false)}
+          onCreated={loadSnapshot}
+        />
+      )}
+
+      {showTrends && (
+        <PriceTrends neighbourhoods={neighbourhoods} onClose={() => setShowTrends(false)} />
       )}
     </div>
   );

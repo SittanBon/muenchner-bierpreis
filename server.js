@@ -1,8 +1,11 @@
 require('dotenv').config();
 
+const path = require('path');
+const fs = require('fs');
 const express = require('express');
 const cors = require('cors');
 const jwt = require('jsonwebtoken');
+const multer = require('multer');
 
 const {
   initSchema,
@@ -11,9 +14,22 @@ const {
   getVenue,
   getNeighbourhoods,
   getStats,
+  getTrends,
+  createVenue,
+  addBeerToVenue,
+  updateBeerPrice,
+  deleteBeer,
   DB_PATH,
   statements: S,
 } = require('./backend/db/database');
+
+const UPLOADS_DIR = path.join(__dirname, 'backend', 'uploads');
+fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+const upload = multer({
+  dest: UPLOADS_DIR,
+  limits: { fileSize: 8 * 1024 * 1024 }, // 8MB
+  fileFilter: (req, file, cb) => cb(null, /^image\//.test(file.mimetype)),
+});
 
 // ─── Config ──────────────────────────────────────────────────────────────────
 const PORT = Number(process.env.PORT) || 3001;
@@ -38,6 +54,7 @@ const app = express();
 app.set('etag', false); // API responses are always regenerated from the live DB
 app.use(cors());
 app.use(express.json());
+app.use('/uploads', express.static(UPLOADS_DIR));
 
 // Never let a browser or proxy serve a stale API response.
 app.use('/api', (req, res, next) => {
@@ -74,6 +91,11 @@ app.get('/api/neighbourhoods', (req, res) => {
 // ─── STATS (public — powers the stats bar) ───────────────────────────────────
 app.get('/api/stats', (req, res) => {
   res.json(getStats());
+});
+
+// ─── TRENDS (public — powers the Price Trends chart) ─────────────────────────
+app.get('/api/stats/trends', (req, res) => {
+  res.json(getTrends());
 });
 
 // ─── VENUES ──────────────────────────────────────────────────────────────────
@@ -130,8 +152,25 @@ app.get('/api/venues/:id', (req, res) => {
 });
 
 // ─── SUBMISSIONS ─────────────────────────────────────────────────────────────
+
+// Every field the new_venue-only columns need, defaulted to null so a single
+// INSERT statement (with @named params) works for every report_type.
+const BLANK_NEW_VENUE_FIELDS = {
+  venue_type: null, neighbourhood_id: null, address: null, lat: null, lng: null,
+  size_mass: null, photo_path: null,
+};
+
+function nextSubmissionId() {
+  const seq = S.nextSubmissionSeq.get().n + 1;
+  return `s${String(seq).padStart(3, '0')}`;
+}
+
+// The unified "📢 Report" button on a venue detail page funnels all four topics
+// through here: price_change, new_beer (both need a brand+size+price), closed
+// and other_info (neither does — a venue_id and/or a note is enough).
 app.post('/api/submissions', (req, res) => {
   const {
+    report_type = 'price_change',
     venue_id,
     venue_name,
     is_new_venue,
@@ -143,40 +182,57 @@ app.post('/api/submissions', (req, res) => {
     note,
   } = req.body || {};
 
-  if (!price || !beer_brand || !size) {
-    return res.status(400).json({ error: 'Missing required fields' });
+  const VALID_TYPES = ['price_change', 'new_beer', 'closed', 'other_info'];
+  if (!VALID_TYPES.includes(report_type)) {
+    return res.status(400).json({ error: 'Invalid report_type' });
   }
 
-  const numPrice = parseFloat(price);
-  if (Number.isNaN(numPrice) || numPrice < 1 || numPrice > 30) {
-    return res.status(400).json({ error: 'Invalid price' });
+  let numPrice = null;
+  if (report_type === 'price_change' || report_type === 'new_beer') {
+    if (!price || !beer_brand || !size) {
+      return res.status(400).json({ error: 'Missing required fields' });
+    }
+    numPrice = parseFloat(price);
+    if (Number.isNaN(numPrice) || numPrice < 1 || numPrice > 30) {
+      return res.status(400).json({ error: 'Invalid price' });
+    }
+  }
+  if (!venue_id) {
+    return res.status(400).json({ error: 'venue_id is required' });
+  }
+  if (report_type === 'other_info' && !note?.trim()) {
+    return res.status(400).json({ error: 'A note is required for this report type' });
   }
 
-  // Outlier check: >25% deviation from the current headline price.
+  // Outlier check: >25% deviation from that SPECIFIC BRAND's current price (only
+  // meaningful when this report actually carries a price). Also resolves whether
+  // `venue_id` names a real venue — `submissions.venue_id` has a FOREIGN KEY
+  // REFERENCES venues(id), so a stale/unknown id must never reach the INSERT
+  // below or SQLite throws and the request 500s with a raw stack trace.
   let isOutlier = false;
-  let resolvedName = venue_name;
-  if (venue_id) {
-    const venue = getVenue(venue_id);
-    if (venue) {
-      resolvedName = resolvedName || venue.name;
-      const beer = venue.beers[0];
-      if (beer) {
-        const currentPrice = size === '1L' ? beer.size_mass : beer.size_05;
-        if (currentPrice && Math.abs(numPrice - currentPrice) / currentPrice > 0.25) {
-          isOutlier = true;
-        }
+  const venue = getVenue(venue_id);
+  if (!venue) {
+    return res.status(400).json({ error: 'Unknown venue_id' });
+  }
+  const resolvedName = venue_name || venue.name;
+  if (numPrice != null) {
+    const beer = venue.beers.find((b) => b.brand === beer_brand);
+    if (beer) {
+      const currentPrice = size === '1L' ? beer.size_mass : beer.size_05;
+      if (currentPrice && Math.abs(numPrice - currentPrice) / currentPrice > 0.25) {
+        isOutlier = true;
       }
     }
   }
 
-  const seq = S.nextSubmissionSeq.get().n + 1;
   const submission = {
-    id: `s${String(seq).padStart(3, '0')}`,
-    venue_id: venue_id || null,
+    id: nextSubmissionId(),
+    report_type,
+    venue_id,
     venue_name: resolvedName || null,
     is_new_venue: is_new_venue ? 1 : 0,
-    beer_brand,
-    size,
+    beer_brand: beer_brand || null,
+    size: size || null,
     price: numPrice,
     visit_date: visit_date || new Date().toISOString().split('T')[0],
     submitter_name: submitter_name || 'Anonym',
@@ -184,10 +240,73 @@ app.post('/api/submissions', (req, res) => {
     status: 'pending',
     is_outlier: isOutlier ? 1 : 0,
     created_at: new Date().toISOString(),
+    ...BLANK_NEW_VENUE_FIELDS,
   };
 
-  S.insertSubmission.run(submission);
+  try {
+    S.insertSubmission.run(submission);
+  } catch (err) {
+    console.error('Failed to insert submission:', err);
+    return res.status(500).json({ error: 'Could not save submission' });
+  }
   res.status(201).json({ message: 'Submitted successfully', id: submission.id, is_outlier: isOutlier });
+});
+
+// The "🍺 Missing a bar?" flow — a full new-venue proposal, with an optional
+// photo, so this is multipart/form-data rather than JSON.
+app.post('/api/submissions/new-venue', upload.single('photo'), (req, res) => {
+  const {
+    name, type, neighbourhood_id, address, lat, lng,
+    beer_brand, size_05, size_mass, visit_date, submitter_name, note,
+  } = req.body || {};
+
+  if (!name || !type || !neighbourhood_id || !beer_brand || !size_05) {
+    if (req.file) fs.unlink(req.file.path, () => {});
+    return res.status(400).json({ error: 'name, type, neighbourhood_id, beer_brand and size_05 are required' });
+  }
+  const validHoods = getNeighbourhoods().map((n) => n.id);
+  if (!validHoods.includes(neighbourhood_id)) {
+    if (req.file) fs.unlink(req.file.path, () => {});
+    return res.status(400).json({ error: 'Unknown neighbourhood_id' });
+  }
+  const numPrice = parseFloat(size_05);
+  if (Number.isNaN(numPrice) || numPrice < 1 || numPrice > 30) {
+    if (req.file) fs.unlink(req.file.path, () => {});
+    return res.status(400).json({ error: 'Invalid price' });
+  }
+
+  const submission = {
+    id: nextSubmissionId(),
+    report_type: 'new_venue',
+    venue_id: null,
+    venue_name: name,
+    is_new_venue: 1,
+    beer_brand,
+    size: '0.5L',
+    price: numPrice,
+    visit_date: visit_date || new Date().toISOString().split('T')[0],
+    submitter_name: submitter_name || 'Anonym',
+    note: note || '',
+    status: 'pending',
+    is_outlier: 0,
+    created_at: new Date().toISOString(),
+    venue_type: type,
+    neighbourhood_id,
+    address: address || null,
+    lat: lat ? parseFloat(lat) : null,
+    lng: lng ? parseFloat(lng) : null,
+    size_mass: size_mass ? parseFloat(size_mass) : null,
+    photo_path: req.file ? `/uploads/${req.file.filename}` : null,
+  };
+
+  try {
+    S.insertSubmission.run(submission);
+  } catch (err) {
+    console.error('Failed to insert new-venue submission:', err);
+    if (req.file) fs.unlink(req.file.path, () => {});
+    return res.status(500).json({ error: 'Could not save submission' });
+  }
+  res.status(201).json({ message: 'Submitted successfully', id: submission.id });
 });
 
 // ─── ADMIN ROUTES ────────────────────────────────────────────────────────────
@@ -201,20 +320,140 @@ app.patch('/api/admin/submissions/:id', authMiddleware, (req, res) => {
   const sub = S.submissionById.get(req.params.id);
   if (!sub) return res.status(404).json({ error: 'Not found' });
 
-  const { status } = req.body || {};
-  S.setSubmissionStatus.run(status, sub.id);
+  const { status, reject_reason } = req.body || {};
+  if (!['approved', 'rejected', 'pending'].includes(status)) {
+    return res.status(400).json({ error: 'Invalid status' });
+  }
+  S.setSubmissionStatus.run({ id: sub.id, status, reject_reason: status === 'rejected' ? (reject_reason || null) : null });
 
-  // If approved for an existing venue, roll the headline price forward.
-  if (status === 'approved' && sub.venue_id && !sub.is_new_venue) {
-    S.updateHeadlinePrice.run({
-      venue_id: sub.venue_id,
-      size: sub.size,
-      price: sub.price,
-      visit_date: sub.visit_date,
-    });
+  let createdVenueId = null;
+  if (status === 'approved') {
+    if (sub.report_type === 'new_venue') {
+      // Build the venue from the captured proposal and materialise it — it then
+      // shows up on the map/lists on the next fetch, no other wiring needed.
+      createdVenueId = createVenue(
+        {
+          name: sub.venue_name,
+          type: sub.venue_type,
+          neighbourhood_id: sub.neighbourhood_id,
+          address: sub.address,
+          lat: sub.lat,
+          lng: sub.lng,
+        },
+        [{ brand: sub.beer_brand, size_05: sub.price, size_mass: sub.size_mass }],
+      );
+      S.setSubmissionVenueId.run(createdVenueId, sub.id);
+    } else if (sub.venue_id && sub.beer_brand && sub.price != null) {
+      // price_change or new_beer: roll the price into that specific brand's row
+      // if the venue already lists it, otherwise add it as a new beer — either
+      // way this must never touch the wrong brand (a venue can list several).
+      const venue = getVenue(sub.venue_id);
+      const existingBeer = venue?.beers.find((b) => b.brand === sub.beer_brand);
+      if (existingBeer) {
+        S.updateHeadlinePrice.run({
+          venue_id: sub.venue_id,
+          brand: sub.beer_brand,
+          size: sub.size,
+          price: sub.price,
+          visit_date: sub.visit_date,
+        });
+      } else {
+        const size_05 = sub.size === '0.5L' ? sub.price : Math.round((sub.price / 2) * 20) / 20;
+        const size_mass = sub.size === '1L' ? sub.price : null;
+        addBeerToVenue(sub.venue_id, { brand: sub.beer_brand, size_05, size_mass });
+      }
+    }
+    // 'closed' and 'other_info' reports carry no automated DB action — the admin
+    // reads the note and acts on it manually (e.g. via Manage Venues).
   }
 
-  res.json({ message: 'Updated', submission: { ...sub, status } });
+  const updated = S.submissionById.get(sub.id);
+  res.json({ message: 'Updated', submission: updated, venue_id: createdVenueId });
+});
+
+// ─── ADMIN VENUE MANAGEMENT ──────────────────────────────────────────────────
+
+// Create a venue with one or more beers at once ("+ Add another beer" in the UI).
+app.post('/api/admin/venues', authMiddleware, (req, res) => {
+  const {
+    name, type, neighbourhood_id, address, lat, lng,
+    opening_hours, website, description_de, description_en, beers,
+  } = req.body || {};
+
+  if (!name || !type || !neighbourhood_id) {
+    return res.status(400).json({ error: 'name, type and neighbourhood_id are required' });
+  }
+  if (!Array.isArray(beers) || beers.length === 0) {
+    return res.status(400).json({ error: 'At least one beer is required' });
+  }
+  for (const b of beers) {
+    if (!b.brand || b.size_05 == null || Number.isNaN(parseFloat(b.size_05))) {
+      return res.status(400).json({ error: 'Each beer needs a brand and a 0.5L price' });
+    }
+  }
+  const validHoods = getNeighbourhoods().map((n) => n.id);
+  if (!validHoods.includes(neighbourhood_id)) {
+    return res.status(400).json({ error: 'Unknown neighbourhood_id' });
+  }
+
+  try {
+    const id = createVenue(
+      { name, type, neighbourhood_id, address, lat, lng, opening_hours, website, description_de, description_en },
+      beers.map((b) => ({
+        brand: b.brand,
+        size_05: parseFloat(b.size_05),
+        size_mass: b.size_mass ? parseFloat(b.size_mass) : null,
+      })),
+    );
+    res.status(201).json(getVenue(id));
+  } catch (err) {
+    console.error('Failed to create venue:', err);
+    res.status(500).json({ error: 'Could not create venue' });
+  }
+});
+
+// Add a new brand to an existing venue.
+app.post('/api/admin/venues/:id/beers', authMiddleware, (req, res) => {
+  const venue = getVenue(req.params.id);
+  if (!venue) return res.status(404).json({ error: 'Venue not found' });
+
+  const { brand, size_05, size_mass } = req.body || {};
+  if (!brand || size_05 == null || Number.isNaN(parseFloat(size_05))) {
+    return res.status(400).json({ error: 'brand and size_05 are required' });
+  }
+  if (venue.beers.some((b) => b.brand.toLowerCase() === String(brand).toLowerCase())) {
+    return res.status(400).json({ error: 'This venue already lists that brand' });
+  }
+
+  addBeerToVenue(venue.id, {
+    brand,
+    size_05: parseFloat(size_05),
+    size_mass: size_mass ? parseFloat(size_mass) : null,
+  });
+  res.status(201).json(getVenue(venue.id));
+});
+
+// Edit one beer's price directly (admin override — separate from the
+// submit-and-approve workflow, no submission record is created).
+app.patch('/api/admin/venues/:id/beers/:beerId', authMiddleware, (req, res) => {
+  const { size_05, size_mass } = req.body || {};
+  if (size_05 == null || Number.isNaN(parseFloat(size_05))) {
+    return res.status(400).json({ error: 'size_05 is required' });
+  }
+  const ok = updateBeerPrice(req.params.id, Number(req.params.beerId), {
+    size_05: parseFloat(size_05),
+    size_mass: size_mass ? parseFloat(size_mass) : null,
+  });
+  if (!ok) return res.status(404).json({ error: 'Beer not found for this venue' });
+  res.json(getVenue(req.params.id));
+});
+
+// Remove one beer from a venue outright — a venue must always keep at least one.
+app.delete('/api/admin/venues/:id/beers/:beerId', authMiddleware, (req, res) => {
+  const result = deleteBeer(req.params.id, Number(req.params.beerId));
+  if (result === 'not_found') return res.status(404).json({ error: 'Beer not found for this venue' });
+  if (result === 'last_beer') return res.status(400).json({ error: 'A venue must keep at least one beer' });
+  res.json(getVenue(req.params.id));
 });
 
 app.get('/api/admin/stats', authMiddleware, (req, res) => {
@@ -231,6 +470,23 @@ app.get('/api/admin/stats', authMiddleware, (req, res) => {
     outliers: S.countPendingOutliers.get().n,
   });
 });
+
+// ─── PRODUCTION STATIC SERVING ────────────────────────────────────────────────
+// Serves the built frontend (frontend/dist) from this same Node process, so one
+// deploy handles both the API and the site. Only active when NODE_ENV=production
+// — in dev, the frontend runs separately via `vite`.
+if (process.env.NODE_ENV === 'production') {
+  app.use(express.static(path.join(__dirname, 'frontend/dist')));
+  // Express 5's router (path-to-regexp v8) rejects a bare '*' pattern in
+  // app.get('*', ...) — it requires a named wildcard like '/*splat'. A plain
+  // app.use() catch-all sidesteps path pattern parsing entirely and is
+  // otherwise identical: serve the SPA shell for any non-API GET so client-side
+  // routing works on a hard refresh/deep link.
+  app.use((req, res, next) => {
+    if (req.path.startsWith('/api')) return next();
+    res.sendFile(path.join(__dirname, 'frontend/dist/index.html'));
+  });
+}
 
 app.listen(PORT, () => {
   console.log(`🍺 Bierpreis API running on http://localhost:${PORT}`);

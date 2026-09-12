@@ -1,30 +1,137 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
+import {
+  ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip,
+} from 'recharts';
 import { fetchVenue } from '../hooks/useApi';
-import SubmissionForm from './SubmissionForm';
+import ReportForm from './ReportForm';
 import FreshnessLight from './FreshnessLight';
 
 const TYPE_ICONS = { beer_garden: '🌳', beer_hall: '🏛️', bar: '🍺', restaurant: '🍽️' };
 
-function PriceHistory({ history }) {
-  const { t } = useTranslation();
-  if (!history?.length) return null;
+// Same validated categorical order used for the Price Trends chart (dataviz
+// skill's default palette) — assigned by the beer's position in the venue's
+// (already cheapest-first) list, so a brand keeps its colour across renders.
+const BRAND_COLORS = ['#2a78d6', '#eb6834', '#1baf7a', '#eda100', '#e87ba4', '#008300', '#4a3aa7', '#e34948'];
+const DAY_MS = 24 * 60 * 60 * 1000;
 
-  const max = Math.max(...history.map(h => h.price));
-  const min = Math.min(...history.map(h => h.price));
+// Per-brand history rows with "days at this price" — the days between a price
+// taking effect and the next reported change for that SAME brand (or today, if
+// it's still the current price).
+function daysAtPriceRows(history) {
+  const byBrand = {};
+  (history || []).forEach((h) => { (byBrand[h.beer_brand] ||= []).push(h); });
+
+  const today = new Date();
+  const rows = [];
+  for (const [brand, entries] of Object.entries(byBrand)) {
+    const sorted = [...entries].sort((a, b) => a.visit_date.localeCompare(b.visit_date));
+    sorted.forEach((h, i) => {
+      const start = new Date(h.visit_date);
+      const end = i < sorted.length - 1 ? new Date(sorted[i + 1].visit_date) : today;
+      const days = Math.max(0, Math.round((end - start) / DAY_MS));
+      rows.push({ ...h, brand, days, isCurrent: i === sorted.length - 1 });
+    });
+  }
+  return rows.sort((a, b) => b.visit_date.localeCompare(a.visit_date));
+}
+
+function BrandHistoryChart({ history, beers }) {
+  const { t } = useTranslation();
+  const brands = useMemo(() => beers.map((b) => b.brand), [beers]);
+  const [visible, setVisible] = useState(() => new Set(brands));
+
+  useEffect(() => { setVisible(new Set(brands)); }, [brands]);
+
+  const colorFor = (brand) => {
+    const i = brands.indexOf(brand);
+    return BRAND_COLORS[i >= 0 ? i % BRAND_COLORS.length : 0];
+  };
+
+  const chartData = useMemo(() => {
+    if (!history?.length) return [];
+    const byDate = {};
+    [...history].sort((a, b) => a.visit_date.localeCompare(b.visit_date)).forEach((h) => {
+      const row = byDate[h.visit_date] || (byDate[h.visit_date] = { date: h.visit_date });
+      row[h.beer_brand] = h.price;
+    });
+    return Object.values(byDate);
+  }, [history]);
+
+  const rows = useMemo(() => daysAtPriceRows(history), [history]);
+
+  const toggle = (brand) => {
+    setVisible((v) => {
+      const next = new Set(v);
+      if (next.has(brand)) next.delete(brand); else next.add(brand);
+      return next;
+    });
+  };
+
+  if (!history?.length) {
+    return <div className="vdp-history-empty">{t('venue.noHistory')}</div>;
+  }
 
   return (
-    <div className="price-history">
-      <div className="section-title">{t('priceHistory')}</div>
-      <div className="history-list">
-        {history.slice(0, 6).map((h, i) => (
-          <div key={i} className="history-item">
-            <span className="hi-date">{new Date(h.visit_date).toLocaleDateString()}</span>
-            <div className="hi-bar-wrap">
-              <div className="hi-bar" style={{ width: `${((h.price - min + 0.5) / (max - min + 1)) * 100}%` }} />
-            </div>
-            <span className="hi-price">€{h.price.toFixed(2)}</span>
-            <span className="hi-who">{h.submitter_name}</span>
+    <div className="brand-history">
+      <div className="brand-history-toggles">
+        {brands.map((brand) => (
+          <button
+            key={brand}
+            type="button"
+            className={`trends-toggle ${visible.has(brand) ? 'active' : ''}`}
+            style={{ '--tc': colorFor(brand) }}
+            onClick={() => toggle(brand)}
+            aria-pressed={visible.has(brand)}
+          >
+            <span className="trends-swatch" />
+            {brand}
+          </button>
+        ))}
+      </div>
+      <ResponsiveContainer width="100%" height={220}>
+        <LineChart data={chartData} margin={{ top: 8, right: 12, left: 0, bottom: 4 }}>
+          <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
+          <XAxis dataKey="date" tick={{ fontSize: 11, fill: 'var(--text-secondary)' }} axisLine={{ stroke: 'var(--border-md)' }} tickLine={false} />
+          <YAxis
+            tick={{ fontSize: 11, fill: 'var(--text-secondary)' }}
+            axisLine={false}
+            tickLine={false}
+            tickFormatter={(v) => `€${v.toFixed(2)}`}
+            width={48}
+          />
+          <Tooltip
+            formatter={(value, key) => [value == null ? '—' : `€${Number(value).toFixed(2)}`, key]}
+            contentStyle={{ background: 'var(--amber-900)', border: 'none', borderRadius: 10, color: 'var(--amber-100)' }}
+            itemStyle={{ color: 'var(--amber-100)' }}
+            labelStyle={{ color: 'var(--amber-200)', fontWeight: 600 }}
+          />
+          {brands.filter((b) => visible.has(b)).map((brand) => (
+            <Line
+              key={brand}
+              type="monotone"
+              dataKey={brand}
+              name={brand}
+              stroke={colorFor(brand)}
+              strokeWidth={2}
+              dot={{ r: 3, strokeWidth: 0 }}
+              activeDot={{ r: 6 }}
+              connectNulls
+              isAnimationActive={false}
+            />
+          ))}
+        </LineChart>
+      </ResponsiveContainer>
+
+      {/* Days-at-price list */}
+      <div className="days-at-price-list">
+        {rows.map((r, i) => (
+          <div key={i} className="dap-row">
+            <span className="dap-swatch" style={{ background: colorFor(r.brand) }} />
+            <span className="dap-brand">{r.brand}</span>
+            <span className="dap-price">€{r.price.toFixed(2)}</span>
+            <span className="dap-date">{new Date(r.visit_date).toLocaleDateString()}</span>
+            <span className="dap-days">{t('venue.daysAtPrice', { count: r.days })}{r.isCurrent ? ` (${t('venue.current')})` : ''}</span>
           </div>
         ))}
       </div>
@@ -35,7 +142,7 @@ function PriceHistory({ history }) {
 export default function VenueDetail({ venue: initialVenue, onBack }) {
   const { t, i18n } = useTranslation();
   const [venue, setVenue] = useState(initialVenue);
-  const [showForm, setShowForm] = useState(false);
+  const [showReport, setShowReport] = useState(false);
   const [submitSuccess, setSubmitSuccess] = useState(false);
   const [loading, setLoading] = useState(false);
 
@@ -46,14 +153,18 @@ export default function VenueDetail({ venue: initialVenue, onBack }) {
       .catch(() => setLoading(false));
   }, [initialVenue.id]);
 
-  const beer = venue.beers?.[0];
+  const beers = venue.beers || [];
+  const headline = beers[0]; // cheapest active beer — the API sorts beers ASC by price
+  const otherBeers = beers.slice(1);
   const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(venue.name + ' ' + venue.address)}`;
 
   const handleSubmitSuccess = () => {
-    setShowForm(false);
+    setShowReport(false);
     setSubmitSuccess(true);
     setTimeout(() => setSubmitSuccess(false), 4000);
   };
+
+  const venueBrandNames = beers.map((b) => b.brand);
 
   return (
     <div className="venue-detail">
@@ -74,28 +185,44 @@ export default function VenueDetail({ venue: initialVenue, onBack }) {
         </div>
       </div>
 
-      {/* Price block */}
-      {beer && (
+      {/* Headline price block — always the cheapest active beer */}
+      {headline && (
         <div className="vd-price-block">
           <div className="vdp-main">
-            <div className="vdp-amount">€{beer.size_05.toFixed(2)}</div>
+            <div className="vdp-amount">€{headline.size_05.toFixed(2)}</div>
             <div className="vdp-label">{t('venue.price05')}</div>
           </div>
-          {beer.size_mass && (
+          {headline.size_mass && (
             <div className="vdp-mass">
-              <div className="vdp-amount-sm">€{beer.size_mass.toFixed(2)}</div>
+              <div className="vdp-amount-sm">€{headline.size_mass.toFixed(2)}</div>
               <div className="vdp-label">{t('venue.priceMass')}</div>
             </div>
           )}
           <div className="vdp-brand-block">
-            <div className="vdp-brand">🍻 {beer.brand}</div>
+            <div className="vdp-brand">🍻 {headline.brand}</div>
             <div className="vdp-updated">
-              {t('venue.lastUpdated')}: {new Date(beer.updated).toLocaleDateString()}
+              {t('venue.lastUpdated')}: {new Date(headline.updated).toLocaleDateString()}
             </div>
             <div className="vdp-freshness">
-              <FreshnessLight date={beer.updated} />
+              <FreshnessLight date={headline.updated} />
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Other beers at this venue */}
+      {otherBeers.length > 0 && (
+        <div className="vd-other-beers">
+          <div className="section-title">{t('venue.otherBeers')}</div>
+          {otherBeers.map((b) => (
+            <div key={b.id} className="ob-row">
+              <div className="ob-info">
+                <span className="ob-brand">🍺 {b.brand}</span>
+                <FreshnessLight date={b.updated} compact />
+              </div>
+              <span className="ob-price">€{b.size_05.toFixed(2)}</span>
+            </div>
+          ))}
         </div>
       )}
 
@@ -133,9 +260,6 @@ export default function VenueDetail({ venue: initialVenue, onBack }) {
         <a href={mapsUrl} target="_blank" rel="noopener noreferrer" className="action-btn directions">
           🗺️ {t('venue.directions')}
         </a>
-        <button className="action-btn report" onClick={() => setShowForm(!showForm)}>
-          💬 {t('venue.reportPrice')}
-        </button>
       </div>
 
       {/* Success message */}
@@ -143,24 +267,31 @@ export default function VenueDetail({ venue: initialVenue, onBack }) {
         <div className="submit-success">{t('submission.success')}</div>
       )}
 
-      {/* Submission form */}
-      {showForm && (
-        <SubmissionForm
-          venueId={venue.id}
-          venueName={venue.name}
-          currentBrand={beer?.brand}
-          onSuccess={handleSubmitSuccess}
-          onCancel={() => setShowForm(false)}
-        />
+      {/* Price history — separate coloured line per brand + days-at-price */}
+      {!loading && (
+        <div className="price-history">
+          <div className="section-title">{t('priceHistory')}</div>
+          <BrandHistoryChart history={venue.price_history} beers={beers} />
+        </div>
       )}
 
-      {/* Price history */}
-      {!loading && <PriceHistory history={venue.price_history} />}
+      {/* Disclaimer */}
+      <p className="vd-disclaimer">{t('venue.disclaimer')}</p>
 
-      {/* Report incorrect info */}
-      <div className="vd-report-link">
-        <button className="report-incorrect-btn">{t('venue.reportIncorrect')}</button>
-      </div>
+      {/* Unified report entry point — always the last element */}
+      {showReport ? (
+        <ReportForm
+          venueId={venue.id}
+          venueName={venue.name}
+          venueBrands={venueBrandNames}
+          onSuccess={handleSubmitSuccess}
+          onCancel={() => setShowReport(false)}
+        />
+      ) : (
+        <button className="vd-report-btn" onClick={() => setShowReport(true)}>
+          📢 {t('report.button')}
+        </button>
+      )}
     </div>
   );
 }

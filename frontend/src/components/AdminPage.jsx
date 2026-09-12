@@ -1,6 +1,16 @@
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { adminLogin, adminFetchSubmissions, adminUpdateSubmission, adminFetchStats } from '../hooks/useApi';
+import VenueManager from './VenueManager';
+import MiniMapPreview from './MiniMapPreview';
+
+const REPORT_TYPE_META = {
+  new_venue: { icon: '🆕', label: 'New Venue' },
+  price_change: { icon: '💶', label: 'Price change' },
+  new_beer: { icon: '🍺', label: 'New beer' },
+  closed: { icon: '🔒', label: 'Closed' },
+  other_info: { icon: 'ℹ️', label: 'Other info' },
+};
 
 export default function AdminPage({ onBack }) {
   const { t } = useTranslation();
@@ -11,6 +21,7 @@ export default function AdminPage({ onBack }) {
   const [stats, setStats] = useState(null);
   const [filter, setFilter] = useState('pending');
   const [loading, setLoading] = useState(false);
+  const [section, setSection] = useState('submissions'); // 'submissions' | 'venues'
 
   const handleLogin = async () => {
     const res = await adminLogin(creds.username, creds.password);
@@ -41,14 +52,27 @@ export default function AdminPage({ onBack }) {
     }).catch(() => { setToken(''); setLoading(false); });
   }, [token, filter]);
 
-  const handleAction = async (id, status) => {
-    await adminUpdateSubmission(token, id, status);
+  const handleAction = async (id, status, reject_reason) => {
+    try {
+      await adminUpdateSubmission(token, id, status, reject_reason);
+    } catch {
+      // Token likely expired/invalid mid-session — drop back to the login screen
+      // rather than leaving the button silently doing nothing.
+      handleLogout();
+      return;
+    }
     setSubmissions(s => s.filter(sub => sub.id !== id));
     setStats(st => st ? {
       ...st,
       pending: st.pending - 1,
       [status]: (st[status] || 0) + 1
     } : st);
+  };
+
+  const handleReject = (id) => {
+    const reason = window.prompt(t('admin.rejectReasonPrompt'));
+    if (reason === null) return; // cancelled
+    handleAction(id, 'rejected', reason || null);
   };
 
   if (!token) {
@@ -92,49 +116,77 @@ export default function AdminPage({ onBack }) {
         </div>
       )}
 
-      {/* Filter tabs */}
-      <div className="admin-tabs">
-        {['pending', 'approved', 'rejected'].map(s => (
-          <button key={s} className={`admin-tab ${filter === s ? 'active' : ''}`} onClick={() => setFilter(s)}>
-            {t(`admin.${s}`)}
-          </button>
-        ))}
+      {/* Section switcher */}
+      <div className="admin-section-tabs">
+        <button className={`admin-section-tab ${section === 'submissions' ? 'active' : ''}`} onClick={() => setSection('submissions')}>
+          📋 {t('admin.submissions')}
+        </button>
+        <button className={`admin-section-tab ${section === 'venues' ? 'active' : ''}`} onClick={() => setSection('venues')}>
+          🍺 {t('admin.venues.tab')}
+        </button>
       </div>
 
-      {/* Submissions list */}
-      {loading ? (
-        <div className="loading">{t('loading')}</div>
-      ) : submissions.length === 0 ? (
-        <div className="no-items">{t('admin.noSubmissions')}</div>
+      {section === 'venues' ? (
+        <VenueManager token={token} />
       ) : (
-        <div className="submissions-list">
-          {submissions.map(sub => (
+        <>
+          {/* Filter tabs */}
+          <div className="admin-tabs">
+            {['pending', 'approved', 'rejected'].map(s => (
+              <button key={s} className={`admin-tab ${filter === s ? 'active' : ''}`} onClick={() => setFilter(s)}>
+                {t(`admin.${s}`)}
+              </button>
+            ))}
+          </div>
+
+          {/* Submissions list */}
+          {loading ? (
+            <div className="loading">{t('loading')}</div>
+          ) : submissions.length === 0 ? (
+            <div className="no-items">{t('admin.noSubmissions')}</div>
+          ) : (
+            <div className="submissions-list">
+          {submissions.map(sub => {
+            const meta = REPORT_TYPE_META[sub.report_type] || REPORT_TYPE_META.price_change;
+            return (
             <div key={sub.id} className={`submission-card ${sub.is_outlier ? 'outlier' : ''}`}>
               <div className="sub-top">
+                <span className="report-type-badge">{meta.icon} {meta.label}</span>
                 <strong>{sub.venue_name || 'Neues Lokal'}</strong>
-                {sub.is_new_venue && <span className="new-badge">Neu</span>}
                 {sub.is_outlier && <span className="outlier-badge">⚠️ Ausreißer</span>}
               </div>
               <div className="sub-details">
-                <span>🍻 {sub.beer_brand}</span>
-                <span>📏 {sub.size}</span>
-                <span>💶 €{sub.price.toFixed(2)}</span>
-                <span>📅 {sub.visit_date}</span>
+                {sub.beer_brand && <span>🍻 {sub.beer_brand}</span>}
+                {sub.size && <span>📏 {sub.size}</span>}
+                {sub.price != null && <span>💶 €{sub.price.toFixed(2)}</span>}
+                {sub.report_type === 'new_venue' && sub.size_mass != null && <span>💶 €{sub.size_mass.toFixed(2)} (Maß)</span>}
+                {sub.report_type === 'new_venue' && sub.address && <span>📍 {sub.address}</span>}
+                {sub.visit_date && <span>📅 {sub.visit_date}</span>}
                 <span>👤 {sub.submitter_name}</span>
               </div>
+              {sub.note && <div className="sub-note">💬 {sub.note}</div>}
+              {sub.report_type === 'new_venue' && sub.lat != null && sub.lng != null && (
+                <MiniMapPreview lat={sub.lat} lng={sub.lng} className="sub-map-preview" />
+              )}
+              {sub.status === 'rejected' && sub.reject_reason && (
+                <div className="sub-reject-reason">✕ {sub.reject_reason}</div>
+              )}
               {filter === 'pending' && (
                 <div className="sub-actions">
                   <button className="approve-btn" onClick={() => handleAction(sub.id, 'approved')}>
                     ✓ {t('admin.approve')}
                   </button>
-                  <button className="reject-btn" onClick={() => handleAction(sub.id, 'rejected')}>
+                  <button className="reject-btn" onClick={() => handleReject(sub.id)}>
                     ✕ {t('admin.reject')}
                   </button>
                 </div>
               )}
             </div>
-          ))}
-        </div>
+            );
+          })}
+            </div>
+          )}
+        </>
       )}
     </div>
   );

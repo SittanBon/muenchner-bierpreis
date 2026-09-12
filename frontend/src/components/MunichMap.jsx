@@ -12,10 +12,11 @@ function priceToColor(price, min = 4.40, max = 6.30) {
   return `rgb(${r},${g},${b})`;
 }
 
-export default function MunichMap({ neighbourhoods, venues, onNeighbourhoodClick, activeId, highlight = false }) {
+export default function MunichMap({ neighbourhoods, venues, onNeighbourhoodClick, onVenueClick, activeId, highlight = false }) {
   const mapRef = useRef(null);
   const leafletMap = useRef(null);
   const layerRef = useRef(null);
+  const markersLayerRef = useRef(null);
   const tooltipRef = useRef(null);
   const { t, i18n } = useTranslation();
   const [hoveredId, setHoveredId] = useState(null);
@@ -78,11 +79,15 @@ export default function MunichMap({ neighbourhoods, venues, onNeighbourhoodClick
         // When a search is running, ring the neighbourhoods that still have matches.
         const isMatch = highlight && hasFilteredData;
 
+        // Overlays stay subtle at all times so the map tiles underneath read clearly —
+        // only a light fill tint plus a crisp border communicates state. Fill opacity
+        // never exceeds ~0.3 even when active/hovered/matched; the border colour/weight
+        // does the heavy lifting for feedback instead.
         return {
           fillColor: hasFilteredData ? priceToColor(stat.avg) : '#d4cfc8',
-          fillOpacity: isActive ? 0.82 : isHovered ? 0.72 : isMatch ? 0.7 : hasFilteredData ? 0.55 : 0.15,
+          fillOpacity: isActive ? 0.30 : isHovered ? 0.25 : isMatch ? 0.22 : hasFilteredData ? 0.15 : 0.08,
           color: isActive ? '#1a0a00' : isHovered ? '#3d1f00' : isMatch ? '#c88010' : '#6b4c1e',
-          weight: isActive ? 2.5 : isHovered ? 2 : isMatch ? 3 : 1,
+          weight: isActive ? 2.5 : isHovered ? 2 : isMatch ? 3 : 1.5,
           dashArray: hasFilteredData ? null : '4 4'
         };
       },
@@ -130,8 +135,8 @@ export default function MunichMap({ neighbourhoods, venues, onNeighbourhoodClick
             setHoveredId(null);
             const isMatch = highlight && stat;
             layer.setStyle({
-              fillOpacity: activeId === id ? 0.82 : isMatch ? 0.7 : stat ? 0.55 : 0.15,
-              weight: activeId === id ? 2.5 : isMatch ? 3 : 1,
+              fillOpacity: activeId === id ? 0.30 : isMatch ? 0.22 : stat ? 0.15 : 0.08,
+              weight: activeId === id ? 2.5 : isMatch ? 3 : 1.5,
               color: activeId === id ? '#1a0a00' : isMatch ? '#c88010' : '#6b4c1e'
             });
             if (tooltipRef.current) tooltipRef.current.style.display = 'none';
@@ -139,6 +144,11 @@ export default function MunichMap({ neighbourhoods, venues, onNeighbourhoodClick
           click: () => {
             // Every neighbourhood polygon is selectable, even when the current
             // filters leave it with no venues — the panel then explains why.
+            // (Previously this also zoomed the map to level 14 on the clicked
+            // neighbourhood — after 2-3 clicks that pushed the OTHER polygons
+            // far enough outside the viewport that Leaflet's SVG renderer
+            // stopped drawing them at all, making them unclickable. Selection
+            // must never depend on how far the map happens to be zoomed/panned.)
             onNeighbourhoodClick(id);
           }
         });
@@ -146,6 +156,45 @@ export default function MunichMap({ neighbourhoods, venues, onNeighbourhoodClick
     }).addTo(leafletMap.current);
 
   }, [neighbourhoods, venues, activeId, highlight, i18n.language]);
+
+  // Venue pins — one small amber/brown dot per venue with GPS coordinates. Rebuilt
+  // whenever the (already filtered/searched) venue set changes so pins always match
+  // the sidebar list. Kept in its own layer/effect from the neighbourhood polygons
+  // so a search that narrows venues doesn't have to redraw the whole GeoJSON layer.
+  useEffect(() => {
+    if (!leafletMap.current) return;
+    const L = window.L;
+
+    if (markersLayerRef.current) markersLayerRef.current.remove();
+
+    const pinIcon = L.divIcon({
+      className: 'venue-pin',
+      html: '<span class="venue-pin-dot"></span>',
+      iconSize: [12, 12],
+      iconAnchor: [6, 6],
+    });
+
+    const markers = venues
+      .filter((v) => v.lat != null && v.lng != null)
+      .map((v) => {
+        const marker = L.marker([v.lat, v.lng], { icon: pinIcon, keyboard: false });
+        // Cheapest beer (beers[0] — the API already sorts ASC by price) plus how
+        // many other brands this venue lists, e.g. "Augustiner €4.80 + 2 more".
+        const cheapest = v.beers?.[0];
+        const extra = (v.beers?.length || 0) - 1;
+        const priceLine = cheapest
+          ? `${cheapest.brand} €${cheapest.size_05.toFixed(2)}${extra > 0 ? ` + ${extra} more` : ''}`
+          : '';
+        marker.bindTooltip(
+          `<div class="pin-tt-name">${v.name}</div>${priceLine ? `<div class="pin-tt-price">${priceLine}</div>` : ''}`,
+          { direction: 'top', offset: [0, -6] }
+        );
+        marker.on('click', () => onVenueClick && onVenueClick(v));
+        return marker;
+      });
+
+    markersLayerRef.current = L.layerGroup(markers).addTo(leafletMap.current);
+  }, [venues, onVenueClick]);
 
   return (
     <div style={{ position: 'relative', width: '100%', height: '100%' }}>

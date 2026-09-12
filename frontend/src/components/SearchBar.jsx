@@ -1,8 +1,11 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { BRANDS, OTHER_BRAND } from '../constants/brands';
 
-const BRANDS = ['Augustiner', 'Paulaner', 'Hofbräu', 'Hacker-Pschorr', 'Löwenbräu', 'Spaten', 'Andechs', 'Ayinger', 'Haderner'];
 const TYPES = ['beer_garden', 'beer_hall', 'bar', 'restaurant'];
+// "Other / Andere" is a free-text catch-all for reporting a new brand — it never
+// matches an actual venue, so it's meaningless as a filter option here.
+const FILTERABLE_BRANDS = BRANDS.filter((b) => b !== OTHER_BRAND);
 const NEIGHBOURHOODS = [
   { id: 'altstadt', de: 'Altstadt', en: 'Old Town' },
   { id: 'maxvorstadt', de: 'Maxvorstadt', en: 'Maxvorstadt' },
@@ -10,7 +13,7 @@ const NEIGHBOURHOODS = [
   { id: 'isarvorstadt', de: 'Isarvorstadt', en: 'Isarvorstadt' }
 ];
 
-export default function SearchBar({ onSearch, onFilterChange, filters, onNeighbourhoodSelect }) {
+export default function SearchBar({ onSearch, onFocus, onFilterChange, filters, onNeighbourhoodSelect }) {
   const { t, i18n } = useTranslation();
   const [query, setQuery] = useState('');
   const [showFilters, setShowFilters] = useState(false);
@@ -42,6 +45,7 @@ export default function SearchBar({ onSearch, onFilterChange, filters, onNeighbo
             placeholder={t('search.placeholder')}
             value={query}
             onChange={e => handleSearch(e.target.value)}
+            onFocus={onFocus}
           />
           {query && (
             <button className="search-clear" onClick={() => handleSearch('')}>✕</button>
@@ -98,7 +102,7 @@ export default function SearchBar({ onSearch, onFilterChange, filters, onNeighbo
               <label className="filter-label">{t('filters.brand')}</label>
               <select value={filters.brand || '__all__'} onChange={e => setFilter('brand', e.target.value)}>
                 <option value="__all__">{t('filters.all')}</option>
-                {BRANDS.map(b => <option key={b} value={b}>{b}</option>)}
+                {FILTERABLE_BRANDS.map(b => <option key={b} value={b}>{b}</option>)}
               </select>
             </div>
 

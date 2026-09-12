@@ -28,7 +28,9 @@ CREATE TABLE IF NOT EXISTS venues (
   created_at       TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
--- One row per beer offered at a venue. beers[0] is treated as the headline Helles.
+-- One row per beer offered at a venue. A venue can list several brands; beers[0]
+-- in the API response is always the CHEAPEST active one (the headline price) —
+-- see beersForVenue in database.js, which sorts by size_05 ASC.
 CREATE TABLE IF NOT EXISTS beers (
   id         INTEGER PRIMARY KEY AUTOINCREMENT,
   venue_id   TEXT NOT NULL REFERENCES venues(id) ON DELETE CASCADE,
@@ -36,22 +38,38 @@ CREATE TABLE IF NOT EXISTS beers (
   size_05    REAL,            -- price for 0.5 L (Halbe), EUR
   size_mass  REAL,            -- price for 1 L (Maß), EUR, nullable
   updated    TEXT,            -- ISO date the price was last confirmed
-  reports    INTEGER NOT NULL DEFAULT 1
+  reports    INTEGER NOT NULL DEFAULT 1,
+  active     INTEGER NOT NULL DEFAULT 1  -- 0 = delisted; kept for price history, hidden from the menu
 );
 
+-- report_type: price_change | new_beer | closed | other_info | new_venue.
+-- The unified "📢 Report" button on a venue produces the first four; the
+-- "🍺 Missing a bar?" flow produces new_venue. beer_brand/size/price are only
+-- meaningful for price_change/new_beer/new_venue — nullable so closed/other_info
+-- reports don't need dummy values.
 CREATE TABLE IF NOT EXISTS submissions (
   id            TEXT PRIMARY KEY,
+  report_type   TEXT NOT NULL DEFAULT 'price_change',
   venue_id      TEXT REFERENCES venues(id),
   venue_name    TEXT,
   is_new_venue  INTEGER NOT NULL DEFAULT 0,
-  beer_brand    TEXT NOT NULL,
-  size          TEXT NOT NULL,          -- '0.5L' | '1L'
-  price         REAL NOT NULL,
+  beer_brand    TEXT,
+  size          TEXT,                   -- '0.5L' | '1L'
+  price         REAL,
   visit_date    TEXT,
   submitter_name TEXT,
   note          TEXT,
   status        TEXT NOT NULL DEFAULT 'pending',   -- pending | approved | rejected
   is_outlier    INTEGER NOT NULL DEFAULT 0,
+  reject_reason TEXT,
+  -- new_venue-only fields (report_type = 'new_venue')
+  venue_type       TEXT,
+  neighbourhood_id TEXT,
+  address          TEXT,
+  lat              REAL,
+  lng              REAL,
+  size_mass        REAL,
+  photo_path       TEXT,
   created_at    TEXT NOT NULL DEFAULT (datetime('now'))
 );
 

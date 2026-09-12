@@ -48,6 +48,65 @@ const insertBeer = db.prepare(`
   VALUES (@venue_id, @brand, @size_05, @size_mass, @updated, @reports)
 `);
 
+const insertHistorySubmission = db.prepare(`
+  INSERT INTO submissions
+    (id, venue_id, venue_name, is_new_venue, beer_brand, size, price,
+     visit_date, submitter_name, note, status, is_outlier, created_at)
+  VALUES
+    (@id, @venue_id, @venue_name, 0, @beer_brand, '0.5L', @price,
+     @visit_date, 'Community', 'seeded price-trend history', 'approved', 0, @created_at)
+`);
+
+// Months-ago → the first of that month, as an ISO date string.
+function monthsAgoISO(n) {
+  const d = new Date();
+  d.setUTCDate(1);
+  d.setUTCMonth(d.getUTCMonth() - n);
+  return d.toISOString().slice(0, 10);
+}
+
+// Backfill ~9 months of approved price reports so the Price Trends chart has a real
+// series to draw per neighbourhood + a city average, instead of one flat point.
+// Prices are derived from each venue's current headline price, discounted backwards
+// by a modest monthly inflation rate (Munich Helles has been getting steadily
+// pricier) plus small per-report noise — not real historical data, but a realistic
+// shape consistent with today's actual prices.
+const MONTHLY_INFLATION = 0.004; // ~0.4%/month, roughly Munich's recent beer-price drift
+const HISTORY_MONTHS = 9;
+
+function seedTrendHistory() {
+  let seq = db.prepare('SELECT COUNT(*) AS n FROM submissions').get().n;
+  const byHood = {};
+  for (const v of venues) {
+    (byHood[v.neighbourhood_id] ||= []).push(v);
+  }
+
+  for (const [hoodId, hoodVenues] of Object.entries(byHood)) {
+    // Trend price is the neighbourhood's blended average, discounted backwards —
+    // a single, smooth curve per neighbourhood. Every month's row still has to
+    // point at a real venue (FK constraint), so pick one fixed anchor venue to
+    // file them under; that doesn't affect the price value used.
+    const avgNow = hoodVenues.reduce((s, v) => s + v.beers[0].size_05, 0) / hoodVenues.length;
+    const anchor = hoodVenues[0];
+
+    for (let m = HISTORY_MONTHS; m >= 1; m--) {
+      const noise = ((m * 37 + hoodId.length * 13) % 9 - 4) / 100; // -0.04..+0.04, deterministic and small
+      const price = Math.round((avgNow / Math.pow(1 + MONTHLY_INFLATION, m) + noise) * 20) / 20;
+
+      seq += 1;
+      insertHistorySubmission.run({
+        id: `h${String(seq).padStart(4, '0')}`,
+        venue_id: anchor.id,
+        venue_name: anchor.name,
+        beer_brand: anchor.beers[0].brand,
+        price: Math.max(4.0, price),
+        visit_date: monthsAgoISO(m),
+        created_at: new Date().toISOString(),
+      });
+    }
+  }
+}
+
 const seed = db.transaction(() => {
   db.exec('DELETE FROM beers; DELETE FROM submissions; DELETE FROM venues; DELETE FROM neighbourhoods;');
 
@@ -91,6 +150,8 @@ const seed = db.transaction(() => {
       });
     });
   });
+
+  seedTrendHistory();
 });
 
 initSchema();
@@ -106,6 +167,7 @@ const counts = {
   neighbourhoods: db.prepare('SELECT COUNT(*) n FROM neighbourhoods').get().n,
   venues: db.prepare('SELECT COUNT(*) n FROM venues').get().n,
   beers: db.prepare('SELECT COUNT(*) n FROM beers').get().n,
+  history: db.prepare("SELECT COUNT(*) n FROM submissions WHERE id LIKE 'h%'").get().n,
 };
 
-console.log(`🍺 Seeded ${counts.venues} venues, ${counts.beers} beers, ${counts.neighbourhoods} neighbourhoods.`);
+console.log(`🍺 Seeded ${counts.venues} venues, ${counts.beers} beers, ${counts.neighbourhoods} neighbourhoods, ${counts.history} historical price reports.`);
