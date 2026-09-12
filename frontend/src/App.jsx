@@ -167,19 +167,13 @@ export default function App() {
         <div className="nav-brand" onClick={() => { setView('map'); selectNeighbourhood(null); setMobileMenuOpen(false); }}>
           <span className="nav-logo">🍺</span>
           <div>
-            <div className="nav-title">
-              <span className="nav-title-full">{t('nav.title')}</span>
-              <span className="nav-title-short">Bierpreis</span>
-            </div>
+            <div className="nav-title">{t('nav.title')}</div>
             <div className="nav-subtitle">{t('nav.subtitle')}</div>
           </div>
         </div>
 
         {/* Desktop actions — hidden on mobile in favour of the ☰ menu below */}
         <div className="nav-actions">
-          <button className="trends-link-btn" onClick={() => setShowTrends(true)}>
-            📊 {t('trends.button')}
-          </button>
           <button className="lang-btn" onClick={() => i18n.changeLanguage(i18n.language === 'de' ? 'en' : 'de')}>
             {t('nav.language')}
           </button>
@@ -200,9 +194,6 @@ export default function App() {
             <>
               <div className="mobile-menu-backdrop" onClick={() => setMobileMenuOpen(false)} />
               <div className="mobile-menu-dropdown">
-                <button onClick={() => { setShowTrends(true); setMobileMenuOpen(false); }}>
-                  📊 {t('trends.button')}
-                </button>
                 <button onClick={() => { setView('admin'); setMobileMenuOpen(false); }}>
                   🔐 Admin
                 </button>
@@ -221,6 +212,7 @@ export default function App() {
         activeNeighbourhood={activeNeighbourhood}
         onSelectNeighbourhood={selectNeighbourhood}
         onSelectVenue={handleSelectVenueById}
+        onShowTrends={() => setShowTrends(true)}
       />
 
       <div className="main-layout">
@@ -304,6 +296,11 @@ export default function App() {
               )}
             </div>
           )}
+
+          {/* Desktop-only trigger — mobile shows a pill on the stats bar instead */}
+          <button className="sidebar-trends-btn" onClick={() => setShowTrends(true)}>
+            📊 {t('trends.button')}
+          </button>
         </div>
 
         <div className="map-container">

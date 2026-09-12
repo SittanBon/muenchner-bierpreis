@@ -25,11 +25,10 @@ body{font-family:'Source Sans 3',sans-serif;background:var(--cream);color:var(--
 .nav-brand{display:flex;align-items:center;gap:10px;cursor:pointer}
 .nav-logo{font-size:24px}
 .nav-title{font-family:'Playfair Display',serif;font-size:17px;font-weight:700;color:var(--amber-200);letter-spacing:0.3px}
-.nav-title-short{display:none} /* shown only on mobile — see media query */
 .nav-subtitle{font-size:11px;color:var(--amber-400);letter-spacing:0.5px;text-transform:uppercase}
 .nav-actions{display:flex;align-items:center;gap:10px}
-.lang-btn,.admin-link-btn,.trends-link-btn{background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);color:var(--amber-100);border-radius:6px;padding:5px 12px;font-size:13px;cursor:pointer;font-family:'Source Sans 3',sans-serif;transition:background 0.2s;white-space:nowrap}
-.lang-btn:hover,.admin-link-btn:hover,.trends-link-btn:hover{background:rgba(255,255,255,0.18)}
+.lang-btn,.admin-link-btn{background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);color:var(--amber-100);border-radius:6px;padding:5px 12px;font-size:13px;cursor:pointer;font-family:'Source Sans 3',sans-serif;transition:background 0.2s;white-space:nowrap}
+.lang-btn:hover,.admin-link-btn:hover{background:rgba(255,255,255,0.18)}
 .lang-btn{font-weight:600;letter-spacing:1px}
 .nav-mobile-menu{display:none} /* shown only on mobile — see media query */
 
@@ -111,6 +110,16 @@ body{font-family:'Source Sans 3',sans-serif;background:var(--cream);color:var(--
 .panel-footer{padding:10px 12px;border-top:1px solid var(--border);background:var(--surface)}
 .add-venue-btn{width:100%;padding:10px;background:var(--amber-50);border:1.5px dashed var(--amber-400);border-radius:8px;color:var(--amber-800);font-size:13px;font-weight:500;cursor:pointer;font-family:'Source Sans 3',sans-serif;transition:all 0.2s}
 .add-venue-btn:hover{background:var(--amber-100);border-style:solid}
+
+/* Desktop trigger for the Price Trends panel — pinned to the very bottom of the
+   sidebar so it's reachable regardless of which sidebar view (hint/panel/detail)
+   is showing. Hidden on mobile, where a pill on the stats bar does this job instead. */
+.sidebar-trends-btn{
+  width:100%;flex-shrink:0;padding:12px;border:none;border-top:1px solid var(--border);
+  background:var(--amber-600);color:#fff;font-size:14px;font-weight:600;cursor:pointer;
+  font-family:'Source Sans 3',sans-serif;transition:background 0.2s;
+}
+.sidebar-trends-btn:hover{background:var(--amber-500)}
 
 /* Venue Detail */
 .sidebar-content.scrollable{flex:1;overflow-y:auto}
@@ -388,6 +397,11 @@ body{font-family:'Source Sans 3',sans-serif;background:var(--cream);color:var(--
 
 /* Price Trends modal */
 .trends-card{max-width:760px;max-height:88vh;display:flex;flex-direction:column}
+@media (max-width:768px){
+  /* Full-screen on mobile, opened via the stats-bar pill instead of a menu item */
+  .modal-overlay:has(.trends-card){padding:0}
+  .trends-card{max-width:100%;width:100%;height:100%;max-height:100%;border-radius:0}
+}
 .trends-header{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;padding:18px 20px 12px;border-bottom:1px solid var(--border)}
 .trends-title{font-family:'Playfair Display',serif;font-size:19px;font-weight:700;color:var(--text-primary)}
 .trends-subtitle{font-size:12.5px;color:var(--text-muted);margin-top:2px}
@@ -427,6 +441,9 @@ body{font-family:'Source Sans 3',sans-serif;background:var(--cream);color:var(--
 .stat-tile-btn:disabled{opacity:0.55;cursor:default}
 .stat-tile.cheapest{border-left:3px solid #3a9d3a}
 .stat-tile.priciest{border-left:3px solid #c8442c}
+/* Mobile-only pill trigger for Price Trends — desktop uses the sidebar-bottom
+   button instead, so this stays hidden until the mobile media query flips it on. */
+.trends-pill-mobile{display:none}
 .stat-tile-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted)}
 .stat-tile-value{font-family:'Playfair Display',serif;font-size:19px;font-weight:700;color:var(--amber-800);line-height:1.15}
 .stat-tile-sub{font-size:11px;color:var(--text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:150px}
@@ -465,8 +482,7 @@ body{font-family:'Source Sans 3',sans-serif;background:var(--cream);color:var(--
   .navbar{padding:0 16px;height:64px}
   .nav-brand{gap:12px}
   .nav-logo{font-size:27px}
-  .nav-title-full{display:none}
-  .nav-title-short{display:inline-block;font-family:'Playfair Display',serif;font-size:18px;font-weight:700;color:var(--amber-200);letter-spacing:0.3px}
+  .nav-title{font-size:18px}
   .nav-subtitle{display:none}
   .nav-actions{display:none}
 
@@ -511,6 +527,18 @@ body{font-family:'Source Sans 3',sans-serif;background:var(--cream);color:var(--
   .stat-tile-sub{max-width:none}
   .stats-pills{flex-wrap:nowrap;overflow-x:auto;padding-bottom:2px;-webkit-overflow-scrolling:touch}
   .stats-pills-label{display:none}
+
+  /* Trends moved out of the hamburger menu and onto its own pill here */
+  .trends-pill-mobile{
+    display:flex;align-items:center;justify-content:center;gap:6px;
+    grid-column:1 / -1;padding:8px 12px;border-radius:20px;border:1.5px solid var(--amber-400);
+    background:var(--amber-50);color:var(--amber-800);font-size:12.5px;font-weight:600;
+    cursor:pointer;font-family:'Source Sans 3',sans-serif;
+  }
+  .trends-pill-mobile:active{background:var(--amber-100)}
+
+  /* Desktop-only trigger — mobile uses the pill above instead */
+  .sidebar-trends-btn{display:none}
 
   .main-layout{position:relative}
   .map-container{position:absolute;inset:0}

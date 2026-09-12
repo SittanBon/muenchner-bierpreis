@@ -1,8 +1,8 @@
 export const de = {
   translation: {
     nav: {
-      title: "MünchnerBierpreis",
-      subtitle: "Finde dein Helles",
+      title: "Bierpreis",
+      subtitle: "Faires Bier für Alle",
       language: "EN"
     },
     search: {
@@ -204,8 +204,8 @@ export const de = {
 export const en = {
   translation: {
     nav: {
-      title: "MünchnerBierpreis",
-      subtitle: "Find your Helles",
+      title: "Bierpreis",
+      subtitle: "Fair Beer for Everyone",
       language: "DE"
     },
     search: {

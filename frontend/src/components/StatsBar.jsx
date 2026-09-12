@@ -5,7 +5,7 @@ import { formatEuro } from '../utils/price';
 //  - average / cheapest / most-expensive tiles (cheapest & priciest jump straight
 //    to that venue's detail page — onSelectVenue is given the venue id)
 //  - one toggle pill per neighbourhood showing its average (click to focus it)
-export default function StatsBar({ stats, neighbourhoods, activeNeighbourhood, onSelectNeighbourhood, onSelectVenue }) {
+export default function StatsBar({ stats, neighbourhoods, activeNeighbourhood, onSelectNeighbourhood, onSelectVenue, onShowTrends }) {
   const { t, i18n } = useTranslation();
   if (!stats) return null;
 
@@ -45,6 +45,11 @@ export default function StatsBar({ stats, neighbourhoods, activeNeighbourhood, o
           <span className="stat-tile-label">▲ {t('stats.priciest')}</span>
           <span className="stat-tile-value">{eur(stats.most_expensive?.price)}</span>
           <span className="stat-tile-sub stat-tile-tappable">{stats.most_expensive?.name || '—'} <span className="stat-tile-arrow">→</span></span>
+        </button>
+
+        {/* Mobile-only — desktop keeps its trigger at the bottom of the sidebar */}
+        <button type="button" className="trends-pill-mobile" onClick={onShowTrends}>
+          📊 {t('trends.button')}
         </button>
       </div>
 
