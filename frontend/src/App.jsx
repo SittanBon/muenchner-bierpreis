@@ -329,6 +329,7 @@ function AppContent() {
               onNeighbourhoodClick={selectNeighbourhood}
               onVenueClick={handleVenueClick}
               activeId={activeNeighbourhood}
+              selectedVenueId={view === 'venue' ? selectedVenue?.id : null}
               highlight={searchQuery.trim().length > 0}
             />
           )}

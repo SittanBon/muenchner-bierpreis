@@ -13,7 +13,57 @@ function priceToColor(price, min = 4.40, max = 6.30) {
   return `rgb(${r},${g},${b})`;
 }
 
-export default function MunichMap({ neighbourhoods, venues, onNeighbourhoodClick, onVenueClick, activeId, highlight = false }) {
+// One colour + emoji per venue type — same emoji already used elsewhere
+// (VenuePanel/VenueDetail's TYPE_ICONS) for a consistent visual vocabulary.
+const TYPE_META = {
+  beer_garden: { emoji: '🌳', color: '#2d7a2d' },
+  beer_hall: { emoji: '🏛️', color: '#7a4a06' },
+  bar: { emoji: '🍺', color: '#e8a020' },
+  restaurant: { emoji: '🍽️', color: '#5a3d1e' },
+};
+const DEFAULT_TYPE_META = { emoji: '🍺', color: '#e8a020' };
+
+function escapeHtml(s) {
+  return String(s ?? '')
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+// "Overlap" only means anything in SCREEN pixels, not metres — the same 25m
+// gap between two venues is a couple of pixels (invisible) at a city-wide
+// zoom but many pin-widths apart (clearly separate) at street-level zoom. So
+// clustering has to be computed from each venue's PROJECTED pixel position
+// at the map's current zoom, and re-computed on every zoomend — a fixed
+// metre threshold would either never fire while zoomed in, or (as measured
+// against zoom 13, where 25m is ~2px) leave genuinely overlapping pins
+// un-clustered, silently stacked on top of each other with the topmost one
+// eating every click meant for the one underneath.
+const CLUSTER_PIXEL_RADIUS = 36; // roughly one pin's own width
+
+function clusterVenuesByPixel(map, venues, zoom) {
+  const pts = venues
+    .filter((v) => v.lat != null && v.lng != null)
+    .map((v) => ({ v, p: map.project([v.lat, v.lng], zoom) }));
+  const used = new Array(pts.length).fill(false);
+  const clusters = [];
+  for (let i = 0; i < pts.length; i++) {
+    if (used[i]) continue;
+    const group = [pts[i].v];
+    used[i] = true;
+    for (let j = i + 1; j < pts.length; j++) {
+      if (used[j]) continue;
+      const dx = pts[i].p.x - pts[j].p.x;
+      const dy = pts[i].p.y - pts[j].p.y;
+      if (Math.sqrt(dx * dx + dy * dy) < CLUSTER_PIXEL_RADIUS) {
+        group.push(pts[j].v);
+        used[j] = true;
+      }
+    }
+    clusters.push(group);
+  }
+  return clusters;
+}
+
+export default function MunichMap({ neighbourhoods, venues, onNeighbourhoodClick, onVenueClick, activeId, selectedVenueId, highlight = false }) {
   const mapRef = useRef(null);
   const leafletMap = useRef(null);
   const layerRef = useRef(null);
@@ -158,44 +208,92 @@ export default function MunichMap({ neighbourhoods, venues, onNeighbourhoodClick
 
   }, [neighbourhoods, venues, activeId, highlight, i18n.language]);
 
-  // Venue pins — one small amber/brown dot per venue with GPS coordinates. Rebuilt
-  // whenever the (already filtered/searched) venue set changes so pins always match
-  // the sidebar list. Kept in its own layer/effect from the neighbourhood polygons
-  // so a search that narrows venues doesn't have to redraw the whole GeoJSON layer.
+  // Venue pins — one colour-coded, type-icon marker per venue with GPS
+  // coordinates (pins that overlap on screen at the current zoom collapse
+  // into a single numbered cluster pin instead of silently stacking, which
+  // would leave everything but the topmost one unclickable). Rebuilt
+  // whenever the (already filtered/searched) venue set, the active
+  // neighbourhood, the selected venue, or the map's own zoom changes — kept
+  // in its own layer/effect from the neighbourhood polygons so a search that
+  // narrows venues doesn't redraw the whole GeoJSON layer. Clicking a pin
+  // never touches the map's view/zoom — only the sidebar/bottom-sheet
+  // reacts (via onVenueClick); clicking a CLUSTER does zoom in, since that's
+  // what actually separates its pins back out.
   useEffect(() => {
     if (!leafletMap.current) return;
     const L = window.L;
+    const map = leafletMap.current;
 
-    if (markersLayerRef.current) markersLayerRef.current.remove();
+    // A 44x44 icon box is the actual click/touch target on every screen size
+    // (comfortably clears the 44x44 mobile minimum) — the visible circle
+    // inside is styled smaller (32px desktop / 38px mobile) and centred
+    // within that box entirely via CSS, so the anchor point never shifts
+    // between breakpoints.
+    const iconSize = [44, 44];
+    const iconAnchor = [22, 22];
 
-    const pinIcon = L.divIcon({
-      className: 'venue-pin',
-      html: '<span class="venue-pin-dot"></span>',
-      iconSize: [12, 12],
-      iconAnchor: [6, 6],
-    });
+    function buildMarkers() {
+      if (markersLayerRef.current) markersLayerRef.current.remove();
 
-    const markers = venues
-      .filter((v) => v.lat != null && v.lng != null)
-      .map((v) => {
-        const marker = L.marker([v.lat, v.lng], { icon: pinIcon, keyboard: false });
-        // Cheapest beer (beers[0] — the API already sorts ASC by price) plus how
-        // many other brands this venue lists, e.g. "Augustiner €4.80 + 2 more".
+      const markers = clusterVenuesByPixel(map, venues, map.getZoom()).map((group) => {
+        if (group.length > 1) {
+          const lat = group.reduce((s, v) => s + v.lat, 0) / group.length;
+          const lng = group.reduce((s, v) => s + v.lng, 0) / group.length;
+          const icon = L.divIcon({
+            className: 'venue-pin',
+            html: `<div class="venue-cluster-wrap"><div class="venue-cluster-circle">${group.length}</div></div>`,
+            iconSize, iconAnchor,
+          });
+          const marker = L.marker([lat, lng], { icon, keyboard: false });
+          marker.bindTooltip(
+            `${group.length} ${t('map.venues')}`,
+            { direction: 'top', offset: [0, -18] }
+          );
+          marker.on('click', () => {
+            map.setView([lat, lng], Math.min(19, map.getZoom() + 3));
+          });
+          return marker;
+        }
+
+        const v = group[0];
+        const meta = TYPE_META[v.type] || DEFAULT_TYPE_META;
+        const isSelected = selectedVenueId != null && v.id === selectedVenueId;
+        const showLabel = activeId != null && v.neighbourhood_id === activeId;
+
+        const icon = L.divIcon({
+          className: 'venue-pin',
+          html: `
+            <div class="venue-pin-wrap${isSelected ? ' selected' : ''}">
+              <div class="venue-pin-circle" style="background:${meta.color}">
+                <span class="venue-pin-emoji">${meta.emoji}</span>
+              </div>
+              ${showLabel ? `<div class="venue-pin-label">${escapeHtml(v.name)}</div>` : ''}
+            </div>
+          `,
+          iconSize, iconAnchor,
+        });
+        const marker = L.marker([v.lat, v.lng], { icon, keyboard: false });
+
         const cheapest = v.beers?.[0];
-        const extra = (v.beers?.length || 0) - 1;
-        const priceLine = cheapest
-          ? `${cheapest.brand} ${formatEuro(cheapest.size_05, i18n.language)}${extra > 0 ? ` + ${extra} more` : ''}`
-          : '';
-        marker.bindTooltip(
-          `<div class="pin-tt-name">${v.name}</div>${priceLine ? `<div class="pin-tt-price">${priceLine}</div>` : ''}`,
-          { direction: 'top', offset: [0, -6] }
-        );
+        if (cheapest) {
+          marker.bindTooltip(
+            `${escapeHtml(v.name)} · ${formatEuro(cheapest.size_05, i18n.language)}`,
+            { direction: 'top', offset: [0, -18] }
+          );
+        }
         marker.on('click', () => onVenueClick && onVenueClick(v));
         return marker;
       });
 
-    markersLayerRef.current = L.layerGroup(markers).addTo(leafletMap.current);
-  }, [venues, onVenueClick, i18n.language]);
+      markersLayerRef.current = L.layerGroup(markers).addTo(map);
+    }
+
+    buildMarkers();
+    // Re-cluster on zoom — the same set of venues can be one overlapping
+    // clump at city zoom and fully separated pins a few zoom levels in.
+    map.on('zoomend', buildMarkers);
+    return () => { map.off('zoomend', buildMarkers); };
+  }, [venues, onVenueClick, i18n.language, activeId, selectedVenueId, t]);
 
   return (
     <div style={{ position: 'relative', width: '100%', height: '100%' }}>

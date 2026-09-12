@@ -8,6 +8,7 @@
     "build": "cd frontend && npm install && npm run build",
     "seed": "node backend/db/seed.js",
     "seed:force": "node backend/db/seed.js --force",
+    "geocode": "node backend/db/geocode.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],

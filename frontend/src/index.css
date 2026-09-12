@@ -453,20 +453,59 @@ body{font-family:'Source Sans 3',sans-serif;background:var(--cream);color:var(--
 .leaflet-control-zoom a{background:var(--amber-900)!important;color:var(--amber-200)!important;border-color:var(--amber-800)!important;font-weight:600}
 .leaflet-control-zoom a:hover{background:var(--amber-800)!important}
 
-/* Venue pins */
+/* Venue pins — colour-coded circular markers, one per venue type. The
+   divIcon's own box is always 44x44 (set in MunichMap.jsx) so the tap target
+   never shrinks below the mobile-accessibility minimum; the visible circle
+   inside is sized independently below and centred via flexbox, so it can be
+   32px on desktop / 38px on mobile without the anchor point ever shifting. */
 .venue-pin{background:none;border:none}
-.venue-pin-dot{
-  display:block;width:12px;height:12px;border-radius:50%;
-  background:radial-gradient(circle at 35% 30%, var(--amber-400), var(--amber-800) 70%, var(--brown-600));
-  border:1.5px solid var(--cream);
-  box-shadow:0 1px 4px rgba(26,9,0,0.5);
-  cursor:pointer;transition:transform 0.15s;
+.venue-pin-wrap{
+  width:100%;height:100%;display:flex;align-items:center;justify-content:center;
+  position:relative;
 }
-.venue-pin-dot:hover{transform:scale(1.35)}
+.venue-pin-circle{
+  width:32px;height:32px;border-radius:50%;
+  display:flex;align-items:center;justify-content:center;
+  border:2px solid var(--cream);
+  box-shadow:0 1px 5px rgba(26,9,0,0.5);
+  cursor:pointer;transition:transform 0.15s,box-shadow 0.15s;
+}
+.venue-pin-wrap:hover .venue-pin-circle{transform:scale(1.15)}
+.venue-pin-emoji{font-size:15px;line-height:1;filter:drop-shadow(0 1px 1px rgba(0,0,0,0.35))}
+/* Selected pin — a white ring around the coloured circle */
+.venue-pin-wrap.selected .venue-pin-circle{
+  box-shadow:0 0 0 3px #fff, 0 0 0 5px rgba(26,9,0,0.35), 0 1px 5px rgba(26,9,0,0.5);
+}
+/* Venue name label under the pin — only shown (via the mobile media query
+   below) while that venue's neighbourhood is the active one. */
+.venue-pin-label{
+  display:none;position:absolute;top:100%;left:50%;transform:translateX(-50%);
+  margin-top:2px;padding:1px 6px;border-radius:5px;white-space:nowrap;
+  background:rgba(26,9,0,0.75);color:#fff;font-size:10px;font-weight:600;
+  font-family:'Source Sans 3',sans-serif;pointer-events:none;
+}
+/* Cluster pin — venues stacked within ~25m collapse into one numbered marker */
+.venue-cluster-wrap{width:100%;height:100%;display:flex;align-items:center;justify-content:center}
+.venue-cluster-circle{
+  width:34px;height:34px;border-radius:50%;
+  display:flex;align-items:center;justify-content:center;
+  background:var(--amber-600);border:2px solid var(--cream);color:#fff;
+  font-size:13px;font-weight:700;font-family:'Source Sans 3',sans-serif;
+  box-shadow:0 1px 5px rgba(26,9,0,0.5);cursor:pointer;transition:transform 0.15s;
+}
+.venue-cluster-wrap:hover .venue-cluster-circle{transform:scale(1.15)}
+
 .leaflet-tooltip{background:var(--amber-900);color:var(--amber-100);border:none;border-radius:8px;padding:6px 10px;box-shadow:var(--shadow-md);font-family:'Source Sans 3',sans-serif}
 .leaflet-tooltip-top::before{border-top-color:var(--amber-900)}
 .pin-tt-name{font-weight:600;font-size:12.5px}
 .pin-tt-price{font-size:11.5px;color:var(--amber-300);margin-top:2px}
+
+@media (max-width:768px){
+  .venue-pin-circle{width:38px;height:38px}
+  .venue-pin-emoji{font-size:17px}
+  .venue-cluster-circle{width:40px;height:40px;font-size:14px}
+  .venue-pin-label{display:block}
+}
 
 /* ===== Stats bar ===== */
 .stats-bar{display:flex;align-items:center;gap:18px;padding:8px 20px;background:var(--surface);border-bottom:1px solid var(--border);flex-shrink:0;overflow-x:auto;z-index:150}
