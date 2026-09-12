@@ -9,6 +9,8 @@ import MissingBarModal from './components/MissingBarModal';
 import AdminPage from './components/AdminPage';
 import StatsBar from './components/StatsBar';
 import CitySelector from './components/CitySelector';
+import ToastContainer from './components/ToastContainer';
+import { ToastProvider } from './hooks/ToastProvider';
 import PriceTrends from './components/PriceTrends';
 import FreshnessLight from './components/FreshnessLight';
 import { fetchNeighbourhoods, fetchVenues, fetchStats } from './hooks/useApi';
@@ -28,6 +30,18 @@ function venueParams(filters, q) {
 }
 
 export default function App() {
+  return (
+    <ToastProvider>
+      <AppContent />
+      <ToastContainer />
+    </ToastProvider>
+  );
+}
+
+// The actual app — split out so ToastProvider wraps both the admin dashboard
+// and the main map view (App used to `return <AdminPage/>` early, which would
+// otherwise have skipped the provider entirely for that branch).
+function AppContent() {
   const { t, i18n } = useTranslation();
   const [neighbourhoods, setNeighbourhoods] = useState([]);
   const [allVenues, setAllVenues] = useState([]);       // every venue in the DB

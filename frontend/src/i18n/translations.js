@@ -9,6 +9,13 @@ export const de = {
       comingSoon: "Demnächst",
       comingSoonTooltip: "Demnächst! Hilf uns, nach {{city}} zu expandieren."
     },
+    toast: {
+      priceReportSuccess: "🍺 Danke! Wir prüfen deine Meldung innerhalb von 48 Stunden.",
+      closedSuccess: "Danke! Wir prüfen und aktualisieren den Eintrag.",
+      wrongInfoSuccess: "Verstanden! Unser Team prüft deine Meldung.",
+      missingVenueSuccess: "🍺 Danke! Dein Vorschlag ist in unserer Warteschlange.",
+      genericError: "Etwas ist schiefgelaufen. Bitte erneut versuchen."
+    },
     search: {
       placeholder: "Lokal, Viertel, Straße, Marke oder Typ suchen...",
       filters: "Filter",
@@ -61,6 +68,7 @@ export const de = {
       daysAtPrice: "{{count}} Tage",
       current: "aktuell",
       disclaimer: "Preise sind community-gemeldete Schätzungen. Bitte vor dem Besuch vor Ort prüfen.",
+      aboutLabel: "Über diesen Ort",
       confidence: {
         low: "Wenig Daten",
         medium: "Einige Meldungen",
@@ -179,6 +187,8 @@ export const de = {
         searchPlaceholder: "Nach Name, Stadtteil oder Marke suchen...",
         deleteBeer: "Löschen",
         confirmDelete: "{{brand}} wirklich löschen?",
+        deleteVenue: "Lokal löschen",
+        confirmDeleteVenue: "{{venue}} wirklich dauerhaft löschen? Das kann nicht rückgängig gemacht werden.",
         lastBeer: "Ein Lokal muss mindestens ein Bier haben",
         website: "Website",
         activeLabel: "Status",
@@ -200,6 +210,48 @@ export const de = {
         comingSoon: "Demnächst",
         errName: "Name, englischer Name und Ländercode sind erforderlich",
         errCoords: "Ungültige Koordinaten"
+      },
+      toast: {
+        approved: "✅ Genehmigt! Preis aktualisiert für {{venue}}.",
+        approvedGeneric: "✅ Genehmigt.",
+        markedClosed: "🔒 {{venue}} als dauerhaft geschlossen markiert.",
+        rejected: "❌ Abgelehnt. Aus der Warteschlange entfernt.",
+        venueSaved: "✅ Änderungen für {{venue}} gespeichert.",
+        venueAdded: "✅ {{venue}} zur Karte hinzugefügt.",
+        venueDeleted: "🗑️ {{venue}} dauerhaft gelöscht.",
+        beerDeleted: "🗑️ {{brand}} von {{venue}} entfernt.",
+        toggledInactive: "👁️ {{venue}} von der Karte ausgeblendet."
+      },
+      logs: {
+        tab: "Aktivitätsprotokoll",
+        total: "{{count}} Aktionen protokolliert",
+        allActions: "Alle Aktionen",
+        filterVenue: "Lokal suchen",
+        clearFilters: "Filter zurücksetzen",
+        exportCsv: "📥 CSV exportieren",
+        columnTime: "Zeitpunkt",
+        columnAction: "Aktion",
+        columnVenue: "Lokal",
+        columnDetails: "Details",
+        columnBy: "Ausgeführt von",
+        prev: "← Zurück",
+        next: "Weiter →",
+        pageInfo: "Seite {{page}} von {{total}}",
+        noLogs: "Keine Einträge gefunden",
+        noReason: "Kein Grund angegeben",
+        permanentlyClosed: "Dauerhaft geschlossen",
+        active: "Aktiv",
+        actions: {
+          APPROVE: "Genehmigt",
+          REJECT: "Abgelehnt",
+          EDIT_VENUE: "Lokal bearbeitet",
+          ADD_VENUE: "Lokal hinzugefügt",
+          DELETE_VENUE: "Lokal gelöscht",
+          ADD_BEER: "Bier hinzugefügt",
+          DELETE_BEER: "Bier gelöscht",
+          TOGGLE_ACTIVE: "Sichtbarkeit geändert",
+          MARK_CLOSED: "Als geschlossen markiert"
+        }
       }
     },
     priceHistory: "Preisentwicklung",
@@ -228,6 +280,13 @@ export const en = {
     citySelector: {
       comingSoon: "Coming soon",
       comingSoonTooltip: "Coming soon! Help us expand to {{city}}."
+    },
+    toast: {
+      priceReportSuccess: "🍺 Thanks! We'll review your report within 48 hours.",
+      closedSuccess: "Thanks! We'll verify and update the listing.",
+      wrongInfoSuccess: "Got it! Our team will review shortly.",
+      missingVenueSuccess: "🍺 Thanks! Your suggestion is in our queue.",
+      genericError: "Something went wrong. Please try again."
     },
     search: {
       placeholder: "Search venue, area, street, brand or type...",
@@ -281,6 +340,7 @@ export const en = {
       daysAtPrice: "{{count}} days",
       current: "current",
       disclaimer: "Prices are community-reported estimates. Please verify prices on site before visiting.",
+      aboutLabel: "About this place",
       confidence: {
         low: "Few reports",
         medium: "Some reports",
@@ -399,6 +459,8 @@ export const en = {
         searchPlaceholder: "Search by name, neighbourhood or brand...",
         deleteBeer: "Delete",
         confirmDelete: "Really delete {{brand}}?",
+        deleteVenue: "Delete venue",
+        confirmDeleteVenue: "Really permanently delete {{venue}}? This cannot be undone.",
         lastBeer: "A venue must keep at least one beer",
         website: "Website",
         activeLabel: "Status",
@@ -420,6 +482,48 @@ export const en = {
         comingSoon: "Coming soon",
         errName: "Name, English name and country code are required",
         errCoords: "Invalid coordinates"
+      },
+      toast: {
+        approved: "✅ Approved! Price updated for {{venue}}.",
+        approvedGeneric: "✅ Approved.",
+        markedClosed: "🔒 {{venue}} marked as permanently closed.",
+        rejected: "❌ Rejected. Removed from queue.",
+        venueSaved: "✅ Changes saved for {{venue}}.",
+        venueAdded: "✅ {{venue}} added to the map.",
+        venueDeleted: "🗑️ {{venue}} permanently deleted.",
+        beerDeleted: "🗑️ {{brand}} removed from {{venue}}.",
+        toggledInactive: "👁️ {{venue}} hidden from map."
+      },
+      logs: {
+        tab: "Activity Log",
+        total: "{{count}} actions logged",
+        allActions: "All actions",
+        filterVenue: "Search venue",
+        clearFilters: "Clear filters",
+        exportCsv: "📥 Export CSV",
+        columnTime: "Timestamp",
+        columnAction: "Action",
+        columnVenue: "Venue",
+        columnDetails: "Details",
+        columnBy: "Performed by",
+        prev: "← Prev",
+        next: "Next →",
+        pageInfo: "Page {{page}} of {{total}}",
+        noLogs: "No entries found",
+        noReason: "No reason given",
+        permanentlyClosed: "Permanently closed",
+        active: "Active",
+        actions: {
+          APPROVE: "Approved",
+          REJECT: "Rejected",
+          EDIT_VENUE: "Venue edited",
+          ADD_VENUE: "Venue added",
+          DELETE_VENUE: "Venue deleted",
+          ADD_BEER: "Beer added",
+          DELETE_BEER: "Beer deleted",
+          TOGGLE_ACTIVE: "Visibility toggled",
+          MARK_CLOSED: "Marked closed"
+        }
       }
     },
     priceHistory: "Price history",

@@ -5,6 +5,7 @@
 const fs = require('fs');
 const path = require('path');
 const Database = require('better-sqlite3');
+const { generateDescription } = require('./descriptions');
 
 const DEFAULT_PATH = path.join(__dirname, 'bierpreis.db');
 const DB_PATH = process.env.DATABASE_PATH
@@ -53,6 +54,34 @@ function migrate() {
         (4, 'Wien',    'Vienna',  'AT', 48.2082, 16.3738, 12, 0, 1)
     `);
   }
+  backfillDescriptions();
+}
+
+// Fills in description_de/description_en for any venue missing either one —
+// every existing non-empty description is left exactly as-is. Runs on every
+// boot but is a no-op once nothing needs it (the WHERE clause matches zero
+// rows), so it's cheap to leave in the regular migration path.
+function backfillDescriptions() {
+  const rows = db.prepare(`
+    SELECT id, name, type, neighbourhood_id, address, description_de, description_en
+      FROM venues
+     WHERE description_de IS NULL OR TRIM(description_de) = ''
+        OR description_en IS NULL OR TRIM(description_en) = ''
+  `).all();
+  if (rows.length === 0) return;
+
+  const updateDesc = db.prepare(
+    'UPDATE venues SET description_de = @description_de, description_en = @description_en WHERE id = @id'
+  );
+  const txn = db.transaction((list) => {
+    for (const v of list) {
+      const description_de = v.description_de && v.description_de.trim() ? v.description_de : generateDescription(v, 'de');
+      const description_en = v.description_en && v.description_en.trim() ? v.description_en : generateDescription(v, 'en');
+      updateDesc.run({ id: v.id, description_de, description_en });
+    }
+  });
+  txn(rows);
+  console.log(`📝 Generated description(s) for ${rows.length} venue(s) that were missing one.`);
 }
 
 // Ensure tables exist before any prepared statement below is compiled.
@@ -222,6 +251,88 @@ function updateCity(id, fields) {
     coming_soon: fields.coming_soon ? 1 : 0,
   });
   return true;
+}
+
+// ─── Admin activity log ─────────────────────────────────────────────────────
+
+const insertAdminLog = db.prepare(`
+  INSERT INTO admin_logs (action_type, venue_id, venue_name, details, performed_by, created_at)
+  VALUES (@action_type, @venue_id, @venue_name, @details, @performed_by, @created_at)
+`);
+
+// One row per mutating admin action. `details` is whatever small JSON-able
+// object is relevant to that action_type (see the ACTION_TYPE comment list in
+// server.js) — stored as a JSON string, parsed back out in hydrateLog.
+function logAdminAction(actionType, { venueId = null, venueName = null, details = null, performedBy = 'admin' } = {}) {
+  insertAdminLog.run({
+    action_type: actionType,
+    venue_id: venueId,
+    venue_name: venueName,
+    details: details != null ? JSON.stringify(details) : null,
+    performed_by: performedBy,
+    created_at: new Date().toISOString(),
+  });
+}
+
+function hydrateLog(row) {
+  let details = row.details;
+  if (details) {
+    try { details = JSON.parse(details); } catch { /* leave as raw string */ }
+  }
+  return {
+    id: row.id,
+    action_type: row.action_type,
+    venue_id: row.venue_id,
+    venue_name: row.venue_name,
+    details,
+    performed_by: row.performed_by,
+    created_at: row.created_at,
+  };
+}
+
+// A bare "2026-09-13" `to` filter should include the whole day — as a raw
+// string bound against an ISO timestamp column, "2026-09-13" sorts BEFORE
+// "2026-09-13T10:23...", which would silently exclude every same-day entry.
+function normalizeToDate(to) {
+  return to && /^\d{4}-\d{2}-\d{2}$/.test(to) ? `${to}T23:59:59.999Z` : to;
+}
+
+function logFilterClause({ action_type, venue, from, to } = {}) {
+  const clauses = [];
+  const params = {};
+  if (action_type) { clauses.push('action_type = @action_type'); params.action_type = action_type; }
+  if (venue) { clauses.push('venue_name LIKE @venue'); params.venue = `%${venue}%`; }
+  if (from) { clauses.push('created_at >= @from'); params.from = from; }
+  const toNorm = normalizeToDate(to);
+  if (toNorm) { clauses.push('created_at <= @to'); params.to = toNorm; }
+  return { where: clauses.length ? `WHERE ${clauses.join(' AND ')}` : '', params };
+}
+
+// Paginated + filterable — powers the Activity Log tab's table.
+function getAdminLogs(filters = {}) {
+  const page = Math.max(1, parseInt(filters.page, 10) || 1);
+  const pageSize = 50;
+  const { where, params } = logFilterClause(filters);
+  const total = db.prepare(`SELECT COUNT(*) AS n FROM admin_logs ${where}`).get(params).n;
+  const offset = (page - 1) * pageSize;
+  const rows = db.prepare(
+    `SELECT * FROM admin_logs ${where} ORDER BY datetime(created_at) DESC, id DESC LIMIT @limit OFFSET @offset`
+  ).all({ ...params, limit: pageSize, offset });
+  return {
+    logs: rows.map(hydrateLog),
+    total,
+    page,
+    pageSize,
+    totalPages: Math.max(1, Math.ceil(total / pageSize)),
+  };
+}
+
+// Same filters, no pagination — feeds the CSV export so it exports every
+// matching row, not just the page currently on screen.
+function getAdminLogsForExport(filters = {}) {
+  const { where, params } = logFilterClause(filters);
+  return db.prepare(`SELECT * FROM admin_logs ${where} ORDER BY datetime(created_at) DESC, id DESC`)
+    .all(params).map(hydrateLog);
 }
 
 // City-wide stats for the public stats bar.
@@ -429,6 +540,13 @@ const createVenue = db.transaction((venue, beersInput) => {
   const id = uniqueVenueId(venue.name);
   const today = new Date().toISOString().slice(0, 10);
 
+  // A venue created without a description (admin form left blank, or a
+  // user-submitted new-venue proposal, which never asks for one) still gets
+  // one — same generator the startup backfill uses for pre-existing venues.
+  const descSeed = { id, name: venue.name, type: venue.type, neighbourhood_id: venue.neighbourhood_id, address: venue.address };
+  const description_de = venue.description_de?.trim() || generateDescription(descSeed, 'de');
+  const description_en = venue.description_en?.trim() || generateDescription(descSeed, 'en');
+
   insertVenueStmt.run({
     id,
     name: venue.name,
@@ -439,8 +557,8 @@ const createVenue = db.transaction((venue, beersInput) => {
     lng: venue.lng ?? null,
     opening_hours: venue.opening_hours || null,
     website: venue.website || null,
-    description_de: venue.description_de || null,
-    description_en: venue.description_en || null,
+    description_de,
+    description_en,
   });
 
   for (const b of beersInput) {
@@ -473,6 +591,35 @@ function updateBeerPrice(venue_id, beer_id, { size_05, size_mass }) {
   const today = new Date().toISOString().slice(0, 10);
   updateBeerPriceStmt.run({ beer_id, venue_id, size_05, size_mass: size_mass ?? null, updated: today });
   return true;
+}
+
+// Raw active-flag flip, independent of the full-edit form — used when
+// approving a "closed" report auto-deactivates the venue (MARK_CLOSED).
+const setVenueActiveStmt = db.prepare('UPDATE venues SET active = @active WHERE id = @id');
+function setVenueActive(id, active) {
+  if (!venueExistsStmt.get(id)) return null;
+  setVenueActiveStmt.run({ id, active: active ? 1 : 0 });
+  return getVenueAdmin(id);
+}
+
+// Hard delete. Beers cascade via their FK (ON DELETE CASCADE); a submission
+// that references this venue is detached (venue_id -> NULL) rather than
+// deleted, so its approved price-history entry isn't wiped along with it —
+// and so the FK on submissions.venue_id (no cascade) doesn't reject the delete.
+const deleteVenueStmt = db.prepare('DELETE FROM venues WHERE id = ?');
+const detachSubmissionsStmt = db.prepare('UPDATE submissions SET venue_id = NULL WHERE venue_id = ?');
+const deleteVenueTxn = db.transaction((id) => {
+  detachSubmissionsStmt.run(id);
+  deleteVenueStmt.run(id);
+});
+
+// Returns the venue as it was just before deletion (for logging/notifying),
+// or null if it didn't exist.
+function deleteVenue(id) {
+  const venue = getVenueAdmin(id);
+  if (!venue) return null;
+  deleteVenueTxn(id);
+  return venue;
 }
 
 const deleteBeerStmt = db.prepare('DELETE FROM beers WHERE id = ? AND venue_id = ?');
@@ -508,11 +655,16 @@ module.exports = {
   getCities,
   createCity,
   updateCity,
+  logAdminAction,
+  getAdminLogs,
+  getAdminLogsForExport,
   getStats,
   getTrends,
   hydrateVenue,
   createVenue,
   updateVenue,
+  setVenueActive,
+  deleteVenue,
   addBeerToVenue,
   updateBeerPrice,
   deleteBeer,

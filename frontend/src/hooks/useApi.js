@@ -117,6 +117,13 @@ export async function adminUpdateVenue(token, venueId, fields) {
   });
 }
 
+export async function adminDeleteVenue(token, venueId) {
+  return authedFetch(`${BASE}/admin/venues/${venueId}`, {
+    method: 'DELETE',
+    headers: { Authorization: `Bearer ${token}` }
+  });
+}
+
 export async function adminAddBeer(token, venueId, beer) {
   return authedFetch(`${BASE}/admin/venues/${venueId}/beers`, {
     method: 'POST',
@@ -161,6 +168,28 @@ export async function adminUpdateCity(token, cityId, fields) {
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
     body: JSON.stringify(fields)
   });
+}
+
+// Admin "📋 Activity Log" tab — paginated + filterable.
+export async function adminFetchLogs(token, params = {}) {
+  const qs = new URLSearchParams();
+  Object.entries(params).forEach(([k, v]) => { if (v) qs.set(k, v); });
+  return authedFetch(`${BASE}/admin/logs?${qs}`, {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+}
+
+// CSV export needs the auth header, so a plain <a href> can't fetch it —
+// return the blob and let the caller save it via an object URL.
+export async function adminExportLogsCsv(token, params = {}) {
+  const qs = new URLSearchParams();
+  Object.entries(params).forEach(([k, v]) => { if (v) qs.set(k, v); });
+  const r = await fetch(`${BASE}/admin/logs/export?${qs}`, {
+    cache: 'no-store',
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!r.ok) throw new Error('Export failed');
+  return r.blob();
 }
 
 // The unified "📢 Report" button on a venue — price_change, new_beer, closed,

@@ -2,7 +2,16 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { submitReport } from '../hooks/useApi';
 import { parsePrice } from '../utils/price';
+import { useToast } from '../hooks/useToast';
 import BrandCombobox from './BrandCombobox';
+
+// One success-toast message per report topic — keyed the same as `topic`.
+const SUCCESS_TOAST_KEY = {
+  price_change: 'toast.priceReportSuccess',
+  new_beer: 'toast.priceReportSuccess',
+  closed: 'toast.closedSuccess',
+  other_info: 'toast.wrongInfoSuccess',
+};
 
 const TOPICS = [
   { key: 'price_change', icon: '💶' },
@@ -18,6 +27,7 @@ const TOPICS = [
 // labelled by `report_type`.
 export default function ReportForm({ venueId, venueName, onSuccess, onCancel }) {
   const { t } = useTranslation();
+  const showToast = useToast();
   const [topic, setTopic] = useState(null);
   const [form, setForm] = useState({
     beer_brand: '', size: '0.5L', price: '',
@@ -41,9 +51,11 @@ export default function ReportForm({ venueId, venueName, onSuccess, onCancel }) 
         note: form.note,
         ...extra,
       });
+      showToast('success', t(SUCCESS_TOAST_KEY[topic] || 'toast.priceReportSuccess'));
       onSuccess();
     } catch (err) {
       setError(err.message || t('submission.error'));
+      showToast('error', t('toast.genericError'));
     }
     setLoading(false);
   };

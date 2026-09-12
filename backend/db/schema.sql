@@ -90,7 +90,22 @@ CREATE TABLE IF NOT EXISTS submissions (
   created_at    TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
+-- Every mutating admin action (approve/reject, venue/beer CRUD, active toggles,
+-- closures) gets one row here, `details` a free-form JSON blob per action_type.
+-- Powers the "📋 Activity Log" admin tab.
+CREATE TABLE IF NOT EXISTS admin_logs (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  action_type TEXT NOT NULL,
+  venue_id INTEGER,
+  venue_name TEXT,
+  details TEXT,
+  performed_by TEXT DEFAULT 'admin',
+  created_at TEXT DEFAULT CURRENT_TIMESTAMP
+);
+
 CREATE INDEX IF NOT EXISTS idx_venues_neighbourhood ON venues(neighbourhood_id);
 CREATE INDEX IF NOT EXISTS idx_beers_venue          ON beers(venue_id);
 CREATE INDEX IF NOT EXISTS idx_submissions_venue    ON submissions(venue_id);
 CREATE INDEX IF NOT EXISTS idx_submissions_status   ON submissions(status);
+CREATE INDEX IF NOT EXISTS idx_admin_logs_action    ON admin_logs(action_type);
+CREATE INDEX IF NOT EXISTS idx_admin_logs_created   ON admin_logs(created_at);

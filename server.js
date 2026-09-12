@@ -22,12 +22,25 @@ const {
   getTrends,
   createVenue,
   updateVenue,
+  setVenueActive,
+  deleteVenue,
   addBeerToVenue,
   updateBeerPrice,
   deleteBeer,
+  logAdminAction,
+  getAdminLogs,
+  getAdminLogsForExport,
   DB_PATH,
   statements: S,
 } = require('./backend/db/database');
+const {
+  notifyNewPriceReport,
+  notifyNewVenue,
+  notifyClosure,
+  notifyIncorrectInfo,
+  notifyApproved,
+  notifyStartup,
+} = require('./backend/notifications');
 
 const UPLOADS_DIR = path.join(__dirname, 'backend', 'uploads');
 fs.mkdirSync(UPLOADS_DIR, { recursive: true });
@@ -262,6 +275,36 @@ app.post('/api/submissions', (req, res) => {
     console.error('Failed to insert submission:', err);
     return res.status(500).json({ error: 'Could not save submission' });
   }
+
+  // Fire-and-forget — sendTelegramMessage already swallows its own errors, so
+  // this can never delay or fail the response.
+  const neighbourhoodName = venue.neighbourhood_name_de;
+  if (report_type === 'price_change' || report_type === 'new_beer') {
+    notifyNewPriceReport({
+      venueName: resolvedName,
+      neighbourhoodName,
+      price: numPrice,
+      size: submission.size,
+      brand: beer_brand,
+      submitterName: submission.submitter_name,
+      visitDate: submission.visit_date,
+      isOutlier,
+    });
+  } else if (report_type === 'closed') {
+    notifyClosure({
+      venueName: resolvedName,
+      neighbourhoodName,
+      submitterName: submission.submitter_name,
+      visitDate: submission.visit_date,
+    });
+  } else if (report_type === 'other_info') {
+    notifyIncorrectInfo({
+      venueName: resolvedName,
+      note: submission.note,
+      submitterName: submission.submitter_name,
+    });
+  }
+
   res.status(201).json({ message: 'Submitted successfully', id: submission.id, is_outlier: isOutlier });
 });
 
@@ -319,6 +362,16 @@ app.post('/api/submissions/new-venue', upload.single('photo'), (req, res) => {
     if (req.file) fs.unlink(req.file.path, () => {});
     return res.status(500).json({ error: 'Could not save submission' });
   }
+
+  const nHood = getNeighbourhoods().find((n) => n.id === neighbourhood_id);
+  notifyNewVenue({
+    name,
+    address: submission.address,
+    neighbourhoodName: nHood?.name_de || neighbourhood_id,
+    price: numPrice,
+    submitterName: submission.submitter_name,
+  });
+
   res.status(201).json({ message: 'Submitted successfully', id: submission.id });
 });
 
@@ -341,6 +394,10 @@ app.patch('/api/admin/submissions/:id', authMiddleware, (req, res) => {
 
   let createdVenueId = null;
   if (status === 'approved') {
+    // Captured for the APPROVE log entry below — null for a brand-new venue
+    // (nothing to compare against) or for closed/other_info (no price at all).
+    let oldPrice = null;
+
     if (sub.report_type === 'new_venue') {
       // Build the venue from the captured proposal and materialise it — it then
       // shows up on the map/lists on the next fetch, no other wiring needed.
@@ -363,6 +420,7 @@ app.patch('/api/admin/submissions/:id', authMiddleware, (req, res) => {
       const venue = getVenueAdmin(sub.venue_id);
       const existingBeer = venue?.beers.find((b) => b.brand === sub.beer_brand);
       if (existingBeer) {
+        oldPrice = sub.size === '1L' ? existingBeer.size_mass : existingBeer.size_05;
         S.updateHeadlinePrice.run({
           venue_id: sub.venue_id,
           brand: sub.beer_brand,
@@ -375,9 +433,35 @@ app.patch('/api/admin/submissions/:id', authMiddleware, (req, res) => {
         const size_mass = sub.size === '1L' ? sub.price : null;
         addBeerToVenue(sub.venue_id, { brand: sub.beer_brand, size_05, size_mass });
       }
+    } else if (sub.report_type === 'closed' && sub.venue_id) {
+      // No dedicated "closed" UI action exists — approving the report itself
+      // is the trigger: hide the venue from the public map and log it as its
+      // own action_type (distinct from a manual TOGGLE_ACTIVE) so the audit
+      // trail shows WHY it went inactive.
+      setVenueActive(sub.venue_id, false);
+      logAdminAction('MARK_CLOSED', {
+        venueId: sub.venue_id,
+        venueName: sub.venue_name,
+        details: { venue_name: sub.venue_name },
+      });
     }
-    // 'closed' and 'other_info' reports carry no automated DB action — the admin
-    // reads the note and acts on it manually (e.g. via Manage Venues).
+    // 'other_info' reports carry no automated DB action — the admin reads the
+    // note and acts on it manually (e.g. via Manage Venues).
+
+    logAdminAction('APPROVE', {
+      venueId: createdVenueId || sub.venue_id,
+      venueName: sub.venue_name,
+      details: { submission_id: sub.id, old_price: oldPrice, new_price: sub.price, brand: sub.beer_brand },
+    });
+    if (sub.price != null) {
+      notifyApproved({ venueName: sub.venue_name, price: sub.price });
+    }
+  } else if (status === 'rejected') {
+    logAdminAction('REJECT', {
+      venueId: sub.venue_id,
+      venueName: sub.venue_name,
+      details: { submission_id: sub.id, reason: reject_reason || null },
+    });
   }
 
   const updated = S.submissionById.get(sub.id);
@@ -418,6 +502,12 @@ app.post('/api/admin/venues', authMiddleware, (req, res) => {
         size_mass: b.size_mass ? parseFloat(b.size_mass) : null,
       })),
     );
+    const nHood = getNeighbourhoods().find((n) => n.id === neighbourhood_id);
+    logAdminAction('ADD_VENUE', {
+      venueId: id,
+      venueName: name,
+      details: { name, neighbourhood: nHood?.name_de || neighbourhood_id, type },
+    });
     res.status(201).json(getVenueAdmin(id));
   } catch (err) {
     console.error('Failed to create venue:', err);
@@ -461,16 +551,65 @@ app.patch('/api/admin/venues/:id', authMiddleware, (req, res) => {
     return res.status(400).json({ error: 'Invalid coordinates' });
   }
 
+  const nextActive = active !== false && active !== 0; // default to active unless explicitly turned off
   const ok = updateVenue(req.params.id, {
     name: name.trim(),
     type,
     neighbourhood_id,
     address, lat: numLat, lng: numLng,
     opening_hours, website, description_de, description_en,
-    active: active !== false && active !== 0, // default to active unless explicitly turned off
+    active: nextActive,
   });
   if (!ok) return res.status(404).json({ error: 'Venue not found' });
+
+  // Diff against the pre-edit snapshot fetched at the top of this handler —
+  // `active` gets its own action_type (TOGGLE_ACTIVE) distinct from the rest
+  // of the form (EDIT_VENUE), one log row per changed field so each reads as
+  // a clean "field: old → new" line in the Activity Log.
+  // '' and null both mean "empty" for these optional text fields — the edit
+  // form's inputs default an unset DB value to '', so comparing raw values
+  // would log a spurious "field: null -> ''" no-op on every single save.
+  const blankToNull = (v) => (v === '' || v === undefined ? null : v);
+  const FIELD_DIFFS = [
+    ['name', venue.name, name.trim()],
+    ['type', venue.type, type],
+    ['neighbourhood_id', venue.neighbourhood_id, neighbourhood_id],
+    ['address', venue.address, blankToNull(address)],
+    ['lat', venue.lat, numLat],
+    ['lng', venue.lng, numLng],
+    ['opening_hours', venue.opening_hours, blankToNull(opening_hours)],
+    ['website', venue.website, blankToNull(website)],
+    ['description_de', venue.description_de, blankToNull(description_de)],
+    ['description_en', venue.description_en, blankToNull(description_en)],
+  ];
+  for (const [field, old_value, new_value] of FIELD_DIFFS) {
+    if (old_value !== new_value) {
+      logAdminAction('EDIT_VENUE', { venueId: venue.id, venueName: name.trim(), details: { field, old_value, new_value } });
+    }
+  }
+  if (venue.active !== nextActive) {
+    logAdminAction('TOGGLE_ACTIVE', {
+      venueId: venue.id,
+      venueName: name.trim(),
+      details: { old_state: venue.active, new_state: nextActive },
+    });
+  }
+
   res.json(getVenueAdmin(req.params.id));
+});
+
+// Hard delete — the venue and its beers are gone for good (beers cascade via
+// their FK). Any historic submissions that pointed at it are detached
+// (venue_id -> NULL) rather than deleted, so approved price history survives.
+app.delete('/api/admin/venues/:id', authMiddleware, (req, res) => {
+  const deleted = deleteVenue(req.params.id);
+  if (!deleted) return res.status(404).json({ error: 'Venue not found' });
+  logAdminAction('DELETE_VENUE', {
+    venueId: deleted.id,
+    venueName: deleted.name,
+    details: { name: deleted.name, neighbourhood: deleted.neighbourhood_name_de },
+  });
+  res.json({ message: 'Deleted' });
 });
 
 // Add a new brand to an existing venue.
@@ -490,6 +629,11 @@ app.post('/api/admin/venues/:id/beers', authMiddleware, (req, res) => {
     brand,
     size_05: parseFloat(size_05),
     size_mass: size_mass ? parseFloat(size_mass) : null,
+  });
+  logAdminAction('ADD_BEER', {
+    venueId: venue.id,
+    venueName: venue.name,
+    details: { brand, price: parseFloat(size_05), size: '0.5L' },
   });
   res.status(201).json(getVenueAdmin(venue.id));
 });
@@ -511,9 +655,18 @@ app.patch('/api/admin/venues/:id/beers/:beerId', authMiddleware, (req, res) => {
 
 // Remove one beer from a venue outright — a venue must always keep at least one.
 app.delete('/api/admin/venues/:id/beers/:beerId', authMiddleware, (req, res) => {
+  const venueBefore = getVenueAdmin(req.params.id);
+  const beer = venueBefore?.beers.find((b) => b.id === Number(req.params.beerId));
   const result = deleteBeer(req.params.id, Number(req.params.beerId));
   if (result === 'not_found') return res.status(404).json({ error: 'Beer not found for this venue' });
   if (result === 'last_beer') return res.status(400).json({ error: 'A venue must keep at least one beer' });
+  if (beer) {
+    logAdminAction('DELETE_BEER', {
+      venueId: req.params.id,
+      venueName: venueBefore.name,
+      details: { brand: beer.brand },
+    });
+  }
   res.json(getVenueAdmin(req.params.id));
 });
 
@@ -575,6 +728,41 @@ app.patch('/api/admin/cities/:id', authMiddleware, (req, res) => {
   res.json(getCities().find((c) => c.id === id));
 });
 
+// ─── ADMIN ACTIVITY LOG ──────────────────────────────────────────────────────
+
+// One row per mutating admin action (see the ACTION_TYPE list next to each
+// logAdminAction() call above) — powers the "📋 Activity Log" admin tab.
+app.get('/api/admin/logs', authMiddleware, (req, res) => {
+  const { page, action_type, venue, from, to } = req.query;
+  res.json(getAdminLogs({ page, action_type, venue, from, to }));
+});
+
+// Same filters as the list above, no pagination — a plain CSV of every
+// matching row. The frontend fetches this with its auth header and saves the
+// response as a blob (a plain <a href> can't carry the Authorization header).
+function toCsvCell(v) {
+  const s = v == null ? '' : String(v);
+  return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+}
+function logsToCsv(rows) {
+  const header = ['id', 'timestamp', 'action_type', 'venue_name', 'details', 'performed_by'];
+  const lines = [header.join(',')];
+  for (const r of rows) {
+    lines.push([
+      r.id, r.created_at, r.action_type, r.venue_name,
+      r.details ? JSON.stringify(r.details) : '', r.performed_by,
+    ].map(toCsvCell).join(','));
+  }
+  return lines.join('\r\n');
+}
+app.get('/api/admin/logs/export', authMiddleware, (req, res) => {
+  const { action_type, venue, from, to } = req.query;
+  const rows = getAdminLogsForExport({ action_type, venue, from, to });
+  res.set('Content-Type', 'text/csv; charset=utf-8');
+  res.set('Content-Disposition', 'attachment; filename="bierpreis-admin-logs.csv"');
+  res.send(logsToCsv(rows));
+});
+
 app.get('/api/admin/stats', authMiddleware, (req, res) => {
   const byStatus = {};
   for (const row of S.countSubmissionsByStatus.all()) byStatus[row.status] = row.n;
@@ -610,4 +798,5 @@ if (process.env.NODE_ENV === 'production') {
 app.listen(PORT, () => {
   console.log(`🍺 Bierpreis API running on http://localhost:${PORT}`);
   console.log(`   DB: ${DB_PATH}`);
+  notifyStartup();
 });

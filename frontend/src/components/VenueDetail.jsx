@@ -225,11 +225,14 @@ export default function VenueDetail({ venue: initialVenue, onBack }) {
         </div>
       )}
 
-      {/* Description */}
+      {/* About this place — hidden entirely when neither language has one */}
       {(venue.description_de || venue.description_en) && (
-        <p className="vd-description">
-          {i18n.language === 'de' ? venue.description_de : venue.description_en}
-        </p>
+        <div className="vd-about">
+          <div className="vd-about-label">ℹ️ {t('venue.aboutLabel')}</div>
+          <p className="vd-description">
+            {(i18n.language === 'de' ? venue.description_de : venue.description_en) || venue.description_de || venue.description_en}
+          </p>
+        </div>
       )}
 
       {/* Info grid */}

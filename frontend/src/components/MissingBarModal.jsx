@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { searchNominatim, submitNewVenue } from '../hooks/useApi';
+import { useToast } from '../hooks/useToast';
 import MiniMapPreview from './MiniMapPreview';
 import BrandCombobox from './BrandCombobox';
 import { parsePrice, formatEuro, pricePlaceholder } from '../utils/price';
@@ -25,6 +26,7 @@ function emptyForm() {
 
 export default function MissingBarModal({ allVenues, onClose, onCreated }) {
   const { t, i18n } = useTranslation();
+  const showToast = useToast();
   const de = i18n.language === 'de';
   const [step, setStep] = useState(1);
   const [query, setQuery] = useState('');
@@ -113,9 +115,11 @@ export default function MissingBarModal({ allVenues, onClose, onCreated }) {
     try {
       await submitNewVenue(fd);
       setSuccess(true);
+      showToast('success', t('toast.missingVenueSuccess'));
       onCreated?.();
     } catch (err) {
       setSubmitError(err.message);
+      showToast('error', t('toast.genericError'));
     }
     setSubmitting(false);
   };

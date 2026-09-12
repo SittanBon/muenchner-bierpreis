@@ -2,9 +2,10 @@ import { useState, useEffect, useCallback, useMemo, Fragment } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   fetchNeighbourhoods, adminFetchVenues, adminCreateVenue, adminUpdateVenue,
-  adminAddBeer, adminUpdateBeerPrice, adminDeleteBeer,
+  adminDeleteVenue, adminAddBeer, adminUpdateBeerPrice, adminDeleteBeer,
 } from '../hooks/useApi';
 import { parsePrice, formatEuro, pricePlaceholder } from '../utils/price';
+import { useToast } from '../hooks/useToast';
 import BrandCombobox from './BrandCombobox';
 
 const TYPES = ['beer_garden', 'beer_hall', 'bar', 'restaurant'];
@@ -29,6 +30,7 @@ function detailsFromVenue(venue) {
 
 function AddVenueForm({ token, neighbourhoods, onCreated, onCancel }) {
   const { t, i18n } = useTranslation();
+  const showToast = useToast();
   const [form, setForm] = useState({
     name: '', type: 'restaurant', neighbourhood_id: neighbourhoods[0]?.id || '',
     address: '', lat: '', lng: '', opening_hours: '', website: '',
@@ -64,6 +66,7 @@ function AddVenueForm({ token, neighbourhoods, onCreated, onCancel }) {
         lng: form.lng ? parseFloat(form.lng) : null,
         beers: cleanBeers,
       });
+      showToast('success', t('admin.toast.venueAdded', { venue: form.name }));
       onCreated();
     } catch (err) {
       setError(err.message);
@@ -156,6 +159,7 @@ function AddVenueForm({ token, neighbourhoods, onCreated, onCancel }) {
 // typo doesn't accidentally touch anything else.
 function VenueDetailsForm({ token, venue, neighbourhoods, onUpdated }) {
   const { t } = useTranslation();
+  const showToast = useToast();
   const [details, setDetails] = useState(() => detailsFromVenue(venue));
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -188,6 +192,12 @@ function VenueDetailsForm({ token, venue, neighbourhoods, onUpdated }) {
       });
       onUpdated(updated);
       setDirty(false);
+      // The active toggle gets its own warning — everything else is a plain save.
+      if (venue.active !== false && details.active === false) {
+        showToast('warning', t('admin.toast.toggledInactive', { venue: details.name.trim() }));
+      } else {
+        showToast('success', t('admin.toast.venueSaved', { venue: details.name.trim() }));
+      }
     } catch (err) {
       setError(err.message);
     }
@@ -264,14 +274,16 @@ function VenueDetailsForm({ token, venue, neighbourhoods, onUpdated }) {
   );
 }
 
-function EditVenueForm({ token, venue, neighbourhoods, onUpdated, onCancel }) {
+function EditVenueForm({ token, venue, neighbourhoods, onUpdated, onDeleted, onCancel }) {
   const { t, i18n } = useTranslation();
+  const showToast = useToast();
   const [prices, setPrices] = useState(() => Object.fromEntries(venue.beers.map((b) => [b.id, String(b.size_05)])));
   const [savingId, setSavingId] = useState(null);
   const [deletingId, setDeletingId] = useState(null);
   const [error, setError] = useState('');
   const [newBeer, setNewBeer] = useState(emptyBeer());
   const [addingBeer, setAddingBeer] = useState(false);
+  const [deletingVenue, setDeletingVenue] = useState(false);
 
   // Prices are keyed by beer id, so a fresh venue prop (after any edit) just
   // adds/keeps entries — no need to reset the whole map each time.
@@ -306,10 +318,25 @@ function EditVenueForm({ token, venue, neighbourhoods, onUpdated, onCancel }) {
     try {
       const updated = await adminDeleteBeer(token, venue.id, beer.id);
       onUpdated(updated);
+      showToast('warning', t('admin.toast.beerDeleted', { brand: beer.brand, venue: venue.name }));
     } catch (err) {
       setError(err.message);
     }
     setDeletingId(null);
+  };
+
+  const deleteVenue = async () => {
+    if (!window.confirm(t('admin.venues.confirmDeleteVenue', { venue: venue.name }))) return;
+    setError('');
+    setDeletingVenue(true);
+    try {
+      await adminDeleteVenue(token, venue.id);
+      showToast('warning', t('admin.toast.venueDeleted', { venue: venue.name }));
+      onDeleted(venue.id);
+    } catch (err) {
+      setError(err.message);
+      setDeletingVenue(false);
+    }
   };
 
   const addNewBeer = async () => {
@@ -390,20 +417,26 @@ function EditVenueForm({ token, venue, neighbourhoods, onUpdated, onCancel }) {
       {error && <div className="sf-error">{error}</div>}
 
       <div className="sf-actions">
+        <button className="vm-delete-venue" onClick={deleteVenue} disabled={deletingVenue}>
+          {deletingVenue ? '...' : `🗑 ${t('admin.venues.deleteVenue')}`}
+        </button>
         <button className="sf-cancel" onClick={onCancel}>{t('admin.venues.close')}</button>
       </div>
     </div>
   );
 }
 
-export default function VenueManager({ token }) {
+export default function VenueManager({ token, initialQuery = '' }) {
   const { t, i18n } = useTranslation();
   const [venues, setVenues] = useState([]);
   const [neighbourhoods, setNeighbourhoods] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showAdd, setShowAdd] = useState(false);
   const [editingVenueId, setEditingVenueId] = useState(null);
-  const [query, setQuery] = useState('');
+  // Seeded from the Activity Log's "jump to this venue" link — VenueManager is
+  // only ever mounted while section==='venues', so a fresh initialQuery always
+  // reaches a fresh instance of this state.
+  const [query, setQuery] = useState(initialQuery);
 
   const load = useCallback(() => {
     setLoading(true);
@@ -417,6 +450,10 @@ export default function VenueManager({ token }) {
   const handleCreated = () => { setShowAdd(false); load(); };
   const handleUpdated = (updatedVenue) => {
     setVenues((vs) => vs.map((v) => (v.id === updatedVenue.id ? updatedVenue : v)));
+  };
+  const handleDeleted = (venueId) => {
+    setVenues((vs) => vs.filter((v) => v.id !== venueId));
+    setEditingVenueId((id) => (id === venueId ? null : id));
   };
 
   // Real-time filter by name, neighbourhood (id or either-language name) or brand.
@@ -503,6 +540,7 @@ export default function VenueManager({ token }) {
                           venue={editingVenue}
                           neighbourhoods={neighbourhoods}
                           onUpdated={handleUpdated}
+                          onDeleted={handleDeleted}
                           onCancel={() => setEditingVenueId(null)}
                         />
                       </td>

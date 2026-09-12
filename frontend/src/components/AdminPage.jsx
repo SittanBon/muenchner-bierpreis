@@ -3,8 +3,10 @@ import { useTranslation } from 'react-i18next';
 import { adminLogin, adminFetchSubmissions, adminUpdateSubmission, adminFetchStats } from '../hooks/useApi';
 import VenueManager from './VenueManager';
 import CityManager from './CityManager';
+import ActivityLog from './ActivityLog';
 import MiniMapPreview from './MiniMapPreview';
 import { formatEuro } from '../utils/price';
+import { useToast } from '../hooks/useToast';
 
 const REPORT_TYPE_META = {
   new_venue: { icon: '🆕', label: 'New Venue' },
@@ -16,6 +18,7 @@ const REPORT_TYPE_META = {
 
 export default function AdminPage({ onBack }) {
   const { t, i18n } = useTranslation();
+  const showToast = useToast();
   const [token, setToken] = useState(localStorage.getItem('bp_admin_token') || '');
   const [creds, setCreds] = useState({ username: '', password: '' });
   const [loginError, setLoginError] = useState('');
@@ -23,7 +26,9 @@ export default function AdminPage({ onBack }) {
   const [stats, setStats] = useState(null);
   const [filter, setFilter] = useState('pending');
   const [loading, setLoading] = useState(false);
-  const [section, setSection] = useState('submissions'); // 'submissions' | 'venues' | 'cities'
+  const [section, setSection] = useState('submissions'); // 'submissions' | 'venues' | 'cities' | 'logs'
+  const [venuesQuery, setVenuesQuery] = useState(''); // seeded by "jump to venue" from the Activity Log
+  const openVenueInManager = (name) => { setVenuesQuery(name || ''); setSection('venues'); };
 
   const handleLogin = async () => {
     const res = await adminLogin(creds.username, creds.password);
@@ -55,6 +60,9 @@ export default function AdminPage({ onBack }) {
   }, [token, filter]);
 
   const handleAction = async (id, status, reject_reason) => {
+    // Captured before the row disappears from `submissions` below — the toast
+    // needs the venue name and report_type of the row that was just actioned.
+    const sub = submissions.find((s) => s.id === id);
     try {
       await adminUpdateSubmission(token, id, status, reject_reason);
     } catch {
@@ -69,6 +77,19 @@ export default function AdminPage({ onBack }) {
       pending: st.pending - 1,
       [status]: (st[status] || 0) + 1
     } : st);
+
+    const venueName = sub?.venue_name || '';
+    if (status === 'approved') {
+      if (sub?.report_type === 'closed') {
+        showToast('warning', t('admin.toast.markedClosed', { venue: venueName }));
+      } else if (sub?.report_type === 'other_info') {
+        showToast('success', t('admin.toast.approvedGeneric'));
+      } else {
+        showToast('success', t('admin.toast.approved', { venue: venueName }));
+      }
+    } else if (status === 'rejected') {
+      showToast('warning', t('admin.toast.rejected'));
+    }
   };
 
   const handleReject = (id) => {
@@ -129,12 +150,17 @@ export default function AdminPage({ onBack }) {
         <button className={`admin-section-tab ${section === 'cities' ? 'active' : ''}`} onClick={() => setSection('cities')}>
           🌍 {t('admin.cities.tab')}
         </button>
+        <button className={`admin-section-tab ${section === 'logs' ? 'active' : ''}`} onClick={() => setSection('logs')}>
+          📋 {t('admin.logs.tab')}
+        </button>
       </div>
 
       {section === 'venues' ? (
-        <VenueManager token={token} />
+        <VenueManager token={token} initialQuery={venuesQuery} />
       ) : section === 'cities' ? (
         <CityManager token={token} />
+      ) : section === 'logs' ? (
+        <ActivityLog token={token} onSelectVenue={openVenueInManager} />
       ) : (
         <>
           {/* Filter tabs */}
