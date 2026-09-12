@@ -1,7 +1,7 @@
 {
   "name": "bierpreis",
   "version": "3.0.0",
-  "description": "MünchnerBierpreis — Helles beer prices across Munich's neighbourhoods (v3, SQLite)",
+  "description": "Bierpreis — Helles beer prices across Munich's neighbourhoods (v3, SQLite)",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",

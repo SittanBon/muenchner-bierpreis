@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { adminLogin, adminFetchSubmissions, adminUpdateSubmission, adminFetchStats } from '../hooks/useApi';
 import VenueManager from './VenueManager';
+import CityManager from './CityManager';
 import MiniMapPreview from './MiniMapPreview';
 import { formatEuro } from '../utils/price';
 
@@ -22,7 +23,7 @@ export default function AdminPage({ onBack }) {
   const [stats, setStats] = useState(null);
   const [filter, setFilter] = useState('pending');
   const [loading, setLoading] = useState(false);
-  const [section, setSection] = useState('submissions'); // 'submissions' | 'venues'
+  const [section, setSection] = useState('submissions'); // 'submissions' | 'venues' | 'cities'
 
   const handleLogin = async () => {
     const res = await adminLogin(creds.username, creds.password);
@@ -125,10 +126,15 @@ export default function AdminPage({ onBack }) {
         <button className={`admin-section-tab ${section === 'venues' ? 'active' : ''}`} onClick={() => setSection('venues')}>
           🍺 {t('admin.venues.tab')}
         </button>
+        <button className={`admin-section-tab ${section === 'cities' ? 'active' : ''}`} onClick={() => setSection('cities')}>
+          🌍 {t('admin.cities.tab')}
+        </button>
       </div>
 
       {section === 'venues' ? (
         <VenueManager token={token} />
+      ) : section === 'cities' ? (
+        <CityManager token={token} />
       ) : (
         <>
           {/* Filter tabs */}

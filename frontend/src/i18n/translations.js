@@ -5,6 +5,10 @@ export const de = {
       subtitle: "Faires Bier für Alle",
       language: "EN"
     },
+    citySelector: {
+      comingSoon: "Demnächst",
+      comingSoonTooltip: "Demnächst! Hilf uns, nach {{city}} zu expandieren."
+    },
     search: {
       placeholder: "Lokal, Viertel, Straße, Marke oder Typ suchen...",
       filters: "Filter",
@@ -183,6 +187,19 @@ export const de = {
         discard: "Verwerfen",
         descDe: "Beschreibung (Deutsch)",
         descEn: "Beschreibung (Englisch)"
+      },
+      cities: {
+        tab: "Städte",
+        total: "{{count}} Städte",
+        addTitle: "Stadt hinzufügen",
+        editTitle: "Stadt bearbeiten",
+        name: "Name",
+        nameEn: "Name (Englisch)",
+        countryCode: "Ländercode",
+        zoomLevel: "Zoomstufe",
+        comingSoon: "Demnächst",
+        errName: "Name, englischer Name und Ländercode sind erforderlich",
+        errCoords: "Ungültige Koordinaten"
       }
     },
     priceHistory: "Preisentwicklung",
@@ -207,6 +224,10 @@ export const en = {
       title: "Bierpreis",
       subtitle: "Fair Beer for Everyone",
       language: "DE"
+    },
+    citySelector: {
+      comingSoon: "Coming soon",
+      comingSoonTooltip: "Coming soon! Help us expand to {{city}}."
     },
     search: {
       placeholder: "Search venue, area, street, brand or type...",
@@ -386,6 +407,19 @@ export const en = {
         discard: "Discard",
         descDe: "Description (German)",
         descEn: "Description (English)"
+      },
+      cities: {
+        tab: "Cities",
+        total: "{{count}} cities",
+        addTitle: "Add city",
+        editTitle: "Edit city",
+        name: "Name",
+        nameEn: "Name (English)",
+        countryCode: "Country code",
+        zoomLevel: "Zoom level",
+        comingSoon: "Coming soon",
+        errName: "Name, English name and country code are required",
+        errCoords: "Invalid coordinates"
       }
     },
     priceHistory: "Price history",

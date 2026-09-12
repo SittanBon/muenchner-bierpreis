@@ -1,4 +1,4 @@
-// SQLite data layer for MünchnerBierpreis v3.
+// SQLite data layer for Bierpreis v3.
 // Opens a single better-sqlite3 connection, applies the schema, and exposes
 // query helpers that return the exact JSON shapes the frontend expects.
 
@@ -34,6 +34,24 @@ function migrate() {
   const venueCols = db.prepare('PRAGMA table_info(venues)').all().map((c) => c.name);
   if (!venueCols.includes('active')) {
     db.exec('ALTER TABLE venues ADD COLUMN active INTEGER NOT NULL DEFAULT 1');
+  }
+  // city_id scopes a neighbourhood to one of the `cities` rows. DEFAULT 1
+  // backfills every pre-existing neighbourhood to Munich in the same statement.
+  const neighbourhoodCols = db.prepare('PRAGMA table_info(neighbourhoods)').all().map((c) => c.name);
+  if (!neighbourhoodCols.includes('city_id')) {
+    db.exec('ALTER TABLE neighbourhoods ADD COLUMN city_id INTEGER DEFAULT 1');
+  }
+  // One-time seed of the cities table itself (schema.sql only creates the table,
+  // it doesn't populate it) — guarded so a re-run never duplicates rows.
+  const cityCount = db.prepare('SELECT COUNT(*) AS n FROM cities').get().n;
+  if (cityCount === 0) {
+    db.exec(`
+      INSERT INTO cities (id, name, name_en, country_code, lat, lng, zoom_level, is_active, coming_soon) VALUES
+        (1, 'München', 'Munich',  'DE', 48.1374, 11.5755, 13, 1, 0),
+        (2, 'Berlin',  'Berlin',  'DE', 52.5200, 13.4050, 12, 0, 1),
+        (3, 'Hamburg', 'Hamburg', 'DE', 53.5511, 9.9937,  12, 0, 1),
+        (4, 'Wien',    'Vienna',  'AT', 48.2082, 16.3738, 12, 0, 1)
+    `);
   }
 }
 
@@ -130,6 +148,80 @@ function getNeighbourhoods() {
       venue_count: prices.length,
     };
   });
+}
+
+// ─── Cities ──────────────────────────────────────────────────────────────────
+
+const citiesStmt = db.prepare('SELECT * FROM cities ORDER BY id');
+// Only meaningful for a live (is_active) city — a coming-soon city has no
+// neighbourhoods/venues assigned to it yet, so it always reports 0.
+const cityVenueCountStmt = db.prepare(`
+  SELECT COUNT(*) AS n FROM venues v
+    JOIN neighbourhoods nb ON nb.id = v.neighbourhood_id
+   WHERE nb.city_id = ? AND v.active = 1
+`);
+
+function hydrateCity(row) {
+  return {
+    id: row.id,
+    name: row.name,
+    name_en: row.name_en,
+    country_code: row.country_code,
+    lat: row.lat,
+    lng: row.lng,
+    zoom_level: row.zoom_level,
+    is_active: row.is_active === 1,
+    coming_soon: row.coming_soon === 1,
+    venue_count: row.is_active === 1 ? cityVenueCountStmt.get(row.id).n : 0,
+  };
+}
+
+function getCities() {
+  return citiesStmt.all().map(hydrateCity);
+}
+
+const insertCityStmt = db.prepare(`
+  INSERT INTO cities (name, name_en, country_code, lat, lng, zoom_level, is_active, coming_soon)
+  VALUES (@name, @name_en, @country_code, @lat, @lng, @zoom_level, @is_active, @coming_soon)
+`);
+const updateCityStmt = db.prepare(`
+  UPDATE cities SET
+    name = @name, name_en = @name_en, country_code = @country_code,
+    lat = @lat, lng = @lng, zoom_level = @zoom_level,
+    is_active = @is_active, coming_soon = @coming_soon
+  WHERE id = @id
+`);
+const cityExistsStmt = db.prepare('SELECT 1 FROM cities WHERE id = ?');
+
+function createCity(fields) {
+  const info = insertCityStmt.run({
+    name: fields.name,
+    name_en: fields.name_en,
+    country_code: fields.country_code,
+    lat: fields.lat,
+    lng: fields.lng,
+    zoom_level: fields.zoom_level ?? 13,
+    is_active: fields.is_active ? 1 : 0,
+    coming_soon: fields.coming_soon ? 1 : 0,
+  });
+  return info.lastInsertRowid;
+}
+
+// Returns false if the city doesn't exist.
+function updateCity(id, fields) {
+  if (!cityExistsStmt.get(id)) return false;
+  updateCityStmt.run({
+    id,
+    name: fields.name,
+    name_en: fields.name_en,
+    country_code: fields.country_code,
+    lat: fields.lat,
+    lng: fields.lng,
+    zoom_level: fields.zoom_level ?? 13,
+    is_active: fields.is_active ? 1 : 0,
+    coming_soon: fields.coming_soon ? 1 : 0,
+  });
+  return true;
 }
 
 // City-wide stats for the public stats bar.
@@ -413,6 +505,9 @@ module.exports = {
   getVenuesAdmin,
   getVenueAdmin,
   getNeighbourhoods,
+  getCities,
+  createCity,
+  updateCity,
   getStats,
   getTrends,
   hydrateVenue,

@@ -25,6 +25,10 @@ export async function fetchNeighbourhoods() {
   return GET(`${BASE}/neighbourhoods`);
 }
 
+export async function fetchCities() {
+  return GET(`${BASE}/cities`);
+}
+
 export async function fetchStats() {
   return GET(`${BASE}/stats`);
 }
@@ -133,6 +137,29 @@ export async function adminDeleteBeer(token, venueId, beerId) {
   return authedFetch(`${BASE}/admin/venues/${venueId}/beers/${beerId}`, {
     method: 'DELETE',
     headers: { Authorization: `Bearer ${token}` }
+  });
+}
+
+// Admin "🌍 Cities" tab — list includes inactive/coming-soon rows too.
+export async function adminFetchCities(token) {
+  return authedFetch(`${BASE}/admin/cities`, {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+}
+
+export async function adminCreateCity(token, city) {
+  return authedFetch(`${BASE}/admin/cities`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify(city)
+  });
+}
+
+export async function adminUpdateCity(token, cityId, fields) {
+  return authedFetch(`${BASE}/admin/cities/${cityId}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify(fields)
   });
 }
 

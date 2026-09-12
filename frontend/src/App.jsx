@@ -8,6 +8,7 @@ import SearchBar from './components/SearchBar';
 import MissingBarModal from './components/MissingBarModal';
 import AdminPage from './components/AdminPage';
 import StatsBar from './components/StatsBar';
+import CitySelector from './components/CitySelector';
 import PriceTrends from './components/PriceTrends';
 import FreshnessLight from './components/FreshnessLight';
 import { fetchNeighbourhoods, fetchVenues, fetchStats } from './hooks/useApi';
@@ -164,12 +165,15 @@ export default function App() {
   return (
     <div className="app">
       <nav className="navbar">
-        <div className="nav-brand" onClick={() => { setView('map'); selectNeighbourhood(null); setMobileMenuOpen(false); }}>
-          <span className="nav-logo">🍺</span>
-          <div>
-            <div className="nav-title">{t('nav.title')}</div>
-            <div className="nav-subtitle">{t('nav.subtitle')}</div>
+        <div className="nav-left">
+          <div className="nav-brand" onClick={() => { setView('map'); selectNeighbourhood(null); setMobileMenuOpen(false); }}>
+            <span className="nav-logo">🍺</span>
+            <div>
+              <div className="nav-title">{t('nav.title')}</div>
+              <div className="nav-subtitle">{t('nav.subtitle')}</div>
+            </div>
           </div>
+          <CitySelector />
         </div>
 
         {/* Desktop actions — hidden on mobile in favour of the ☰ menu below */}

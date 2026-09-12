@@ -1,4 +1,4 @@
-// Seed script for MünchnerBierpreis v3.
+// Seed script for Bierpreis v3.
 //
 //   node backend/db/seed.js            # seed only if the DB is empty
 //   node backend/db/seed.js --force    # wipe and re-seed

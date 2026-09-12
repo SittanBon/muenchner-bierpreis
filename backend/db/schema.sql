@@ -1,7 +1,23 @@
--- MünchnerBierpreis v3 — SQLite schema
+-- Bierpreis v3 — SQLite schema
 -- Safe to run repeatedly: every statement uses IF NOT EXISTS.
 
 PRAGMA foreign_keys = ON;
+
+-- Cities the app can serve. Munich (id=1) is the only one live today; the rest
+-- are "coming soon" placeholders for the city-picker in the navbar. city_id on
+-- neighbourhoods (added via migrate() for existing DBs) scopes everything else.
+CREATE TABLE IF NOT EXISTS cities (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  name TEXT NOT NULL,
+  name_en TEXT NOT NULL,
+  country_code TEXT NOT NULL,
+  lat REAL NOT NULL,
+  lng REAL NOT NULL,
+  zoom_level INTEGER DEFAULT 13,
+  is_active INTEGER DEFAULT 1,
+  coming_soon INTEGER DEFAULT 0,
+  created_at TEXT DEFAULT CURRENT_TIMESTAMP
+);
 
 CREATE TABLE IF NOT EXISTS neighbourhoods (
   id             TEXT PRIMARY KEY,

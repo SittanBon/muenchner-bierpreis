@@ -15,6 +15,9 @@ const {
   getVenuesAdmin,
   getVenueAdmin,
   getNeighbourhoods,
+  getCities,
+  createCity,
+  updateCity,
   getStats,
   getTrends,
   createVenue,
@@ -89,6 +92,13 @@ function authMiddleware(req, res, next) {
 // ─── NEIGHBOURHOODS ──────────────────────────────────────────────────────────
 app.get('/api/neighbourhoods', (req, res) => {
   res.json(getNeighbourhoods());
+});
+
+// ─── CITIES ──────────────────────────────────────────────────────────────────
+// Public — powers the navbar city selector. Munich (id=1) is the only active
+// city today; the rest come back as coming_soon:true, venue_count:0.
+app.get('/api/cities', (req, res) => {
+  res.json(getCities());
 });
 
 // ─── STATS (public — powers the stats bar) ───────────────────────────────────
@@ -505,6 +515,64 @@ app.delete('/api/admin/venues/:id/beers/:beerId', authMiddleware, (req, res) => 
   if (result === 'not_found') return res.status(404).json({ error: 'Beer not found for this venue' });
   if (result === 'last_beer') return res.status(400).json({ error: 'A venue must keep at least one beer' });
   res.json(getVenueAdmin(req.params.id));
+});
+
+// ─── ADMIN CITY MANAGEMENT ───────────────────────────────────────────────────
+
+// Same shape as the public GET /api/cities — admin just also sees inactive
+// rows there's currently no admin-only field to add, so it's the same call.
+app.get('/api/admin/cities', authMiddleware, (req, res) => {
+  res.json(getCities());
+});
+
+app.post('/api/admin/cities', authMiddleware, (req, res) => {
+  const { name, name_en, country_code, lat, lng, zoom_level, is_active, coming_soon } = req.body || {};
+  if (!name || !String(name).trim() || !name_en || !String(name_en).trim() || !country_code) {
+    return res.status(400).json({ error: 'name, name_en and country_code are required' });
+  }
+  const numLat = parseFloat(lat);
+  const numLng = parseFloat(lng);
+  if (Number.isNaN(numLat) || Number.isNaN(numLng)) {
+    return res.status(400).json({ error: 'Invalid coordinates' });
+  }
+  const id = createCity({
+    name: String(name).trim(),
+    name_en: String(name_en).trim(),
+    country_code: String(country_code).trim().toUpperCase(),
+    lat: numLat,
+    lng: numLng,
+    zoom_level: zoom_level != null && zoom_level !== '' ? parseInt(zoom_level, 10) : 13,
+    is_active: !!is_active,
+    coming_soon: !!coming_soon,
+  });
+  res.status(201).json(getCities().find((c) => c.id === id));
+});
+
+// Full edit — name/name_en/country_code/coordinates/zoom plus the
+// active/coming-soon toggles, all in one PATCH (mirrors the venue edit route).
+app.patch('/api/admin/cities/:id', authMiddleware, (req, res) => {
+  const id = Number(req.params.id);
+  const { name, name_en, country_code, lat, lng, zoom_level, is_active, coming_soon } = req.body || {};
+  if (!name || !String(name).trim() || !name_en || !String(name_en).trim() || !country_code) {
+    return res.status(400).json({ error: 'name, name_en and country_code are required' });
+  }
+  const numLat = parseFloat(lat);
+  const numLng = parseFloat(lng);
+  if (Number.isNaN(numLat) || Number.isNaN(numLng)) {
+    return res.status(400).json({ error: 'Invalid coordinates' });
+  }
+  const ok = updateCity(id, {
+    name: String(name).trim(),
+    name_en: String(name_en).trim(),
+    country_code: String(country_code).trim().toUpperCase(),
+    lat: numLat,
+    lng: numLng,
+    zoom_level: zoom_level != null && zoom_level !== '' ? parseInt(zoom_level, 10) : 13,
+    is_active: !!is_active,
+    coming_soon: !!coming_soon,
+  });
+  if (!ok) return res.status(404).json({ error: 'City not found' });
+  res.json(getCities().find((c) => c.id === id));
 });
 
 app.get('/api/admin/stats', authMiddleware, (req, res) => {

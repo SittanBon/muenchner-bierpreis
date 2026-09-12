@@ -1,4 +1,4 @@
-# 🍺 MünchnerBierpreis — v3
+# 🍺 Bierpreis — v3
 
 **Find your Helles. Know what you pay.**
 

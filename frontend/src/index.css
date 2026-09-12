@@ -22,6 +22,7 @@ body{font-family:'Source Sans 3',sans-serif;background:var(--cream);color:var(--
    onto whatever polygon/pin was underneath instead. 900 clears Leaflet's panes while
    staying below .modal-overlay's 1000 so full-screen modals still cover the navbar. */
 .navbar{height:58px;background:var(--amber-900);display:flex;align-items:center;justify-content:space-between;padding:0 20px;box-shadow:0 2px 12px rgba(0,0,0,0.25);position:relative;z-index:900}
+.nav-left{display:flex;align-items:center;gap:14px;min-width:0}
 .nav-brand{display:flex;align-items:center;gap:10px;cursor:pointer}
 .nav-logo{font-size:24px}
 .nav-title{font-family:'Playfair Display',serif;font-size:17px;font-weight:700;color:var(--amber-200);letter-spacing:0.3px}
@@ -31,6 +32,35 @@ body{font-family:'Source Sans 3',sans-serif;background:var(--cream);color:var(--
 .lang-btn:hover,.admin-link-btn:hover{background:rgba(255,255,255,0.18)}
 .lang-btn{font-weight:600;letter-spacing:1px}
 .nav-mobile-menu{display:none} /* shown only on mobile — see media query */
+
+/* City selector — sits next to the logo/title. Only the active city (Munich)
+   is clickable; the rest are coming-soon previews of the multi-city schema. */
+.city-selector{position:relative;flex-shrink:0}
+.city-selector-btn{display:flex;align-items:center;gap:6px;background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);color:var(--amber-100);border-radius:20px;padding:6px 12px;font-size:13px;cursor:pointer;font-family:'Source Sans 3',sans-serif;transition:background 0.2s;white-space:nowrap}
+.city-selector-btn:hover{background:rgba(255,255,255,0.18)}
+.city-flag{font-size:15px;line-height:1}
+.city-caret{font-size:9px;opacity:0.7}
+.city-dropdown-backdrop{position:fixed;inset:0;z-index:950}
+.city-dropdown{
+  position:absolute;top:calc(100% + 8px);left:0;z-index:960;
+  background:var(--amber-900);border:1px solid rgba(255,255,255,0.15);
+  border-radius:12px;box-shadow:var(--shadow-lg);
+  display:flex;flex-direction:column;gap:2px;min-width:230px;max-width:calc(100vw - 32px);
+  overflow:hidden;padding:5px;
+}
+.city-option{
+  display:flex;align-items:center;gap:9px;width:100%;
+  background:none;border:none;color:var(--amber-100);text-align:left;
+  padding:9px 10px;font-size:13.5px;cursor:pointer;font-family:'Source Sans 3',sans-serif;
+  border-radius:8px;
+}
+.city-option:hover:not(:disabled){background:rgba(255,255,255,0.1)}
+.city-option.selected{font-weight:700}
+.city-option.disabled{opacity:0.45;cursor:not-allowed}
+.city-option-flag{font-size:16px;flex-shrink:0}
+.city-option-name{flex:1;min-width:0}
+.city-option-soon{opacity:0.8;font-size:11.5px;font-weight:400}
+.city-check{color:var(--amber-300);flex-shrink:0}
 
 /* Layout */
 .app{display:flex;flex-direction:column;height:100vh;overflow:hidden}
@@ -334,6 +364,7 @@ body{font-family:'Source Sans 3',sans-serif;background:var(--cream);color:var(--
 .vm-edit-btn:hover{background:var(--amber-100)}
 .vm-row-inactive{opacity:0.55}
 .vm-inactive-badge{background:#f0e0e0;color:#a03030;padding:2px 8px;border-radius:20px;font-size:10.5px;font-weight:600;white-space:nowrap}
+.cm-name-en{color:var(--text-muted);font-size:12px;font-weight:400}
 .vm-search-wrap{position:relative;margin-bottom:14px}
 .vm-search{width:100%;padding:9px 32px 9px 12px;border:1.5px solid var(--border-md);border-radius:8px;font-family:'Source Sans 3',sans-serif;font-size:14px;background:#fff;outline:none;transition:border-color 0.2s}
 .vm-search:focus{border-color:var(--amber-600)}
@@ -482,11 +513,21 @@ body{font-family:'Source Sans 3',sans-serif;background:var(--cream);color:var(--
      visible (mirroring desktop) — a taller bar makes room for the stacked pair
      instead of dropping the subtitle. */
   .navbar{padding:0 16px;height:68px}
-  .nav-brand{gap:12px}
+  .nav-left{gap:8px;min-width:0;overflow:hidden}
+  .nav-brand{gap:12px;min-width:0}
   .nav-logo{font-size:26px}
   .nav-title{font-size:16px}
   .nav-subtitle{font-size:10px}
   .nav-actions{display:none}
+
+  /* Condense to a flag-only button — there isn't room for the full city name
+     next to the stacked title/subtitle and the hamburger. */
+  .city-selector-btn{padding:6px 8px}
+  .city-name,.city-caret{display:none}
+  /* Anchored to the viewport instead of the button — on mobile the flag-only
+     button can sit anywhere along a wide title/subtitle block, so a
+     button-relative dropdown risks overflowing either edge of the screen. */
+  .city-dropdown{position:fixed;top:76px;left:16px;right:16px;width:auto;max-width:none}
 
   .nav-mobile-menu{display:block;position:relative}
   .hamburger-btn{
