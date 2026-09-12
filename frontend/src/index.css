@@ -283,6 +283,18 @@ body{font-family:'Source Sans 3',sans-serif;background:var(--cream);color:var(--
 .vm-save-beer{flex-shrink:0;padding:8px 12px;background:var(--amber-900);border:none;border-radius:7px;color:var(--amber-100);font-size:12.5px;cursor:pointer;font-family:'Source Sans 3',sans-serif}
 .vm-save-beer:hover{background:var(--amber-800)}
 
+/* Beer price fields with a small size label (0,5L / 1L) above the input, since
+   the placeholder itself is now the bilingual decimal-format hint. */
+.vm-price-field{flex:1;display:flex;flex-direction:column;gap:2px;min-width:0}
+.vm-price-field-label{font-size:10px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.3px}
+
+/* Venue-details sub-form inside Edit Venue */
+.vm-details-form{padding-bottom:14px;margin-bottom:14px;border-bottom:1.5px dashed var(--border-md)}
+.vm-full-width{grid-column:1 / -1}
+.vm-active-field{display:flex;flex-direction:column;gap:4px}
+.vm-active-toggle{display:flex;align-items:center;gap:7px;font-size:13.5px;color:var(--text-primary);cursor:pointer;padding:8px 0}
+.vm-active-toggle input{width:16px;height:16px;cursor:pointer}
+
 .vm-table-wrap{overflow-x:auto}
 .vm-table{width:100%;border-collapse:collapse;font-size:13px}
 .vm-table th{text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:0.4px;color:var(--text-muted);padding:0 10px 8px;border-bottom:1.5px solid var(--border)}
@@ -291,6 +303,8 @@ body{font-family:'Source Sans 3',sans-serif;background:var(--cream);color:var(--
 .vm-tag{background:var(--amber-100);color:var(--amber-800);padding:2px 8px;border-radius:20px;font-size:11px;font-weight:500;white-space:nowrap}
 .vm-edit-btn{padding:5px 12px;background:none;border:1.5px solid var(--amber-400);border-radius:6px;color:var(--amber-800);font-size:12px;cursor:pointer;font-family:'Source Sans 3',sans-serif}
 .vm-edit-btn:hover{background:var(--amber-100)}
+.vm-row-inactive{opacity:0.55}
+.vm-inactive-badge{background:#f0e0e0;color:#a03030;padding:2px 8px;border-radius:20px;font-size:10.5px;font-weight:600;white-space:nowrap}
 .vm-search-wrap{position:relative;margin-bottom:14px}
 .vm-search{width:100%;padding:9px 32px 9px 12px;border:1.5px solid var(--border-md);border-radius:8px;font-family:'Source Sans 3',sans-serif;font-size:14px;background:#fff;outline:none;transition:border-color 0.2s}
 .vm-search:focus{border-color:var(--amber-600)}

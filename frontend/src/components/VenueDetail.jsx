@@ -6,6 +6,7 @@ import {
 import { fetchVenue } from '../hooks/useApi';
 import ReportForm from './ReportForm';
 import FreshnessLight from './FreshnessLight';
+import { formatEuro } from '../utils/price';
 
 const TYPE_ICONS = { beer_garden: '🌳', beer_hall: '🏛️', bar: '🍺', restaurant: '🍽️' };
 
@@ -37,7 +38,7 @@ function daysAtPriceRows(history) {
 }
 
 function BrandHistoryChart({ history, beers }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const brands = useMemo(() => beers.map((b) => b.brand), [beers]);
   const [visible, setVisible] = useState(() => new Set(brands));
 
@@ -97,11 +98,11 @@ function BrandHistoryChart({ history, beers }) {
             tick={{ fontSize: 11, fill: 'var(--text-secondary)' }}
             axisLine={false}
             tickLine={false}
-            tickFormatter={(v) => `€${v.toFixed(2)}`}
+            tickFormatter={(v) => formatEuro(v, i18n.language)}
             width={48}
           />
           <Tooltip
-            formatter={(value, key) => [value == null ? '—' : `€${Number(value).toFixed(2)}`, key]}
+            formatter={(value, key) => [formatEuro(value, i18n.language), key]}
             contentStyle={{ background: 'var(--amber-900)', border: 'none', borderRadius: 10, color: 'var(--amber-100)' }}
             itemStyle={{ color: 'var(--amber-100)' }}
             labelStyle={{ color: 'var(--amber-200)', fontWeight: 600 }}
@@ -129,7 +130,7 @@ function BrandHistoryChart({ history, beers }) {
           <div key={i} className="dap-row">
             <span className="dap-swatch" style={{ background: colorFor(r.brand) }} />
             <span className="dap-brand">{r.brand}</span>
-            <span className="dap-price">€{r.price.toFixed(2)}</span>
+            <span className="dap-price">{formatEuro(r.price, i18n.language)}</span>
             <span className="dap-date">{new Date(r.visit_date).toLocaleDateString()}</span>
             <span className="dap-days">{t('venue.daysAtPrice', { count: r.days })}{r.isCurrent ? ` (${t('venue.current')})` : ''}</span>
           </div>
@@ -189,12 +190,12 @@ export default function VenueDetail({ venue: initialVenue, onBack }) {
       {headline && (
         <div className="vd-price-block">
           <div className="vdp-main">
-            <div className="vdp-amount">€{headline.size_05.toFixed(2)}</div>
+            <div className="vdp-amount">{formatEuro(headline.size_05, i18n.language)}</div>
             <div className="vdp-label">{t('venue.price05')}</div>
           </div>
           {headline.size_mass && (
             <div className="vdp-mass">
-              <div className="vdp-amount-sm">€{headline.size_mass.toFixed(2)}</div>
+              <div className="vdp-amount-sm">{formatEuro(headline.size_mass, i18n.language)}</div>
               <div className="vdp-label">{t('venue.priceMass')}</div>
             </div>
           )}
@@ -220,7 +221,7 @@ export default function VenueDetail({ venue: initialVenue, onBack }) {
                 <span className="ob-brand">🍺 {b.brand}</span>
                 <FreshnessLight date={b.updated} compact />
               </div>
-              <span className="ob-price">€{b.size_05.toFixed(2)}</span>
+              <span className="ob-price">{formatEuro(b.size_05, i18n.language)}</span>
             </div>
           ))}
         </div>

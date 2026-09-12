@@ -12,10 +12,13 @@ const {
   isEmpty,
   getVenues,
   getVenue,
+  getVenuesAdmin,
+  getVenueAdmin,
   getNeighbourhoods,
   getStats,
   getTrends,
   createVenue,
+  updateVenue,
   addBeerToVenue,
   updateBeerPrice,
   deleteBeer,
@@ -347,7 +350,7 @@ app.patch('/api/admin/submissions/:id', authMiddleware, (req, res) => {
       // price_change or new_beer: roll the price into that specific brand's row
       // if the venue already lists it, otherwise add it as a new beer — either
       // way this must never touch the wrong brand (a venue can list several).
-      const venue = getVenue(sub.venue_id);
+      const venue = getVenueAdmin(sub.venue_id);
       const existingBeer = venue?.beers.find((b) => b.brand === sub.beer_brand);
       if (existingBeer) {
         S.updateHeadlinePrice.run({
@@ -405,16 +408,64 @@ app.post('/api/admin/venues', authMiddleware, (req, res) => {
         size_mass: b.size_mass ? parseFloat(b.size_mass) : null,
       })),
     );
-    res.status(201).json(getVenue(id));
+    res.status(201).json(getVenueAdmin(id));
   } catch (err) {
     console.error('Failed to create venue:', err);
     res.status(500).json({ error: 'Could not create venue' });
   }
 });
 
+// Manage Venues table — every venue including inactive ones (the public GET
+// /api/venues hides those, but an admin still needs to see & re-activate them).
+app.get('/api/admin/venues', authMiddleware, (req, res) => {
+  res.json(getVenuesAdmin());
+});
+
+// Full edit — every field the Manage Venues "Edit" form exposes (name, type,
+// neighbourhood, address, coordinates, hours, website, both descriptions, and
+// the active/inactive toggle). Beer prices/brands are handled by the routes
+// below, not this one.
+app.patch('/api/admin/venues/:id', authMiddleware, (req, res) => {
+  const venue = getVenueAdmin(req.params.id);
+  if (!venue) return res.status(404).json({ error: 'Venue not found' });
+
+  const {
+    name, type, neighbourhood_id, address, lat, lng,
+    opening_hours, website, description_de, description_en, active,
+  } = req.body || {};
+
+  if (!name || !String(name).trim()) {
+    return res.status(400).json({ error: 'name is required' });
+  }
+  const VALID_TYPES = ['beer_garden', 'beer_hall', 'bar', 'restaurant'];
+  if (!VALID_TYPES.includes(type)) {
+    return res.status(400).json({ error: 'Invalid type' });
+  }
+  const validHoods = getNeighbourhoods().map((n) => n.id);
+  if (!validHoods.includes(neighbourhood_id)) {
+    return res.status(400).json({ error: 'Unknown neighbourhood_id' });
+  }
+  const numLat = lat === '' || lat == null ? null : parseFloat(lat);
+  const numLng = lng === '' || lng == null ? null : parseFloat(lng);
+  if ((numLat != null && Number.isNaN(numLat)) || (numLng != null && Number.isNaN(numLng))) {
+    return res.status(400).json({ error: 'Invalid coordinates' });
+  }
+
+  const ok = updateVenue(req.params.id, {
+    name: name.trim(),
+    type,
+    neighbourhood_id,
+    address, lat: numLat, lng: numLng,
+    opening_hours, website, description_de, description_en,
+    active: active !== false && active !== 0, // default to active unless explicitly turned off
+  });
+  if (!ok) return res.status(404).json({ error: 'Venue not found' });
+  res.json(getVenueAdmin(req.params.id));
+});
+
 // Add a new brand to an existing venue.
 app.post('/api/admin/venues/:id/beers', authMiddleware, (req, res) => {
-  const venue = getVenue(req.params.id);
+  const venue = getVenueAdmin(req.params.id);
   if (!venue) return res.status(404).json({ error: 'Venue not found' });
 
   const { brand, size_05, size_mass } = req.body || {};
@@ -430,7 +481,7 @@ app.post('/api/admin/venues/:id/beers', authMiddleware, (req, res) => {
     size_05: parseFloat(size_05),
     size_mass: size_mass ? parseFloat(size_mass) : null,
   });
-  res.status(201).json(getVenue(venue.id));
+  res.status(201).json(getVenueAdmin(venue.id));
 });
 
 // Edit one beer's price directly (admin override — separate from the
@@ -445,7 +496,7 @@ app.patch('/api/admin/venues/:id/beers/:beerId', authMiddleware, (req, res) => {
     size_mass: size_mass ? parseFloat(size_mass) : null,
   });
   if (!ok) return res.status(404).json({ error: 'Beer not found for this venue' });
-  res.json(getVenue(req.params.id));
+  res.json(getVenueAdmin(req.params.id));
 });
 
 // Remove one beer from a venue outright — a venue must always keep at least one.
@@ -453,7 +504,7 @@ app.delete('/api/admin/venues/:id/beers/:beerId', authMiddleware, (req, res) => 
   const result = deleteBeer(req.params.id, Number(req.params.beerId));
   if (result === 'not_found') return res.status(404).json({ error: 'Beer not found for this venue' });
   if (result === 'last_beer') return res.status(400).json({ error: 'A venue must keep at least one beer' });
-  res.json(getVenue(req.params.id));
+  res.json(getVenueAdmin(req.params.id));
 });
 
 app.get('/api/admin/stats', authMiddleware, (req, res) => {

@@ -1,14 +1,34 @@
 import { useState, useEffect, useCallback, useMemo, Fragment } from 'react';
 import { useTranslation } from 'react-i18next';
-import { fetchVenues, fetchNeighbourhoods, adminCreateVenue, adminAddBeer, adminUpdateBeerPrice, adminDeleteBeer } from '../hooks/useApi';
+import {
+  fetchNeighbourhoods, adminFetchVenues, adminCreateVenue, adminUpdateVenue,
+  adminAddBeer, adminUpdateBeerPrice, adminDeleteBeer,
+} from '../hooks/useApi';
 import { BRANDS } from '../constants/brands';
+import { parsePrice, formatEuro, pricePlaceholder } from '../utils/price';
 
 const TYPES = ['beer_garden', 'beer_hall', 'bar', 'restaurant'];
 
 function emptyBeer() { return { brand: '', size_05: '', size_mass: '' }; }
 
+function detailsFromVenue(venue) {
+  return {
+    name: venue.name || '',
+    type: venue.type || 'restaurant',
+    neighbourhood_id: venue.neighbourhood_id || '',
+    address: venue.address || '',
+    lat: venue.lat ?? '',
+    lng: venue.lng ?? '',
+    opening_hours: venue.opening_hours || '',
+    website: venue.website || '',
+    description_de: venue.description_de || '',
+    description_en: venue.description_en || '',
+    active: venue.active !== false,
+  };
+}
+
 function AddVenueForm({ token, neighbourhoods, onCreated, onCancel }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [form, setForm] = useState({
     name: '', type: 'restaurant', neighbourhood_id: neighbourhoods[0]?.id || '',
     address: '', lat: '', lng: '', opening_hours: '', website: '',
@@ -28,8 +48,11 @@ function AddVenueForm({ token, neighbourhoods, onCreated, onCancel }) {
       setError(t('admin.venues.errName'));
       return;
     }
-    const cleanBeers = beers.filter((b) => b.brand && b.size_05);
-    if (cleanBeers.length === 0) {
+    // Prices may be typed with a comma (German) or dot (English) decimal.
+    const cleanBeers = beers
+      .filter((b) => b.brand && b.size_05)
+      .map((b) => ({ brand: b.brand, size_05: parsePrice(b.size_05), size_mass: parsePrice(b.size_mass) }));
+    if (cleanBeers.length === 0 || cleanBeers.some((b) => b.size_05 == null)) {
       setError(t('admin.venues.errBeer'));
       return;
     }
@@ -39,10 +62,7 @@ function AddVenueForm({ token, neighbourhoods, onCreated, onCancel }) {
         ...form,
         lat: form.lat ? parseFloat(form.lat) : null,
         lng: form.lng ? parseFloat(form.lng) : null,
-        beers: cleanBeers.map((b) => ({
-          brand: b.brand, size_05: parseFloat(b.size_05),
-          size_mass: b.size_mass ? parseFloat(b.size_mass) : null,
-        })),
+        beers: cleanBeers,
       });
       onCreated();
     } catch (err) {
@@ -94,14 +114,20 @@ function AddVenueForm({ token, neighbourhoods, onCreated, onCancel }) {
             <option value="">-- {t('submission.brand')} --</option>
             {BRANDS.map((br) => <option key={br} value={br}>{br}</option>)}
           </select>
-          <input
-            className="vm-price-input" placeholder="0,5L €" inputMode="decimal"
-            value={b.size_05} onChange={(e) => setBeer(i, 'size_05', e.target.value)}
-          />
-          <input
-            className="vm-price-input" placeholder="1L €" inputMode="decimal"
-            value={b.size_mass} onChange={(e) => setBeer(i, 'size_mass', e.target.value)}
-          />
+          <div className="vm-price-field">
+            <span className="vm-price-field-label">0,5L</span>
+            <input
+              className="vm-price-input" placeholder={pricePlaceholder(i18n.language)} inputMode="decimal"
+              value={b.size_05} onChange={(e) => setBeer(i, 'size_05', e.target.value)}
+            />
+          </div>
+          <div className="vm-price-field">
+            <span className="vm-price-field-label">1L</span>
+            <input
+              className="vm-price-input" placeholder={pricePlaceholder(i18n.language)} inputMode="decimal"
+              value={b.size_mass} onChange={(e) => setBeer(i, 'size_mass', e.target.value)}
+            />
+          </div>
           {beers.length > 1 && (
             <button type="button" className="vm-remove-beer" onClick={() => removeBeerRow(i)}>✕</button>
           )}
@@ -121,8 +147,122 @@ function AddVenueForm({ token, neighbourhoods, onCreated, onCancel }) {
   );
 }
 
-function EditVenueForm({ token, venue, onUpdated, onCancel }) {
+// The venue-level fields (name, type, neighbourhood, address, coordinates,
+// hours, website, both descriptions, active toggle) — everything the beer
+// price/brand editor below doesn't cover. Its own Save/Discard so editing a
+// typo doesn't accidentally touch anything else.
+function VenueDetailsForm({ token, venue, neighbourhoods, onUpdated }) {
   const { t } = useTranslation();
+  const [details, setDetails] = useState(() => detailsFromVenue(venue));
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+  const [dirty, setDirty] = useState(false);
+
+  // If the venue changes underneath us (e.g. a beer was just added/removed) and
+  // we haven't touched anything yet, keep the form's snapshot in sync.
+  useEffect(() => {
+    if (!dirty) setDetails(detailsFromVenue(venue));
+  }, [venue, dirty]);
+
+  const set = (k, v) => { setDetails((d) => ({ ...d, [k]: v })); setDirty(true); };
+
+  const discard = () => {
+    setDetails(detailsFromVenue(venue));
+    setDirty(false);
+    setError('');
+  };
+
+  const save = async () => {
+    setError('');
+    if (!details.name.trim()) { setError(t('admin.venues.errName')); return; }
+    setSaving(true);
+    try {
+      const updated = await adminUpdateVenue(token, venue.id, {
+        ...details,
+        name: details.name.trim(),
+        lat: details.lat === '' ? null : parseFloat(details.lat),
+        lng: details.lng === '' ? null : parseFloat(details.lng),
+      });
+      onUpdated(updated);
+      setDirty(false);
+    } catch (err) {
+      setError(err.message);
+    }
+    setSaving(false);
+  };
+
+  return (
+    <div className="vm-details-form">
+      <div className="vm-form-grid">
+        <div className="sf-field">
+          <label>{t('admin.venues.name')}</label>
+          <input value={details.name} onChange={(e) => set('name', e.target.value)} />
+        </div>
+        <div className="sf-field">
+          <label>{t('filters.type')}</label>
+          <select value={details.type} onChange={(e) => set('type', e.target.value)}>
+            {TYPES.map((ty) => <option key={ty} value={ty}>{t(`filters.types.${ty}`)}</option>)}
+          </select>
+        </div>
+        <div className="sf-field">
+          <label>{t('filters.neighbourhood')}</label>
+          <select value={details.neighbourhood_id} onChange={(e) => set('neighbourhood_id', e.target.value)}>
+            {neighbourhoods.map((n) => <option key={n.id} value={n.id}>{n.name_de}</option>)}
+          </select>
+        </div>
+        <div className="sf-field">
+          <label>{t('venue.address')}</label>
+          <input value={details.address} onChange={(e) => set('address', e.target.value)} />
+        </div>
+        <div className="sf-row">
+          <div className="sf-field half">
+            <label>Lat</label>
+            <input value={details.lat} onChange={(e) => set('lat', e.target.value)} inputMode="decimal" />
+          </div>
+          <div className="sf-field half">
+            <label>Lng</label>
+            <input value={details.lng} onChange={(e) => set('lng', e.target.value)} inputMode="decimal" />
+          </div>
+        </div>
+        <div className="sf-field">
+          <label>{t('venue.hours')}</label>
+          <input value={details.opening_hours} onChange={(e) => set('opening_hours', e.target.value)} />
+        </div>
+        <div className="sf-field">
+          <label>{t('admin.venues.website')}</label>
+          <input value={details.website} onChange={(e) => set('website', e.target.value)} placeholder="https://..." />
+        </div>
+        <div className="sf-field vm-active-field">
+          <label>{t('admin.venues.activeLabel')}</label>
+          <label className="vm-active-toggle">
+            <input type="checkbox" checked={details.active} onChange={(e) => set('active', e.target.checked)} />
+            <span>{details.active ? t('admin.venues.active') : t('admin.venues.inactive')}</span>
+          </label>
+        </div>
+        <div className="sf-field vm-full-width">
+          <label>{t('admin.venues.descDe')}</label>
+          <textarea rows={2} value={details.description_de} onChange={(e) => set('description_de', e.target.value)} />
+        </div>
+        <div className="sf-field vm-full-width">
+          <label>{t('admin.venues.descEn')}</label>
+          <textarea rows={2} value={details.description_en} onChange={(e) => set('description_en', e.target.value)} />
+        </div>
+      </div>
+
+      {error && <div className="sf-error">{error}</div>}
+
+      <div className="sf-actions">
+        <button className="sf-cancel" onClick={discard} disabled={!dirty || saving}>{t('admin.venues.discard')}</button>
+        <button className="sf-submit" onClick={save} disabled={!dirty || saving}>
+          {saving ? '...' : t('admin.venues.save')}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function EditVenueForm({ token, venue, neighbourhoods, onUpdated, onCancel }) {
+  const { t, i18n } = useTranslation();
   const [prices, setPrices] = useState(() => Object.fromEntries(venue.beers.map((b) => [b.id, String(b.size_05)])));
   const [savingId, setSavingId] = useState(null);
   const [deletingId, setDeletingId] = useState(null);
@@ -145,8 +285,8 @@ function EditVenueForm({ token, venue, onUpdated, onCancel }) {
 
   const savePrice = async (beer) => {
     setError('');
-    const size_05 = parseFloat(prices[beer.id]);
-    if (Number.isNaN(size_05)) { setError(t('admin.venues.errPrice')); return; }
+    const size_05 = parsePrice(prices[beer.id]);
+    if (size_05 == null) { setError(t('admin.venues.errPrice')); return; }
     setSavingId(beer.id);
     try {
       const updated = await adminUpdateBeerPrice(token, venue.id, beer.id, { size_05, size_mass: beer.size_mass });
@@ -172,13 +312,14 @@ function EditVenueForm({ token, venue, onUpdated, onCancel }) {
 
   const addNewBeer = async () => {
     setError('');
-    if (!newBeer.brand || !newBeer.size_05) { setError(t('admin.venues.errBeer')); return; }
+    const size_05 = parsePrice(newBeer.size_05);
+    if (!newBeer.brand || size_05 == null) { setError(t('admin.venues.errBeer')); return; }
     setAddingBeer(true);
     try {
       const updated = await adminAddBeer(token, venue.id, {
         brand: newBeer.brand,
-        size_05: parseFloat(newBeer.size_05),
-        size_mass: newBeer.size_mass ? parseFloat(newBeer.size_mass) : null,
+        size_05,
+        size_mass: parsePrice(newBeer.size_mass),
       });
       onUpdated(updated);
       setNewBeer(emptyBeer());
@@ -192,12 +333,14 @@ function EditVenueForm({ token, venue, onUpdated, onCancel }) {
     <div className="vm-form vm-form-inline">
       <div className="vm-form-title">{t('admin.venues.editTitle')}: {venue.name}</div>
 
+      <VenueDetailsForm token={token} venue={venue} neighbourhoods={neighbourhoods} onUpdated={onUpdated} />
+
       <div className="vm-beers-title">{t('admin.venues.beers')}</div>
       {venue.beers.map((b) => (
         <div key={b.id} className="vm-beer-row vm-edit-row">
           <span className="vm-beer-brand">{b.brand}</span>
           <input
-            className="vm-price-input" inputMode="decimal"
+            className="vm-price-input" inputMode="decimal" placeholder={pricePlaceholder(i18n.language)}
             value={prices[b.id] ?? ''}
             onChange={(e) => setPrices((p) => ({ ...p, [b.id]: e.target.value }))}
           />
@@ -220,14 +363,20 @@ function EditVenueForm({ token, venue, onUpdated, onCancel }) {
           <option value="">-- {t('submission.brand')} --</option>
           {availableBrands.map((br) => <option key={br} value={br}>{br}</option>)}
         </select>
-        <input
-          className="vm-price-input" placeholder="0,5L €" inputMode="decimal"
-          value={newBeer.size_05} onChange={(e) => setNewBeer((b) => ({ ...b, size_05: e.target.value }))}
-        />
-        <input
-          className="vm-price-input" placeholder="1L €" inputMode="decimal"
-          value={newBeer.size_mass} onChange={(e) => setNewBeer((b) => ({ ...b, size_mass: e.target.value }))}
-        />
+        <div className="vm-price-field">
+          <span className="vm-price-field-label">0,5L</span>
+          <input
+            className="vm-price-input" placeholder={pricePlaceholder(i18n.language)} inputMode="decimal"
+            value={newBeer.size_05} onChange={(e) => setNewBeer((b) => ({ ...b, size_05: e.target.value }))}
+          />
+        </div>
+        <div className="vm-price-field">
+          <span className="vm-price-field-label">1L</span>
+          <input
+            className="vm-price-input" placeholder={pricePlaceholder(i18n.language)} inputMode="decimal"
+            value={newBeer.size_mass} onChange={(e) => setNewBeer((b) => ({ ...b, size_mass: e.target.value }))}
+          />
+        </div>
         <button type="button" className="vm-save-beer" onClick={addNewBeer} disabled={addingBeer}>
           {addingBeer ? '...' : '+'}
         </button>
@@ -243,7 +392,7 @@ function EditVenueForm({ token, venue, onUpdated, onCancel }) {
 }
 
 export default function VenueManager({ token }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [venues, setVenues] = useState([]);
   const [neighbourhoods, setNeighbourhoods] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -253,10 +402,10 @@ export default function VenueManager({ token }) {
 
   const load = useCallback(() => {
     setLoading(true);
-    Promise.all([fetchVenues(), fetchNeighbourhoods()])
+    Promise.all([adminFetchVenues(token), fetchNeighbourhoods()])
       .then(([v, n]) => { setVenues(v); setNeighbourhoods(n); })
       .finally(() => setLoading(false));
-  }, []);
+  }, [token]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -314,12 +463,13 @@ export default function VenueManager({ token }) {
                 <th>{t('admin.venues.beers')}</th>
                 <th>{t('admin.venues.cheapest')}</th>
                 <th></th>
+                <th></th>
               </tr>
             </thead>
             <tbody>
               {filteredVenues.map((v) => (
                 <Fragment key={v.id}>
-                  <tr>
+                  <tr className={v.active === false ? 'vm-row-inactive' : ''}>
                     <td>{v.name}</td>
                     <td>{v.neighbourhood_name_de}</td>
                     <td>
@@ -327,7 +477,10 @@ export default function VenueManager({ token }) {
                         {v.beers.map((b) => <span key={b.id} className="vm-tag">{b.brand}</span>)}
                       </div>
                     </td>
-                    <td>€{v.beers[0]?.size_05?.toFixed(2) ?? '—'}</td>
+                    <td>{formatEuro(v.beers[0]?.size_05, i18n.language)}</td>
+                    <td>
+                      {v.active === false && <span className="vm-inactive-badge">{t('admin.venues.inactive')}</span>}
+                    </td>
                     <td>
                       <button
                         className="vm-edit-btn"
@@ -339,10 +492,11 @@ export default function VenueManager({ token }) {
                   </tr>
                   {editingVenueId === v.id && editingVenue && (
                     <tr className="vm-edit-tr">
-                      <td colSpan={5}>
+                      <td colSpan={6}>
                         <EditVenueForm
                           token={token}
                           venue={editingVenue}
+                          neighbourhoods={neighbourhoods}
                           onUpdated={handleUpdated}
                           onCancel={() => setEditingVenueId(null)}
                         />
@@ -352,7 +506,7 @@ export default function VenueManager({ token }) {
                 </Fragment>
               ))}
               {filteredVenues.length === 0 && (
-                <tr><td colSpan={5} className="vm-no-results">{t('search.noResults')}</td></tr>
+                <tr><td colSpan={6} className="vm-no-results">{t('search.noResults')}</td></tr>
               )}
             </tbody>
           </table>

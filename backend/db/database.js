@@ -27,9 +27,13 @@ function initSchema() {
 // columns added to schema.sql later — add them by hand, guarded so this is safe
 // to run on every boot.
 function migrate() {
-  const cols = db.prepare('PRAGMA table_info(beers)').all().map((c) => c.name);
-  if (!cols.includes('active')) {
+  const beerCols = db.prepare('PRAGMA table_info(beers)').all().map((c) => c.name);
+  if (!beerCols.includes('active')) {
     db.exec('ALTER TABLE beers ADD COLUMN active INTEGER NOT NULL DEFAULT 1');
+  }
+  const venueCols = db.prepare('PRAGMA table_info(venues)').all().map((c) => c.name);
+  if (!venueCols.includes('active')) {
+    db.exec('ALTER TABLE venues ADD COLUMN active INTEGER NOT NULL DEFAULT 1');
   }
 }
 
@@ -58,8 +62,13 @@ const venueBase = `
     JOIN neighbourhoods n ON n.id = v.neighbourhood_id
 `;
 
-const allVenuesStmt = db.prepare(`${venueBase} ORDER BY v.name`);
-const venueByIdStmt = db.prepare(`${venueBase} WHERE v.id = ?`);
+// Public reads only ever see active venues; the admin variants see everything
+// (an inactive venue must still be reachable in Manage Venues so it can be
+// re-activated) — see getVenuesAdmin/getVenueAdmin below.
+const allVenuesStmt = db.prepare(`${venueBase} WHERE v.active = 1 ORDER BY v.name`);
+const venueByIdStmt = db.prepare(`${venueBase} WHERE v.id = ? AND v.active = 1`);
+const allVenuesAdminStmt = db.prepare(`${venueBase} ORDER BY v.name`);
+const venueByIdAdminStmt = db.prepare(`${venueBase} WHERE v.id = ?`);
 
 function hydrateVenue(row) {
   if (!row) return null;
@@ -77,6 +86,7 @@ function hydrateVenue(row) {
     website: row.website,
     description_de: row.description_de,
     description_en: row.description_en,
+    active: row.active === 1,
     beers: beersForVenue.all(row.id),
   };
 }
@@ -87,6 +97,14 @@ function getVenues() {
 
 function getVenue(id) {
   return hydrateVenue(venueByIdStmt.get(id));
+}
+
+function getVenuesAdmin() {
+  return allVenuesAdminStmt.all().map(hydrateVenue);
+}
+
+function getVenueAdmin(id) {
+  return hydrateVenue(venueByIdAdminStmt.get(id));
 }
 
 const neighbourhoodsStmt = db.prepare('SELECT * FROM neighbourhoods ORDER BY name_de');
@@ -247,11 +265,41 @@ function getTrends() {
 const insertVenueStmt = db.prepare(`
   INSERT INTO venues
     (id, name, type, neighbourhood_id, address, lat, lng, opening_hours, website,
-     description_de, description_en)
+     description_de, description_en, active)
   VALUES
     (@id, @name, @type, @neighbourhood_id, @address, @lat, @lng, @opening_hours, @website,
-     @description_de, @description_en)
+     @description_de, @description_en, 1)
 `);
+
+// Full-edit — every field the Manage Venues "Edit" form exposes, saved in one go.
+const updateVenueStmt = db.prepare(`
+  UPDATE venues SET
+    name = @name, type = @type, neighbourhood_id = @neighbourhood_id, address = @address,
+    lat = @lat, lng = @lng, opening_hours = @opening_hours, website = @website,
+    description_de = @description_de, description_en = @description_en, active = @active
+  WHERE id = @id
+`);
+const venueExistsStmt = db.prepare('SELECT 1 FROM venues WHERE id = ?');
+
+// Returns false if the venue doesn't exist.
+function updateVenue(id, fields) {
+  if (!venueExistsStmt.get(id)) return false;
+  updateVenueStmt.run({
+    id,
+    name: fields.name,
+    type: fields.type,
+    neighbourhood_id: fields.neighbourhood_id,
+    address: fields.address ?? null,
+    lat: fields.lat ?? null,
+    lng: fields.lng ?? null,
+    opening_hours: fields.opening_hours ?? null,
+    website: fields.website ?? null,
+    description_de: fields.description_de ?? null,
+    description_en: fields.description_en ?? null,
+    active: fields.active ? 1 : 0,
+  });
+  return true;
+}
 
 const insertBeerStmt = db.prepare(`
   INSERT INTO beers (venue_id, brand, size_05, size_mass, updated, reports, active)
@@ -362,11 +410,14 @@ module.exports = {
   isEmpty,
   getVenues,
   getVenue,
+  getVenuesAdmin,
+  getVenueAdmin,
   getNeighbourhoods,
   getStats,
   getTrends,
   hydrateVenue,
   createVenue,
+  updateVenue,
   addBeerToVenue,
   updateBeerPrice,
   deleteBeer,

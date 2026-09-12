@@ -25,6 +25,7 @@ CREATE TABLE IF NOT EXISTS venues (
   website          TEXT,
   description_de    TEXT,
   description_en    TEXT,
+  active           INTEGER NOT NULL DEFAULT 1, -- 0 = hidden from the public site, still editable in admin
   created_at       TEXT NOT NULL DEFAULT (datetime('now'))
 );
 

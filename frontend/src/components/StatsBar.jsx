@@ -1,4 +1,5 @@
 import { useTranslation } from 'react-i18next';
+import { formatEuro } from '../utils/price';
 
 // City-wide price summary shown under the navbar.
 //  - average / cheapest / most-expensive tiles (cheapest & priciest jump straight
@@ -9,7 +10,7 @@ export default function StatsBar({ stats, neighbourhoods, activeNeighbourhood, o
   if (!stats) return null;
 
   const de = i18n.language === 'de';
-  const eur = (n) => (n == null ? '—' : `€${n.toFixed(2)}`);
+  const eur = (n) => formatEuro(n, i18n.language);
 
   const nameById = {};
   (neighbourhoods || []).forEach((n) => { nameById[n.id] = de ? n.name_de : n.name_en; });

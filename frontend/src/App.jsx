@@ -11,6 +11,7 @@ import StatsBar from './components/StatsBar';
 import PriceTrends from './components/PriceTrends';
 import FreshnessLight from './components/FreshnessLight';
 import { fetchNeighbourhoods, fetchVenues, fetchStats } from './hooks/useApi';
+import { formatEuro } from './utils/price';
 
 // Query params for GET /api/venues. Neighbourhood is deliberately NOT included —
 // the focused-neighbourhood list is scoped client-side from the full venue set so
@@ -292,7 +293,7 @@ export default function App() {
                             </span>
                             <span className="av-right">
                               <FreshnessLight date={v.beers[0]?.updated} compact />
-                              <span className="av-price">€{v.beers[0]?.size_05?.toFixed(2) ?? '—'}</span>
+                              <span className="av-price">{formatEuro(v.beers[0]?.size_05, i18n.language)}</span>
                             </span>
                           </div>
                         ))}

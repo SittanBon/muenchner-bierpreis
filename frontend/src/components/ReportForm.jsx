@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { submitReport } from '../hooks/useApi';
 import { BRANDS, OTHER_BRAND } from '../constants/brands';
+import { parsePrice } from '../utils/price';
 
 const TOPICS = [
   { key: 'price_change', icon: '💶' },
@@ -49,11 +50,12 @@ export default function ReportForm({ venueId, venueName, venueBrands, onSuccess,
 
   const submitPriceReport = () => {
     const resolvedBrand = form.beer_brand === OTHER_BRAND ? form.other_brand.trim() : form.beer_brand;
-    if (!resolvedBrand || !form.price) {
+    const price = parsePrice(form.price);
+    if (!resolvedBrand || price == null) {
       setError(t('report.errBrandPrice'));
       return;
     }
-    submit({ beer_brand: resolvedBrand, size: form.size, price: parseFloat(form.price.replace(',', '.')), visit_date: form.visit_date });
+    submit({ beer_brand: resolvedBrand, size: form.size, price, visit_date: form.visit_date });
   };
 
   const submitClosed = () => submit({});

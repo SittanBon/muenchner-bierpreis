@@ -90,7 +90,7 @@ export const de = {
       submit: "Absenden",
       success: "Danke! Deine Meldung wird geprüft.",
       error: "Fehler beim Absenden. Bitte versuche es erneut.",
-      pricePlaceholder: "z.B. 4,80",
+      pricePlaceholder: "z.B. 4,80 oder 4.80",
       namePlaceholder: "Dein Name oder leer lassen",
       thisVenuesBrands: "Biere dieses Lokals",
       allBrands: "Alle Marken",
@@ -171,7 +171,14 @@ export const de = {
         searchPlaceholder: "Nach Name, Stadtteil oder Marke suchen...",
         deleteBeer: "Löschen",
         confirmDelete: "{{brand}} wirklich löschen?",
-        lastBeer: "Ein Lokal muss mindestens ein Bier haben"
+        lastBeer: "Ein Lokal muss mindestens ein Bier haben",
+        website: "Website",
+        activeLabel: "Status",
+        active: "Aktiv",
+        inactive: "Inaktiv",
+        discard: "Verwerfen",
+        descDe: "Beschreibung (Deutsch)",
+        descEn: "Beschreibung (Englisch)"
       }
     },
     priceHistory: "Preisentwicklung",
@@ -282,7 +289,7 @@ export const en = {
       submit: "Submit",
       success: "Thanks! Your report will be reviewed.",
       error: "Submission failed. Please try again.",
-      pricePlaceholder: "e.g. 4.80",
+      pricePlaceholder: "e.g. 4.80 or 4,80",
       namePlaceholder: "Your name or leave blank",
       thisVenuesBrands: "This venue's beers",
       allBrands: "All brands",
@@ -363,7 +370,14 @@ export const en = {
         searchPlaceholder: "Search by name, neighbourhood or brand...",
         deleteBeer: "Delete",
         confirmDelete: "Really delete {{brand}}?",
-        lastBeer: "A venue must keep at least one beer"
+        lastBeer: "A venue must keep at least one beer",
+        website: "Website",
+        activeLabel: "Status",
+        active: "Active",
+        inactive: "Inactive",
+        discard: "Discard",
+        descDe: "Description (German)",
+        descEn: "Description (English)"
       }
     },
     priceHistory: "Price history",

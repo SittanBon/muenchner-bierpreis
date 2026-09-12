@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { neighbourhoodGeoJSON } from '../data/neighbourhoodGeoJSON';
+import { formatEuro } from '../utils/price';
 
 // Price → colour scale (amber/brown tones — Bavarian feel)
 function priceToColor(price, min = 4.40, max = 6.30) {
@@ -113,7 +114,7 @@ export default function MunichMap({ neighbourhoods, venues, onNeighbourhoodClick
               tip.innerHTML = stat
                 ? `<div class="map-tooltip">
                     <div class="tt-name">${name}</div>
-                    <div class="tt-price">Ø <strong>€${stat.avg.toFixed(2)}</strong></div>
+                    <div class="tt-price">Ø <strong>${formatEuro(stat.avg, i18n.language)}</strong></div>
                     <div class="tt-count">${stat.count} ${t('map.venues')}</div>
                    </div>`
                 : `<div class="map-tooltip">
@@ -183,7 +184,7 @@ export default function MunichMap({ neighbourhoods, venues, onNeighbourhoodClick
         const cheapest = v.beers?.[0];
         const extra = (v.beers?.length || 0) - 1;
         const priceLine = cheapest
-          ? `${cheapest.brand} €${cheapest.size_05.toFixed(2)}${extra > 0 ? ` + ${extra} more` : ''}`
+          ? `${cheapest.brand} ${formatEuro(cheapest.size_05, i18n.language)}${extra > 0 ? ` + ${extra} more` : ''}`
           : '';
         marker.bindTooltip(
           `<div class="pin-tt-name">${v.name}</div>${priceLine ? `<div class="pin-tt-price">${priceLine}</div>` : ''}`,
@@ -194,7 +195,7 @@ export default function MunichMap({ neighbourhoods, venues, onNeighbourhoodClick
       });
 
     markersLayerRef.current = L.layerGroup(markers).addTo(leafletMap.current);
-  }, [venues, onVenueClick]);
+  }, [venues, onVenueClick, i18n.language]);
 
   return (
     <div style={{ position: 'relative', width: '100%', height: '100%' }}>

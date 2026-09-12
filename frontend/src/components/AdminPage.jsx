@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { adminLogin, adminFetchSubmissions, adminUpdateSubmission, adminFetchStats } from '../hooks/useApi';
 import VenueManager from './VenueManager';
 import MiniMapPreview from './MiniMapPreview';
+import { formatEuro } from '../utils/price';
 
 const REPORT_TYPE_META = {
   new_venue: { icon: '🆕', label: 'New Venue' },
@@ -13,7 +14,7 @@ const REPORT_TYPE_META = {
 };
 
 export default function AdminPage({ onBack }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [token, setToken] = useState(localStorage.getItem('bp_admin_token') || '');
   const [creds, setCreds] = useState({ username: '', password: '' });
   const [loginError, setLoginError] = useState('');
@@ -158,8 +159,8 @@ export default function AdminPage({ onBack }) {
               <div className="sub-details">
                 {sub.beer_brand && <span>🍻 {sub.beer_brand}</span>}
                 {sub.size && <span>📏 {sub.size}</span>}
-                {sub.price != null && <span>💶 €{sub.price.toFixed(2)}</span>}
-                {sub.report_type === 'new_venue' && sub.size_mass != null && <span>💶 €{sub.size_mass.toFixed(2)} (Maß)</span>}
+                {sub.price != null && <span>💶 {formatEuro(sub.price, i18n.language)}</span>}
+                {sub.report_type === 'new_venue' && sub.size_mass != null && <span>💶 {formatEuro(sub.size_mass, i18n.language)} (Maß)</span>}
                 {sub.report_type === 'new_venue' && sub.address && <span>📍 {sub.address}</span>}
                 {sub.visit_date && <span>📅 {sub.visit_date}</span>}
                 <span>👤 {sub.submitter_name}</span>

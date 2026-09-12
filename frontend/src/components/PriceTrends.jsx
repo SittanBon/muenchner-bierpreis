@@ -4,6 +4,7 @@ import {
   ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip,
 } from 'recharts';
 import { fetchTrends } from '../hooks/useApi';
+import { formatEuro } from '../utils/price';
 
 // Fixed categorical order (validated for CVD-safety via the dataviz skill's
 // validator — worst adjacent ΔE 9.1 CVD / 22.9 normal-vision, all PASS). Assigned
@@ -115,11 +116,11 @@ export default function PriceTrends({ neighbourhoods, onClose }) {
                   axisLine={false}
                   tickLine={false}
                   domain={['dataMin - 0.3', 'dataMax + 0.3']}
-                  tickFormatter={(v) => `€${v.toFixed(2)}`}
+                  tickFormatter={(v) => formatEuro(v, i18n.language)}
                   width={52}
                 />
                 <Tooltip
-                  formatter={(value, key) => [value == null ? '—' : `€${Number(value).toFixed(2)}`, key === 'city' ? (de ? 'München Ø' : 'Munich avg') : (nameById[key] || key)]}
+                  formatter={(value, key) => [formatEuro(value, i18n.language), key === 'city' ? (de ? 'München Ø' : 'Munich avg') : (nameById[key] || key)]}
                   labelFormatter={(label) => label}
                   contentStyle={{ background: 'var(--amber-900)', border: 'none', borderRadius: 10, color: 'var(--amber-100)' }}
                   itemStyle={{ color: 'var(--amber-100)' }}

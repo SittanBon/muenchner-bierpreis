@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { searchNominatim, submitNewVenue } from '../hooks/useApi';
 import { BRANDS, OTHER_BRAND } from '../constants/brands';
 import MiniMapPreview from './MiniMapPreview';
+import { parsePrice, formatEuro, pricePlaceholder } from '../utils/price';
 
 const TYPES = ['beer_garden', 'beer_hall', 'bar', 'restaurant'];
 const NEIGHBOURHOODS = [
@@ -81,7 +82,7 @@ export default function MissingBarModal({ allVenues, onClose, onCreated }) {
     if (!form.neighbourhood_id) return t('missingBar.errNeighbourhood');
     const brand = form.beer_brand === OTHER_BRAND ? form.other_brand.trim() : form.beer_brand;
     if (!brand) return t('missingBar.errBrand');
-    if (!form.size_05) return t('missingBar.errPrice');
+    if (parsePrice(form.size_05) == null) return t('missingBar.errPrice');
     return '';
   };
 
@@ -104,8 +105,9 @@ export default function MissingBarModal({ allVenues, onClose, onCreated }) {
     if (form.lat) fd.append('lat', form.lat);
     if (form.lng) fd.append('lng', form.lng);
     fd.append('beer_brand', resolvedBrand);
-    fd.append('size_05', parseFloat(String(form.size_05).replace(',', '.')));
-    if (form.size_mass) fd.append('size_mass', parseFloat(String(form.size_mass).replace(',', '.')));
+    fd.append('size_05', parsePrice(form.size_05));
+    const mass = parsePrice(form.size_mass);
+    if (mass != null) fd.append('size_mass', mass);
     fd.append('visit_date', form.visit_date);
     fd.append('submitter_name', form.anonymous ? 'Anonym' : form.submitter_name);
     if (form.photo) fd.append('photo', form.photo);
@@ -121,6 +123,8 @@ export default function MissingBarModal({ allVenues, onClose, onCreated }) {
   };
 
   const resolvedBrandLabel = form.beer_brand === OTHER_BRAND ? form.other_brand : form.beer_brand;
+  const resolvedPrice05 = parsePrice(form.size_05);
+  const resolvedPriceMass = parsePrice(form.size_mass);
   const typeLabel = t(`filters.types.${form.type}`);
   const hoodLabel = de
     ? NEIGHBOURHOODS.find((n) => n.id === form.neighbourhood_id)?.de
@@ -238,11 +242,11 @@ export default function MissingBarModal({ allVenues, onClose, onCreated }) {
                 <div className="sf-row">
                   <div className="sf-field half">
                     <label>{t('venue.price05')}</label>
-                    <input value={form.size_05} onChange={(e) => set('size_05', e.target.value)} inputMode="decimal" placeholder="z.B. 4,80" />
+                    <input value={form.size_05} onChange={(e) => set('size_05', e.target.value)} inputMode="decimal" placeholder={pricePlaceholder(i18n.language)} />
                   </div>
                   <div className="sf-field half">
                     <label>{t('missingBar.priceMassOptional')}</label>
-                    <input value={form.size_mass} onChange={(e) => set('size_mass', e.target.value)} inputMode="decimal" placeholder="z.B. 9,60" />
+                    <input value={form.size_mass} onChange={(e) => set('size_mass', e.target.value)} inputMode="decimal" placeholder={pricePlaceholder(i18n.language)} />
                   </div>
                 </div>
 
@@ -287,7 +291,7 @@ export default function MissingBarModal({ allVenues, onClose, onCreated }) {
                   <div className="mb-summary-name">{form.name}</div>
                   <div className="mb-summary-row">{typeLabel} · {hoodLabel}</div>
                   {form.address && <div className="mb-summary-row">📍 {form.address}</div>}
-                  <div className="mb-summary-row">🍺 {resolvedBrandLabel} — €{form.size_05}{form.size_mass ? ` / €${form.size_mass} (Maß)` : ''}</div>
+                  <div className="mb-summary-row">🍺 {resolvedBrandLabel} — {formatEuro(resolvedPrice05, i18n.language)}{resolvedPriceMass != null ? ` / ${formatEuro(resolvedPriceMass, i18n.language)} (Maß)` : ''}</div>
                   <div className="mb-summary-row">📅 {form.visit_date}</div>
                   {form.photo && <div className="mb-summary-row">📷 {form.photo.name}</div>}
                 </div>

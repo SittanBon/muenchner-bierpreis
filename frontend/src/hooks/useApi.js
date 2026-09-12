@@ -87,11 +87,29 @@ export async function adminFetchStats(token) {
   });
 }
 
+// Manage Venues table — every venue including inactive ones (the public
+// fetchVenues() hides those).
+export async function adminFetchVenues(token) {
+  return authedFetch(`${BASE}/admin/venues`, {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+}
+
 export async function adminCreateVenue(token, venue) {
   return authedFetch(`${BASE}/admin/venues`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
     body: JSON.stringify(venue)
+  });
+}
+
+// Full edit — name/type/neighbourhood/address/coordinates/hours/website/
+// descriptions/active. Beer prices go through adminUpdateBeerPrice instead.
+export async function adminUpdateVenue(token, venueId, fields) {
+  return authedFetch(`${BASE}/admin/venues/${venueId}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify(fields)
   });
 }
 

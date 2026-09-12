@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import FreshnessLight from './FreshnessLight';
+import { formatEuro } from '../utils/price';
 
 const TYPE_ICONS = {
   beer_garden: '🌳',
@@ -59,7 +60,7 @@ export default function VenuePanel({ neighbourhood, venues, onVenueClick, onClos
         <div>
           <div className="panel-neighbourhood">{name}</div>
           <div className="panel-stats">
-            Ø €{neighbourhood?.avg_price?.toFixed(2)} · {venues.length} {t('map.venues')}
+            Ø {formatEuro(neighbourhood?.avg_price, i18n.language)} · {venues.length} {t('map.venues')}
           </div>
         </div>
         <button className="panel-close" onClick={onClose}>✕</button>
@@ -90,7 +91,7 @@ export default function VenuePanel({ neighbourhood, venues, onVenueClick, onClos
                 <div className="vc-type">{t(`filters.types.${v.type}`)}</div>
               </div>
               <div className="vc-price-block">
-                <div className="vc-price">€{v.beers[0]?.size_05?.toFixed(2) ?? '—'}</div>
+                <div className="vc-price">{formatEuro(v.beers[0]?.size_05, i18n.language)}</div>
                 <div className="vc-size">0,5L</div>
               </div>
             </div>
