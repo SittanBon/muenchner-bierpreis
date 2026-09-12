@@ -478,12 +478,14 @@ body{font-family:'Source Sans 3',sans-serif;background:var(--cream);color:var(--
 .sheet-handle{display:none}
 
 @media (max-width:768px){
-  /* Navbar — more breathing room, logo only + hamburger */
-  .navbar{padding:0 16px;height:64px}
+  /* Navbar — more breathing room, logo + hamburger. Title and subtitle both stay
+     visible (mirroring desktop) — a taller bar makes room for the stacked pair
+     instead of dropping the subtitle. */
+  .navbar{padding:0 16px;height:68px}
   .nav-brand{gap:12px}
-  .nav-logo{font-size:27px}
-  .nav-title{font-size:18px}
-  .nav-subtitle{display:none}
+  .nav-logo{font-size:26px}
+  .nav-title{font-size:16px}
+  .nav-subtitle{font-size:10px}
   .nav-actions{display:none}
 
   .nav-mobile-menu{display:block;position:relative}
