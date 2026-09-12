@@ -39,7 +39,11 @@ export default function App() {
   const [filters, setFilters] = useState({ type: '', brand: '', neighbourhood: '', min_price: '', max_price: '' });
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
-  const [sheetOpen, setSheetOpen] = useState(false); // mobile bottom-sheet expanded?
+  // Mobile bottom sheet has 3 stops: 'collapsed' (~15%, just the handle),
+  // 'half' (~60%, venue list), 'full' (~90%). No effect on desktop.
+  const [sheetLevel, setSheetLevel] = useState('collapsed');
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false); // ☰ dropdown (mobile navbar)
+  const touchStartY = useRef(null);
 
   // ─── Data loading ──────────────────────────────────────────────────────────
   // Snapshot = the things that mirror the whole database (used by the map + stats
@@ -98,7 +102,7 @@ export default function App() {
   const selectNeighbourhood = useCallback((id) => {
     setActiveNeighbourhood(id || null);
     setFilters((f) => ({ ...f, neighbourhood: id || '' }));
-    if (id) setSheetOpen(true);
+    if (id) setSheetLevel('half'); // tapping a neighbourhood slides the sheet up to 60%
     setView((v) => (v === 'venue' ? 'map' : v));
   }, []);
 
@@ -109,11 +113,39 @@ export default function App() {
   // hidden behind the collapsed sheet — "search does nothing" from the user's POV.
   const handleSearch = useCallback((val) => {
     setSearchQuery(val);
-    if (val.trim()) setSheetOpen(true);
+    if (val.trim()) setSheetLevel('half');
   }, []);
 
-  const handleVenueClick = (venue) => { setSelectedVenue(venue); setView('venue'); setSheetOpen(true); };
+  const handleVenueClick = (venue) => { setSelectedVenue(venue); setView('venue'); setSheetLevel('full'); };
   const handleBack = () => { setView('map'); setSelectedVenue(null); };
+
+  // Stats-bar cheapest/priciest tiles only carry a venue id — resolve it against
+  // the already-loaded full venue list and open it exactly like any other click.
+  const handleSelectVenueById = useCallback((id) => {
+    const venue = allVenues.find((v) => v.id === id);
+    if (venue) handleVenueClick(venue);
+  }, [allVenues]);
+
+  // Bottom sheet: tap the handle to step collapsed<->half; swipe up/down to move
+  // one stop at a time (collapsed -> half -> full and back).
+  const SHEET_STEPS = ['collapsed', 'half', 'full'];
+  const stepSheet = (delta) => {
+    setSheetLevel((level) => {
+      const i = SHEET_STEPS.indexOf(level);
+      const next = Math.min(SHEET_STEPS.length - 1, Math.max(0, i + delta));
+      return SHEET_STEPS[next];
+    });
+  };
+  const handleSheetTap = () => setSheetLevel((level) => (level === 'collapsed' ? 'half' : 'collapsed'));
+  const handleSheetTouchStart = (e) => { touchStartY.current = e.touches[0].clientY; };
+  const handleSheetTouchEnd = (e) => {
+    if (touchStartY.current == null) return;
+    const deltaY = e.changedTouches[0].clientY - touchStartY.current;
+    touchStartY.current = null;
+    if (deltaY < -40) stepSheet(1);       // swipe up -> expand one stop
+    else if (deltaY > 40) stepSheet(-1);  // swipe down -> collapse one stop
+    else handleSheetTap();                // small movement = a tap
+  };
 
   // Venues in the focused neighbourhood — always derived from the full DB set,
   // then narrowed by the active filters/search so the panel matches the map.
@@ -131,13 +163,18 @@ export default function App() {
   return (
     <div className="app">
       <nav className="navbar">
-        <div className="nav-brand" onClick={() => { setView('map'); selectNeighbourhood(null); }}>
+        <div className="nav-brand" onClick={() => { setView('map'); selectNeighbourhood(null); setMobileMenuOpen(false); }}>
           <span className="nav-logo">🍺</span>
           <div>
-            <div className="nav-title">{t('nav.title')}</div>
+            <div className="nav-title">
+              <span className="nav-title-full">{t('nav.title')}</span>
+              <span className="nav-title-short">Bierpreis</span>
+            </div>
             <div className="nav-subtitle">{t('nav.subtitle')}</div>
           </div>
         </div>
+
+        {/* Desktop actions — hidden on mobile in favour of the ☰ menu below */}
         <div className="nav-actions">
           <button className="trends-link-btn" onClick={() => setShowTrends(true)}>
             📊 {t('trends.button')}
@@ -147,6 +184,34 @@ export default function App() {
           </button>
           <button className="admin-link-btn" onClick={() => setView('admin')}>Admin</button>
         </div>
+
+        {/* Mobile hamburger — hidden on desktop */}
+        <div className="nav-mobile-menu">
+          <button
+            className="hamburger-btn"
+            onClick={() => setMobileMenuOpen((o) => !o)}
+            aria-label={mobileMenuOpen ? 'Close menu' : 'Open menu'}
+            aria-expanded={mobileMenuOpen}
+          >
+            ☰
+          </button>
+          {mobileMenuOpen && (
+            <>
+              <div className="mobile-menu-backdrop" onClick={() => setMobileMenuOpen(false)} />
+              <div className="mobile-menu-dropdown">
+                <button onClick={() => { setShowTrends(true); setMobileMenuOpen(false); }}>
+                  📊 {t('trends.button')}
+                </button>
+                <button onClick={() => { setView('admin'); setMobileMenuOpen(false); }}>
+                  🔐 Admin
+                </button>
+                <button onClick={() => { i18n.changeLanguage(i18n.language === 'de' ? 'en' : 'de'); setMobileMenuOpen(false); }}>
+                  🌐 {i18n.language === 'de' ? 'DE / EN' : 'EN / DE'}
+                </button>
+              </div>
+            </>
+          )}
+        </div>
       </nav>
 
       <StatsBar
@@ -154,14 +219,17 @@ export default function App() {
         neighbourhoods={neighbourhoods}
         activeNeighbourhood={activeNeighbourhood}
         onSelectNeighbourhood={selectNeighbourhood}
+        onSelectVenue={handleSelectVenueById}
       />
 
       <div className="main-layout">
-        <div className={`sidebar${sheetOpen ? ' sheet-open' : ''}`}>
+        <div className={`sidebar sheet-${sheetLevel}`}>
           <button
             className="sheet-handle"
-            onClick={() => setSheetOpen(o => !o)}
-            aria-label={sheetOpen ? 'Collapse list' : 'Expand list'}
+            onClick={handleSheetTap}
+            onTouchStart={handleSheetTouchStart}
+            onTouchEnd={handleSheetTouchEnd}
+            aria-label={sheetLevel === 'collapsed' ? 'Expand list' : 'Collapse list'}
           >
             <span className="sheet-grip" />
             <span className="sheet-handle-text">
@@ -175,7 +243,7 @@ export default function App() {
 
           <SearchBar
             onSearch={handleSearch}
-            onFocus={() => setSheetOpen(true)}
+            onFocus={() => setSheetLevel('half')}
             onFilterChange={setFilters}
             filters={filters}
             onNeighbourhoodSelect={selectNeighbourhood}

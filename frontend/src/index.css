@@ -15,15 +15,23 @@ html,body,#root{height:100%}
 body{font-family:'Source Sans 3',sans-serif;background:var(--cream);color:var(--text-primary);font-size:15px;line-height:1.5;-webkit-font-smoothing:antialiased}
 
 /* Navbar */
-.navbar{height:58px;background:var(--amber-900);display:flex;align-items:center;justify-content:space-between;padding:0 20px;box-shadow:0 2px 12px rgba(0,0,0,0.25);position:relative;z-index:200}
+/* z-index:900 (not the old 200) — the navbar establishes a stacking context, so its
+   position:fixed mobile-menu backdrop is confined within it regardless of its own
+   z-index. Leaflet's map panes default to ~400-700, so at 200 the navbar (and its
+   backdrop) rendered BENEATH the map — a tap meant to dismiss the menu fell through
+   onto whatever polygon/pin was underneath instead. 900 clears Leaflet's panes while
+   staying below .modal-overlay's 1000 so full-screen modals still cover the navbar. */
+.navbar{height:58px;background:var(--amber-900);display:flex;align-items:center;justify-content:space-between;padding:0 20px;box-shadow:0 2px 12px rgba(0,0,0,0.25);position:relative;z-index:900}
 .nav-brand{display:flex;align-items:center;gap:10px;cursor:pointer}
 .nav-logo{font-size:24px}
 .nav-title{font-family:'Playfair Display',serif;font-size:17px;font-weight:700;color:var(--amber-200);letter-spacing:0.3px}
+.nav-title-short{display:none} /* shown only on mobile — see media query */
 .nav-subtitle{font-size:11px;color:var(--amber-400);letter-spacing:0.5px;text-transform:uppercase}
 .nav-actions{display:flex;align-items:center;gap:10px}
 .lang-btn,.admin-link-btn,.trends-link-btn{background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);color:var(--amber-100);border-radius:6px;padding:5px 12px;font-size:13px;cursor:pointer;font-family:'Source Sans 3',sans-serif;transition:background 0.2s;white-space:nowrap}
 .lang-btn:hover,.admin-link-btn:hover,.trends-link-btn:hover{background:rgba(255,255,255,0.18)}
 .lang-btn{font-weight:600;letter-spacing:1px}
+.nav-mobile-menu{display:none} /* shown only on mobile — see media query */
 
 /* Layout */
 .app{display:flex;flex-direction:column;height:100vh;overflow:hidden}
@@ -385,6 +393,12 @@ body{font-family:'Source Sans 3',sans-serif;background:var(--cream);color:var(--
 .stat-tile-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted)}
 .stat-tile-value{font-family:'Playfair Display',serif;font-size:19px;font-weight:700;color:var(--amber-800);line-height:1.15}
 .stat-tile-sub{font-size:11px;color:var(--text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:150px}
+/* Cheapest/priciest tiles jump to that venue's detail page — a subtle underline
+   + arrow marks the venue name itself as tappable, on both desktop and mobile. */
+.stat-tile-tappable{text-decoration:underline;text-decoration-color:var(--border-md);text-underline-offset:2px}
+.stat-tile-btn:hover:not(:disabled) .stat-tile-tappable{text-decoration-color:var(--amber-600)}
+.stat-tile-arrow{display:inline-block;opacity:0.6;transition:transform 0.15s}
+.stat-tile-btn:hover:not(:disabled) .stat-tile-arrow{opacity:1;transform:translateX(2px)}
 .stats-pills{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
 .stats-pills-label{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);white-space:nowrap}
 .stats-pill{display:inline-flex;align-items:center;gap:6px;padding:5px 11px;border-radius:20px;border:1.5px solid var(--border-md);background:var(--cream);cursor:pointer;font-family:'Source Sans 3',sans-serif;font-size:12px;color:var(--text-secondary);transition:background 0.15s,border-color 0.15s;white-space:nowrap}
@@ -410,32 +424,78 @@ body{font-family:'Source Sans 3',sans-serif;background:var(--cream);color:var(--
 .sheet-handle{display:none}
 
 @media (max-width:768px){
-  .navbar{padding:0 14px}
+  /* Navbar — more breathing room, logo only + hamburger */
+  .navbar{padding:0 16px;height:64px}
+  .nav-brand{gap:12px}
+  .nav-logo{font-size:27px}
+  .nav-title-full{display:none}
+  .nav-title-short{display:inline-block;font-family:'Playfair Display',serif;font-size:18px;font-weight:700;color:var(--amber-200);letter-spacing:0.3px}
+  .nav-subtitle{display:none}
+  .nav-actions{display:none}
+
+  .nav-mobile-menu{display:block;position:relative}
+  .hamburger-btn{
+    width:44px;height:44px;display:flex;align-items:center;justify-content:center;
+    background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);
+    border-radius:9px;color:var(--amber-100);font-size:20px;cursor:pointer;
+    font-family:'Source Sans 3',sans-serif;
+  }
+  .hamburger-btn:active{background:rgba(255,255,255,0.2)}
+  .mobile-menu-backdrop{position:fixed;inset:0;background:rgba(0,0,0,0.15);z-index:1300}
+  .mobile-menu-dropdown{
+    position:absolute;top:calc(100% + 10px);right:0;z-index:1400;
+    background:var(--amber-900);border:1px solid rgba(255,255,255,0.15);
+    border-radius:12px;box-shadow:var(--shadow-lg);
+    display:flex;flex-direction:column;min-width:200px;overflow:hidden;
+  }
+  .mobile-menu-dropdown button{
+    background:none;border:none;color:var(--amber-100);text-align:left;
+    padding:14px 18px;font-size:14.5px;cursor:pointer;font-family:'Source Sans 3',sans-serif;
+    border-bottom:1px solid rgba(255,255,255,0.08);
+  }
+  .mobile-menu-dropdown button:last-child{border-bottom:none}
+  .mobile-menu-dropdown button:active{background:rgba(255,255,255,0.12)}
+
   .vm-form-grid{grid-template-columns:1fr}
   .admin-stats{grid-template-columns:repeat(2,1fr)}
-  .stats-bar{gap:10px;padding:7px 12px}
-  .stats-tiles{gap:8px}
-  .stat-tile{min-width:104px;padding:5px 10px}
+
+  /* Stats bar — 3 stacked rows, no ambient horizontal scroll of the whole bar */
+  .stats-bar{
+    display:flex;flex-direction:column;align-items:stretch;gap:6px;
+    padding:8px 12px;overflow:visible;
+  }
+  .stats-tiles{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+  .stat-tile{min-width:0;padding:6px 10px}
+  .stat-tile:first-child{
+    grid-column:1 / -1;flex-direction:row;align-items:baseline;gap:6px;flex-wrap:wrap;
+  }
+  .stat-tile:first-child .stat-tile-sub::before{content:'· '}
   .stat-tile-value{font-size:16px}
-  .stats-pills{flex-wrap:nowrap}
+  .stat-tile-sub{max-width:none}
+  .stats-pills{flex-wrap:nowrap;overflow-x:auto;padding-bottom:2px;-webkit-overflow-scrolling:touch}
   .stats-pills-label{display:none}
 
   .main-layout{position:relative}
   .map-container{position:absolute;inset:0}
   .map-legend{bottom:20px;left:10px;transform:scale(0.9);transform-origin:bottom left}
 
+  /* Bottom sheet — 3 stops: collapsed (~15% visible), half (~60%), full (~90%).
+     Height is fixed at 90vh; each stop just translates it down by a different
+     amount, so "how much is visible" and "how tall the sheet is" stay decoupled
+     from the transform math. */
   .sidebar{
     position:fixed;left:0;right:0;bottom:0;top:auto;
     width:auto;min-width:0;
-    height:76vh;max-height:76vh;
+    height:90vh;max-height:90vh;
     border-right:none;border-top:1px solid var(--border-md);
     border-radius:18px 18px 0 0;
     box-shadow:0 -8px 32px rgba(107,76,30,0.22);
-    transform:translateY(calc(100% - 52px));
-    transition:transform 0.28s ease;
+    transform:translateY(75vh); /* collapsed: 90vh - 15vh visible */
+    transition:transform 0.4s cubic-bezier(0.34,1.56,0.64,1); /* springy ease-out-back */
     z-index:1200;
   }
-  .sidebar.sheet-open{transform:translateY(0)}
+  .sidebar.sheet-half{transform:translateY(30vh)} /* 90vh - 60vh visible */
+  .sidebar.sheet-full{transform:translateY(0)}    /* full 90vh visible */
 
   .sheet-handle{
     display:flex;position:relative;align-items:center;
@@ -443,6 +503,7 @@ body{font-family:'Source Sans 3',sans-serif;background:var(--cream);color:var(--
     background:var(--amber-900);color:var(--amber-100);
     border:none;cursor:pointer;border-radius:18px 18px 0 0;
     font-family:'Source Sans 3',sans-serif;
+    touch-action:none; /* the handle owns vertical touch gestures — swipe, don't scroll */
   }
   .sheet-grip{position:absolute;top:7px;left:50%;transform:translateX(-50%);width:38px;height:4px;border-radius:2px;background:rgba(255,255,255,0.4)}
   .sheet-handle-text{font-weight:600;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--amber-100)}
