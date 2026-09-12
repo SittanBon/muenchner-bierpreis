@@ -96,6 +96,10 @@ export const de = {
       allBrands: "Alle Marken",
       otherBrandPlaceholder: "Markenname eingeben"
     },
+    brandPicker: {
+      placeholder: "Marke suchen oder eingeben...",
+      noResults: "Keine Treffer für \"{{query}}\" — als neue Marke übernehmen"
+    },
     report: {
       button: "Melden",
       title: "Was möchtest du melden?",
@@ -294,6 +298,10 @@ export const en = {
       thisVenuesBrands: "This venue's beers",
       allBrands: "All brands",
       otherBrandPlaceholder: "Enter brand name"
+    },
+    brandPicker: {
+      placeholder: "Search or type a brand...",
+      noResults: "No results for \"{{query}}\" — use as a new brand"
     },
     report: {
       button: "Report",

@@ -165,8 +165,6 @@ export default function VenueDetail({ venue: initialVenue, onBack }) {
     setTimeout(() => setSubmitSuccess(false), 4000);
   };
 
-  const venueBrandNames = beers.map((b) => b.brand);
-
   return (
     <div className="venue-detail">
       {/* Back button */}
@@ -284,7 +282,6 @@ export default function VenueDetail({ venue: initialVenue, onBack }) {
         <ReportForm
           venueId={venue.id}
           venueName={venue.name}
-          venueBrands={venueBrandNames}
           onSuccess={handleSubmitSuccess}
           onCancel={() => setShowReport(false)}
         />

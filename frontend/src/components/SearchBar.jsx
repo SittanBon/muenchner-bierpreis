@@ -1,11 +1,14 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { BRANDS, OTHER_BRAND } from '../constants/brands';
+import { BRAND_GROUPS } from '../constants/brands';
 
 const TYPES = ['beer_garden', 'beer_hall', 'bar', 'restaurant'];
-// "Other / Andere" is a free-text catch-all for reporting a new brand — it never
-// matches an actual venue, so it's meaningless as a filter option here.
-const FILTERABLE_BRANDS = BRANDS.filter((b) => b !== OTHER_BRAND);
+// "Other / Andere" and "Craft Beer (lokal)" are free-text catch-alls for
+// reporting a brand — they never match an actual venue's data, so they're
+// meaningless as filter options here.
+const FILTERABLE_GROUPS = BRAND_GROUPS
+  .map((g) => ({ ...g, brands: g.brands.filter((b) => b !== 'Other / Andere' && b !== 'Craft Beer (lokal)') }))
+  .filter((g) => g.brands.length > 0);
 const NEIGHBOURHOODS = [
   { id: 'altstadt', de: 'Altstadt', en: 'Old Town' },
   { id: 'maxvorstadt', de: 'Maxvorstadt', en: 'Maxvorstadt' },
@@ -102,7 +105,11 @@ export default function SearchBar({ onSearch, onFocus, onFilterChange, filters, 
               <label className="filter-label">{t('filters.brand')}</label>
               <select value={filters.brand || '__all__'} onChange={e => setFilter('brand', e.target.value)}>
                 <option value="__all__">{t('filters.all')}</option>
-                {FILTERABLE_BRANDS.map(b => <option key={b} value={b}>{b}</option>)}
+                {FILTERABLE_GROUPS.map(g => (
+                  <optgroup key={g.id} label={i18n.language === 'de' ? g.label_de : g.label_en}>
+                    {g.brands.map(b => <option key={b} value={b}>{b}</option>)}
+                  </optgroup>
+                ))}
               </select>
             </div>
 

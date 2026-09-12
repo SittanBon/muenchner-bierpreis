@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { submitReport } from '../hooks/useApi';
-import { BRANDS, OTHER_BRAND } from '../constants/brands';
 import { parsePrice } from '../utils/price';
+import BrandCombobox from './BrandCombobox';
 
 const TOPICS = [
   { key: 'price_change', icon: '💶' },
@@ -16,11 +16,11 @@ const TOPICS = [
 // buttons (one per beer's "Report price", "+ report a new brand", "report
 // incorrect info") with one funnel, all landing in the same admin queue
 // labelled by `report_type`.
-export default function ReportForm({ venueId, venueName, venueBrands, onSuccess, onCancel }) {
+export default function ReportForm({ venueId, venueName, onSuccess, onCancel }) {
   const { t } = useTranslation();
   const [topic, setTopic] = useState(null);
   const [form, setForm] = useState({
-    beer_brand: '', other_brand: '', size: '0.5L', price: '',
+    beer_brand: '', size: '0.5L', price: '',
     visit_date: new Date().toISOString().split('T')[0],
     submitter_name: '', anonymous: false, note: '',
   });
@@ -49,7 +49,7 @@ export default function ReportForm({ venueId, venueName, venueBrands, onSuccess,
   };
 
   const submitPriceReport = () => {
-    const resolvedBrand = form.beer_brand === OTHER_BRAND ? form.other_brand.trim() : form.beer_brand;
+    const resolvedBrand = form.beer_brand.trim();
     const price = parsePrice(form.price);
     if (!resolvedBrand || price == null) {
       setError(t('report.errBrandPrice'));
@@ -102,20 +102,12 @@ export default function ReportForm({ venueId, venueName, venueBrands, onSuccess,
         <>
           <div className="sf-field">
             <label>{t('submission.brand')}</label>
-            <select value={form.beer_brand} onChange={(e) => set('beer_brand', e.target.value)}>
-              <option value="">-- {t('submission.brand')} --</option>
-              {topic === 'price_change' ? (
-                venueBrands.map((b) => <option key={b} value={b}>{b}</option>)
-              ) : (
-                BRANDS.map((b) => <option key={b} value={b}>{b}</option>)
-              )}
-            </select>
-            {topic === 'new_beer' && form.beer_brand === OTHER_BRAND && (
-              <input
-                type="text" className="sf-other-brand" placeholder={t('submission.otherBrandPlaceholder')}
-                value={form.other_brand} onChange={(e) => set('other_brand', e.target.value)}
-              />
-            )}
+            <BrandCombobox
+              value={form.beer_brand}
+              onChange={(v) => set('beer_brand', v)}
+              placeholder={t('brandPicker.placeholder')}
+              id={`report-brand-${topic}`}
+            />
           </div>
           <div className="sf-row">
             <div className="sf-field half">

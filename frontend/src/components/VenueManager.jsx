@@ -4,8 +4,8 @@ import {
   fetchNeighbourhoods, adminFetchVenues, adminCreateVenue, adminUpdateVenue,
   adminAddBeer, adminUpdateBeerPrice, adminDeleteBeer,
 } from '../hooks/useApi';
-import { BRANDS } from '../constants/brands';
 import { parsePrice, formatEuro, pricePlaceholder } from '../utils/price';
+import BrandCombobox from './BrandCombobox';
 
 const TYPES = ['beer_garden', 'beer_hall', 'bar', 'restaurant'];
 
@@ -110,10 +110,13 @@ function AddVenueForm({ token, neighbourhoods, onCreated, onCancel }) {
       <div className="vm-beers-title">{t('admin.venues.beers')}</div>
       {beers.map((b, i) => (
         <div key={i} className="vm-beer-row">
-          <select value={b.brand} onChange={(e) => setBeer(i, 'brand', e.target.value)}>
-            <option value="">-- {t('submission.brand')} --</option>
-            {BRANDS.map((br) => <option key={br} value={br}>{br}</option>)}
-          </select>
+          <BrandCombobox
+            value={b.brand}
+            onChange={(v) => setBeer(i, 'brand', v)}
+            placeholder={t('brandPicker.placeholder')}
+            id={`add-venue-beer-${i}`}
+            exclude={beers.filter((_, idx) => idx !== i).map((x) => x.brand).filter(Boolean)}
+          />
           <div className="vm-price-field">
             <span className="vm-price-field-label">0,5L</span>
             <input
@@ -281,7 +284,6 @@ function EditVenueForm({ token, venue, neighbourhoods, onUpdated, onCancel }) {
   }, [venue.beers]);
 
   const existingBrands = venue.beers.map((b) => b.brand);
-  const availableBrands = BRANDS.filter((b) => !existingBrands.includes(b));
 
   const savePrice = async (beer) => {
     setError('');
@@ -359,10 +361,13 @@ function EditVenueForm({ token, venue, neighbourhoods, onUpdated, onCancel }) {
 
       <div className="vm-beers-title">{t('admin.venues.addAnotherBeer')}</div>
       <div className="vm-beer-row">
-        <select value={newBeer.brand} onChange={(e) => setNewBeer((b) => ({ ...b, brand: e.target.value }))}>
-          <option value="">-- {t('submission.brand')} --</option>
-          {availableBrands.map((br) => <option key={br} value={br}>{br}</option>)}
-        </select>
+        <BrandCombobox
+          value={newBeer.brand}
+          onChange={(v) => setNewBeer((b) => ({ ...b, brand: v }))}
+          placeholder={t('brandPicker.placeholder')}
+          id={`edit-venue-new-beer-${venue.id}`}
+          exclude={existingBrands}
+        />
         <div className="vm-price-field">
           <span className="vm-price-field-label">0,5L</span>
           <input

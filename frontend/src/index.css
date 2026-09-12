@@ -189,6 +189,26 @@ body{font-family:'Source Sans 3',sans-serif;background:var(--cream);color:var(--
 .sf-field select:focus,.sf-field input:focus{border-color:var(--amber-600)}
 .sf-locked-brand{padding:9px 10px;border:1.5px solid var(--amber-300);border-radius:7px;background:var(--amber-100);color:var(--amber-800);font-weight:600;font-size:14px}
 .sf-other-brand{margin-top:6px}
+
+/* Searchable brand combobox — plain <input> underneath (free text always
+   works) with a custom grouped/filtered dropdown layered on top. */
+.brand-combobox{position:relative;width:100%;min-width:0}
+.brand-combobox-input-wrap{position:relative;display:flex}
+.brand-combobox-input{width:100%;padding:9px 32px 9px 10px;border:1.5px solid var(--border-md);border-radius:7px;font-family:'Source Sans 3',sans-serif;font-size:14px;background:#fff;color:var(--text-primary);outline:none;transition:border-color 0.2s}
+.brand-combobox-input:focus{border-color:var(--amber-600)}
+.brand-combobox-clear{position:absolute;right:5px;top:50%;transform:translateY(-50%);background:none;border:none;color:var(--text-muted);font-size:13px;cursor:pointer;padding:6px 7px;line-height:1;border-radius:5px}
+.brand-combobox-clear:hover{color:var(--text-primary);background:var(--amber-50)}
+.brand-combobox-dropdown{position:absolute;top:calc(100% + 4px);left:0;right:0;z-index:600;background:#fff;border:1.5px solid var(--border-md);border-radius:9px;box-shadow:var(--shadow-lg);max-height:280px;overflow-y:auto;padding:4px 0;list-style:none;-webkit-overflow-scrolling:touch}
+.brand-combobox-group{padding:0}
+.brand-combobox-group-label{font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.4px;color:var(--text-muted);padding:8px 12px 4px}
+.brand-combobox-group ul{list-style:none;margin:0;padding:0}
+.brand-combobox-option{display:block;width:100%;text-align:left;background:none;border:none;padding:10px 12px;font-size:13.5px;color:var(--text-primary);cursor:pointer;font-family:'Source Sans 3',sans-serif}
+.brand-combobox-option:hover,.brand-combobox-option.active{background:var(--amber-50)}
+.brand-combobox-option mark{background:var(--amber-200);color:var(--text-primary);border-radius:2px;padding:0 1px}
+.brand-combobox-noresults{padding:10px 12px;font-size:12.5px;color:var(--text-muted);font-style:italic}
+
+/* Fit inside the compact admin beer-row (previously a <select> with flex:1.4) */
+.vm-beer-row .brand-combobox{flex:1.4;min-width:0}
 .sf-row{display:flex;gap:8px}
 .sf-field.half{flex:1}
 .sf-name-row{display:flex;gap:8px;align-items:center}
@@ -322,7 +342,10 @@ body{font-family:'Source Sans 3',sans-serif;background:var(--cream);color:var(--
 
 /* Missing-bar floating button */
 .missing-bar-fab{
-  position:absolute;right:16px;bottom:24px;z-index:900;
+  /* Must clear .sidebar's z-index:1200 — on mobile the collapsed bottom sheet's
+     handle bar + peeking search box sits at the same bottom-right corner and,
+     at only 900, silently won the stacking order and ate every tap here. */
+  position:absolute;right:16px;bottom:24px;z-index:1250;
   display:flex;align-items:center;gap:8px;padding:12px 18px;
   background:var(--amber-900);color:var(--amber-100);border:none;border-radius:30px;
   font-size:13.5px;font-weight:600;cursor:pointer;font-family:'Source Sans 3',sans-serif;

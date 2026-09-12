@@ -1,8 +1,8 @@
 import { useState, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { searchNominatim, submitNewVenue } from '../hooks/useApi';
-import { BRANDS, OTHER_BRAND } from '../constants/brands';
 import MiniMapPreview from './MiniMapPreview';
+import BrandCombobox from './BrandCombobox';
 import { parsePrice, formatEuro, pricePlaceholder } from '../utils/price';
 
 const TYPES = ['beer_garden', 'beer_hall', 'bar', 'restaurant'];
@@ -16,7 +16,7 @@ const NEIGHBOURHOODS = [
 function emptyForm() {
   return {
     name: '', type: 'restaurant', address: '', neighbourhood_id: 'altstadt',
-    lat: '', lng: '', beer_brand: '', other_brand: '', size_05: '', size_mass: '',
+    lat: '', lng: '', beer_brand: '', size_05: '', size_mass: '',
     submitter_name: '', anonymous: false,
     visit_date: new Date().toISOString().split('T')[0],
     photo: null,
@@ -80,8 +80,7 @@ export default function MissingBarModal({ allVenues, onClose, onCreated }) {
   const step2Error = () => {
     if (!form.name.trim()) return t('missingBar.errName');
     if (!form.neighbourhood_id) return t('missingBar.errNeighbourhood');
-    const brand = form.beer_brand === OTHER_BRAND ? form.other_brand.trim() : form.beer_brand;
-    if (!brand) return t('missingBar.errBrand');
+    if (!form.beer_brand.trim()) return t('missingBar.errBrand');
     if (parsePrice(form.size_05) == null) return t('missingBar.errPrice');
     return '';
   };
@@ -96,7 +95,6 @@ export default function MissingBarModal({ allVenues, onClose, onCreated }) {
   const handleSubmit = async () => {
     setSubmitting(true);
     setSubmitError('');
-    const resolvedBrand = form.beer_brand === OTHER_BRAND ? form.other_brand.trim() : form.beer_brand;
     const fd = new FormData();
     fd.append('name', form.name.trim());
     fd.append('type', form.type);
@@ -104,7 +102,7 @@ export default function MissingBarModal({ allVenues, onClose, onCreated }) {
     fd.append('address', form.address);
     if (form.lat) fd.append('lat', form.lat);
     if (form.lng) fd.append('lng', form.lng);
-    fd.append('beer_brand', resolvedBrand);
+    fd.append('beer_brand', form.beer_brand.trim());
     fd.append('size_05', parsePrice(form.size_05));
     const mass = parsePrice(form.size_mass);
     if (mass != null) fd.append('size_mass', mass);
@@ -122,7 +120,6 @@ export default function MissingBarModal({ allVenues, onClose, onCreated }) {
     setSubmitting(false);
   };
 
-  const resolvedBrandLabel = form.beer_brand === OTHER_BRAND ? form.other_brand : form.beer_brand;
   const resolvedPrice05 = parsePrice(form.size_05);
   const resolvedPriceMass = parsePrice(form.size_mass);
   const typeLabel = t(`filters.types.${form.type}`);
@@ -227,16 +224,12 @@ export default function MissingBarModal({ allVenues, onClose, onCreated }) {
 
                 <div className="sf-field">
                   <label>{t('submission.brand')}</label>
-                  <select value={form.beer_brand} onChange={(e) => set('beer_brand', e.target.value)}>
-                    <option value="">-- {t('submission.brand')} --</option>
-                    {BRANDS.map((b) => <option key={b} value={b}>{b}</option>)}
-                  </select>
-                  {form.beer_brand === OTHER_BRAND && (
-                    <input
-                      type="text" className="sf-other-brand" placeholder={t('submission.otherBrandPlaceholder')}
-                      value={form.other_brand} onChange={(e) => set('other_brand', e.target.value)}
-                    />
-                  )}
+                  <BrandCombobox
+                    value={form.beer_brand}
+                    onChange={(v) => set('beer_brand', v)}
+                    placeholder={t('brandPicker.placeholder')}
+                    id="missing-bar-brand"
+                  />
                 </div>
 
                 <div className="sf-row">
@@ -291,7 +284,7 @@ export default function MissingBarModal({ allVenues, onClose, onCreated }) {
                   <div className="mb-summary-name">{form.name}</div>
                   <div className="mb-summary-row">{typeLabel} · {hoodLabel}</div>
                   {form.address && <div className="mb-summary-row">📍 {form.address}</div>}
-                  <div className="mb-summary-row">🍺 {resolvedBrandLabel} — {formatEuro(resolvedPrice05, i18n.language)}{resolvedPriceMass != null ? ` / ${formatEuro(resolvedPriceMass, i18n.language)} (Maß)` : ''}</div>
+                  <div className="mb-summary-row">🍺 {form.beer_brand} — {formatEuro(resolvedPrice05, i18n.language)}{resolvedPriceMass != null ? ` / ${formatEuro(resolvedPriceMass, i18n.language)} (Maß)` : ''}</div>
                   <div className="mb-summary-row">📅 {form.visit_date}</div>
                   {form.photo && <div className="mb-summary-row">📷 {form.photo.name}</div>}
                 </div>

@@ -1,25 +1,70 @@
-// Single source of truth for the beer-brand list — used by every dropdown
-// (search filters, submission form, admin add/edit venue). Top brands show
-// first, then the rest alphabetically, with "Other / Andere" always last.
+// Complete beer-brand list, grouped by region — the names people actually call
+// these breweries, not their full legal names. Powers the searchable brand
+// combobox (BrandCombobox.jsx) everywhere a brand is entered, plus the
+// brand-filter <select> in SearchBar (grouped there via <optgroup>).
 
-export const TOP_BRANDS = [
-  'Augustiner', 'Paulaner', 'Hofbräu', 'Hacker-Pschorr', 'Löwenbräu', 'Spaten',
-];
-
-const REST_ALPHABETICAL = [
-  'Andechs', 'Ayinger', 'Bayreuther', 'Chiemseer', 'Crew Republic', 'Erdinger',
-  'Forschungsbrauerei', 'Franziskaner', 'Giesinger Bräu', 'Haderner',
-  'Kuchlbauer', "Mahr's Bräu", 'Schönramer', 'Schloss Kaltenberg',
-  'Schwabinger Bräu', 'Tegernseer', 'Tilmans', 'Unertl', 'Weihenstephaner',
+export const BRAND_GROUPS = [
+  {
+    id: 'munich',
+    label_de: 'Münchner Traditionsbrauereien',
+    label_en: 'Munich Traditional Breweries',
+    brands: ['Augustiner', 'Paulaner', 'Hacker-Pschorr', 'Hofbräu München', 'Spaten', 'Löwenbräu'],
+  },
+  {
+    id: 'bavaria',
+    label_de: 'Bayerische Brauereien',
+    label_en: 'Bavarian Breweries',
+    brands: [
+      'Weihenstephaner', 'Ayinger', 'Andechs', 'Giesinger Bräu', 'Tegernseer',
+      'Flötzinger', 'Weltenburger', 'Tucher', 'Kulmbacher', 'Mönchshof',
+      'Bayreuther', 'Chiemseer', 'Schönramer', 'Camba Bavaria', 'Maisel-Bräu',
+      'Maisel & Friends', 'Schneider Weisse', 'Erdinger', 'König Ludwig',
+      'Riedenburger', 'Hofmark', 'Kuchlbauer', 'Riegele', 'Freihof',
+      'Schwaben Bräu', 'Stuttgarter Hofbräu', 'Weldebräu', 'Rothaus',
+    ],
+  },
+  {
+    id: 'national',
+    label_de: 'Nationale Marken',
+    label_en: 'National Brands',
+    brands: [
+      'Krombacher', 'Bitburger', 'Warsteiner', 'Veltins', 'Radeberger', 'Jever',
+      "Beck's", 'Hasseröder', 'König', 'Oettinger', 'Sternburg', 'Freiberger',
+      'Landskron', 'Störtebeker', 'Flensburger', 'Astra', 'Holsten',
+      'Dithmarscher', 'Einbecker', 'Herrenhäuser', 'Licher', 'Binding',
+      'Henninger', 'Gilde', 'Karlsberg',
+    ],
+  },
+  {
+    id: 'west',
+    label_de: 'Köln, Düsseldorf & Westen',
+    label_en: 'Cologne, Düsseldorf & West',
+    brands: [
+      'Früh Kölsch', 'Gaffel', 'Reissdorf', 'Malzmühle', 'Päffgen', 'Sünner',
+      'Hellers', 'Schreckenskammer', 'Sion', 'Küppers', 'Füchschen', 'Uerige',
+      'Schumacher', 'Bolten', 'Diebels', 'Schlüssel', 'Erzquell',
+    ],
+  },
+  {
+    id: 'berlin',
+    label_de: 'Berlin & Craft',
+    label_en: 'Berlin & Craft',
+    brands: [
+      'Berliner Kindl', 'Berliner Berg', 'Lemke', 'BRLO', 'Vagabund', 'BrewDog',
+      'Crew Republic', 'Straßenbräu', 'Schneeeule', 'Freigeist', 'Kehrwieder',
+      'Ratsherrn', 'ÜberQuell', 'Neuzelle', 'Lammsbräu',
+    ],
+  },
+  {
+    id: 'other',
+    label_de: 'Sonstige / Other',
+    label_en: 'Other',
+    brands: ['Craft Beer (lokal)', 'Other / Andere'],
+  },
 ];
 
 export const OTHER_BRAND = 'Other / Andere';
 
-// Full ordered list: top brands, then the rest alphabetically, "Other" last.
-// (Löwenbräu and Spaten already lead the list, so they're filtered out of the
-// alphabetical tail rather than appearing twice.)
-export const BRANDS = [
-  ...TOP_BRANDS,
-  ...REST_ALPHABETICAL.filter((b) => !TOP_BRANDS.includes(b)),
-  OTHER_BRAND,
-];
+// Flat, de-duplicated, group order preserved — for the simple cases (native
+// <select> options, substring search) that don't need the grouping.
+export const BRANDS = [...new Set(BRAND_GROUPS.flatMap((g) => g.brands))];

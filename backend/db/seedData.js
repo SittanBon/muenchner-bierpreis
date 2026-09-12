@@ -45,7 +45,7 @@ const venues = [
     opening_hours: "Mo–So 9:00–23:30",
     website: "https://www.hofbraeuhaus.de",
     beers: [
-      { brand: "Hofbräu", size_05: 6.2, size_mass: 12.4, updated: "2025-03-15", reports: 8 }
+      { brand: "Hofbräu München", size_05: 6.2, size_mass: 12.4, updated: "2025-03-15", reports: 8 }
     ],
     description_de: "Das weltberühmte Wirtshaus am Platzl – ein Münchner Original seit 1589.",
     description_en: "The world-famous inn at Platzl — a Munich original since 1589."
@@ -63,7 +63,7 @@ const venues = [
     beers: [
       { brand: "Augustiner", size_05: 5.3, size_mass: 10.6, updated: "2025-04-20", reports: 5 },
       { brand: "Paulaner", size_05: 5.4, size_mass: 10.8, updated: "2025-06-01", reports: 3 },
-      { brand: "Hofbräu", size_05: 5.6, size_mass: null, updated: "2025-06-01", reports: 5 }
+      { brand: "Hofbräu München", size_05: 5.6, size_mass: null, updated: "2025-06-01", reports: 5 }
     ],
     description_de: "Mitten auf dem Viktualienmarkt – alle 6 Wochen wechselt die Münchner Brauerei, aktuell Augustiner.",
     description_en: "Right in the middle of Viktualienmarkt — every 6 weeks a different Munich brewery, currently Augustiner."
@@ -144,7 +144,7 @@ const venues = [
     opening_hours: "Mo–Fr 11:00–3:00, Sa–So 12:00–3:00",
     website: "",
     beers: [
-      { brand: "Augustiner", size_05: 4.5, size_mass: 9, updated: "2025-04-01", reports: 7 }
+      { brand: "Weihenstephaner", size_05: 4.5, size_mass: 9, updated: "2025-04-01", reports: 7 }
     ],
     description_de: "Kultige Studentenbar in der Maxvorstadt – günstige Preise, gutes Bier.",
     description_en: "Iconic student bar in Maxvorstadt — cheap prices, good beer."
@@ -160,7 +160,7 @@ const venues = [
     opening_hours: "Mo–So 10:00–22:00 (saisonal)",
     website: "https://www.chinaturm.de",
     beers: [
-      { brand: "Hofbräu", size_05: 5.5, size_mass: 11, updated: "2025-04-18", reports: 9 },
+      { brand: "Hofbräu München", size_05: 5.5, size_mass: 11, updated: "2025-04-18", reports: 9 },
       { brand: "Paulaner", size_05: 5.7, size_mass: null, updated: "2025-06-01", reports: 2 },
       { brand: "Augustiner", size_05: 5.4, size_mass: null, updated: "2025-06-01", reports: 4 }
     ],
@@ -195,7 +195,7 @@ const venues = [
     opening_hours: "Mo–So 10:00–1:00",
     website: "",
     beers: [
-      { brand: "Paulaner", size_05: 5.1, size_mass: 10.2, updated: "2025-02-14", reports: 4 }
+      { brand: "Augustiner", size_05: 5.1, size_mass: 10.2, updated: "2025-02-14", reports: 4 }
     ],
     description_de: "Belebte Bar am Schwabinger Platz mit großer Sonnenterrasse.",
     description_en: "Lively bar on the Schwabing square with large sun terrace."
@@ -245,7 +245,7 @@ const venues = [
     opening_hours: "Mo–So 9:00–1:00",
     website: "",
     beers: [
-      { brand: "Augustiner", size_05: 4.7, size_mass: null, updated: "2025-03-30", reports: 5 }
+      { brand: "Löwenbräu", size_05: 4.7, size_mass: null, updated: "2025-03-30", reports: 5 }
     ],
     description_de: "Legendäres Café-Bar im Glockenbachviertel – Frühstück bis Nachtleben.",
     description_en: "Legendary café-bar in Glockenbachviertel — breakfast to nightlife."
@@ -309,7 +309,7 @@ const venues = [
     opening_hours: "Mo–So 10:00–24:00 (Biergarten saisonal)",
     website: "",
     beers: [
-      { brand: "Hofbräu", size_05: 5.3, size_mass: 10.6, updated: "2025-05-28", reports: 6 },
+      { brand: "Hofbräu München", size_05: 5.3, size_mass: 10.6, updated: "2025-05-28", reports: 6 },
       { brand: "Tegernseer", size_05: 5.1, size_mass: 10.2, updated: "2025-06-01", reports: 2 }
     ],
     description_de: "Schattiger Kastanien-Biergarten am Wiener Platz, seit 1892 in Betrieb.",
@@ -392,7 +392,7 @@ const venues = [
     opening_hours: "Mo–So 12:00–1:00",
     website: "",
     beers: [
-      { brand: "Paulaner", size_05: 5.7, size_mass: null, updated: "2025-03-11", reports: 4 }
+      { brand: "Giesinger Bräu", size_05: 5.7, size_mass: null, updated: "2025-03-11", reports: 4 }
     ],
     description_de: "Belebter Irish Pub direkt neben dem Dom – Guinness, Paulaner und Live-Sport.",
     description_en: "Busy Irish pub right next to the cathedral — Guinness, Paulaner and live sport."
@@ -474,7 +474,7 @@ const venues = [
     opening_hours: "Mo–So 11:00–1:00",
     website: "",
     beers: [
-      { brand: "Augustiner", size_05: 4.8, size_mass: 9.6, updated: "2025-03-07", reports: 7 }
+      { brand: "Tegernseer", size_05: 4.8, size_mass: 9.6, updated: "2025-03-07", reports: 7 }
     ],
     description_de: "Studentisch geprägte Kneipe im Uni-Viertel – Augustiner und Wirtshausküche.",
     description_en: "Student pub in the university quarter — Augustiner and hearty pub food."
@@ -492,7 +492,7 @@ const venues = [
     beers: [
       { brand: "Löwenbräu", size_05: 5.5, size_mass: 11, updated: "2025-05-09", reports: 6 },
       { brand: "Augustiner", size_05: 5.7, size_mass: 11.4, updated: "2025-06-01", reports: 6 },
-      { brand: "Franziskaner", size_05: 5.9, size_mass: null, updated: "2025-06-01", reports: 2 }
+      { brand: "Spaten", size_05: 5.9, size_mass: null, updated: "2025-06-01", reports: 2 }
     ],
     description_de: "Prachtbau am Stiglmaierplatz mit Festsaal, Wirtshaus und Biergarten.",
     description_en: "Grand hall on Stiglmaierplatz with a ballroom, tavern and beer garden."
@@ -508,7 +508,7 @@ const venues = [
     opening_hours: "Mo–So 17:00–1:00 (Biergarten saisonal)",
     website: "",
     beers: [
-      { brand: "Löwenbräu", size_05: 4.9, size_mass: 9.8, updated: "2025-04-03", reports: 5 }
+      { brand: "Spaten", size_05: 4.9, size_mass: 9.8, updated: "2025-04-03", reports: 5 }
     ],
     description_de: "Traditionswirtshaus mit kleinem Biergarten, Salsa-Abenden und Studentenpreisen.",
     description_en: "Traditional pub with a small beer garden, salsa nights and student prices."
@@ -524,7 +524,7 @@ const venues = [
     opening_hours: "Mo–So 8:00–1:00",
     website: "",
     beers: [
-      { brand: "Tegernseer", size_05: 5.2, size_mass: null, updated: "2025-05-20", reports: 4 }
+      { brand: "Paulaner", size_05: 5.2, size_mass: null, updated: "2025-05-20", reports: 4 }
     ],
     description_de: "Eck-Lokal am Wedekindplatz – Frühstück, Tegernseer Hell und Schwabinger Publikum.",
     description_en: "Corner spot on Wedekindplatz — breakfast, Tegernseer Hell and a Schwabing crowd."
@@ -540,7 +540,7 @@ const venues = [
     opening_hours: "Mo–So 19:00–3:00",
     website: "",
     beers: [
-      { brand: "Augustiner", size_05: 4.6, size_mass: null, updated: "2025-02-18", reports: 6 }
+      { brand: "Warsteiner", size_05: 4.6, size_mass: null, updated: "2025-02-18", reports: 6 }
     ],
     description_de: "Winzige Kult-Kneipe, letzter Rest des alten, rauen Schwabing.",
     description_en: "Tiny cult dive bar, the last remnant of old, rough-edged Schwabing."
@@ -557,7 +557,7 @@ const venues = [
     website: "",
     beers: [
       { brand: "Paulaner", size_05: 5.3, size_mass: 10.6, updated: "2025-06-04", reports: 5 },
-      { brand: "Hofbräu", size_05: 5.5, size_mass: 11, updated: "2025-06-01", reports: 2 }
+      { brand: "Hofbräu München", size_05: 5.5, size_mass: 11, updated: "2025-06-01", reports: 2 }
     ],
     description_de: "Großer Biergarten im nördlichen Englischen Garten mit Spielplatz und Livemusik.",
     description_en: "Large beer garden in the northern English Garden with playground and live music."
@@ -573,7 +573,7 @@ const venues = [
     opening_hours: "Mo–So 8:00–1:00",
     website: "",
     beers: [
-      { brand: "Augustiner", size_05: 5.4, size_mass: null, updated: "2025-04-27", reports: 3 }
+      { brand: "Hacker-Pschorr", size_05: 5.4, size_mass: null, updated: "2025-04-27", reports: 3 }
     ],
     description_de: "Deli und Bar an der Münchner Freiheit – Frühstück bis Aperitif.",
     description_en: "Deli and bar by Münchner Freiheit — from breakfast through to aperitivo."
@@ -589,7 +589,7 @@ const venues = [
     opening_hours: "Mo–So 11:00–24:00",
     website: "",
     beers: [
-      { brand: "Hofbräu", size_05: 5.6, size_mass: 11.2, updated: "2025-03-25", reports: 4 },
+      { brand: "Hofbräu München", size_05: 5.6, size_mass: 11.2, updated: "2025-03-25", reports: 4 },
       { brand: "Augustiner", size_05: 5.4, size_mass: null, updated: "2025-06-01", reports: 5 }
     ],
     description_de: "Großes Wirtshaus an der Leopoldstraße mit Terrasse zum Flanieren.",
@@ -606,7 +606,7 @@ const venues = [
     opening_hours: "Di–So 18:00–1:00",
     website: "",
     beers: [
-      { brand: "Paulaner", size_05: 5.3, size_mass: null, updated: "2025-05-14", reports: 3 }
+      { brand: "Erdinger", size_05: 5.3, size_mass: null, updated: "2025-05-14", reports: 3 }
     ],
     description_de: "Wirtshaus und Kleinkunstbühne – Kabarett, Konzerte und bayerische Brotzeit.",
     description_en: "Pub and small stage — cabaret, concerts and Bavarian cold platters."
@@ -655,7 +655,7 @@ const venues = [
     opening_hours: "Mo–So 20:00–3:00",
     website: "",
     beers: [
-      { brand: "Tegernseer", size_05: 5.2, size_mass: null, updated: "2025-03-02", reports: 4 }
+      { brand: "Jever", size_05: 5.2, size_mass: null, updated: "2025-03-02", reports: 4 }
     ],
     description_de: "Kleine DJ-Bar am Rand der Isarvorstadt, Treffpunkt der Musikszene.",
     description_en: "Small DJ bar on the edge of Isarvorstadt, a hub for the music scene."
@@ -671,7 +671,7 @@ const venues = [
     opening_hours: "Mo–So 18:00–3:00",
     website: "",
     beers: [
-      { brand: "Augustiner", size_05: 5.8, size_mass: null, updated: "2025-04-19", reports: 3 }
+      { brand: "Warsteiner", size_05: 5.8, size_mass: null, updated: "2025-04-19", reports: 3 }
     ],
     description_de: "Elegante Cocktail- und Szenebar im Glockenbachviertel mit Ledersesseln.",
     description_en: "Elegant cocktail and scene bar in Glockenbach with leather armchairs."
@@ -687,7 +687,7 @@ const venues = [
     opening_hours: "Mo–So 10:00–1:00",
     website: "",
     beers: [
-      { brand: "Augustiner", size_05: 4.9, size_mass: null, updated: "2025-05-30", reports: 5 }
+      { brand: "Krombacher", size_05: 4.9, size_mass: null, updated: "2025-05-30", reports: 5 }
     ],
     description_de: "Ehemaliges Trachtengeschäft, heute Café-Bar mit Kaffeehaus-Charme und Spielen.",
     description_en: "A former traditional-dress shop, now a café-bar with coffee-house charm and board games."
@@ -736,7 +736,7 @@ const venues = [
     opening_hours: "Mo–So 11:30–23:00",
     website: "https://www.klenze17.de/",
     beers: [
-      { brand: "Hofbräu", size_05: 6.85, size_mass: 13.7, updated: "2025-06-01", reports: 8 }
+      { brand: "Hofbräu München", size_05: 6.85, size_mass: 13.7, updated: "2025-06-01", reports: 8 }
     ],
     description_de: "Gehobene Küche mit gut sortierter Bierkarte.",
     description_en: "Well-regarded food with a solid beer selection."
@@ -784,7 +784,7 @@ const venues = [
     opening_hours: "Mo–So 17:00–1:00",
     website: "https://schumanns.de/de/index.html",
     beers: [
-      { brand: "Hacker-Pschorr", size_05: 5, size_mass: null, updated: "2025-06-01", reports: 5 }
+      { brand: "Paulaner", size_05: 5, size_mass: null, updated: "2025-06-01", reports: 5 }
     ],
     description_de: "Beliebte Bar im Viertel – entspannte Atmosphäre, gutes Bier.",
     description_en: "Popular neighbourhood bar — relaxed atmosphere, good beer."
@@ -816,7 +816,7 @@ const venues = [
     opening_hours: "Mo–So 17:00–1:00",
     website: "",
     beers: [
-      { brand: "Tegernseer", size_05: 4.95, size_mass: null, updated: "2025-06-01", reports: 4 }
+      { brand: "Camba Bavaria", size_05: 4.95, size_mass: null, updated: "2025-06-01", reports: 4 }
     ],
     description_de: "Beliebte Bar im Viertel – entspannte Atmosphäre, gutes Bier.",
     description_en: "Popular neighbourhood bar — relaxed atmosphere, good beer."
@@ -832,7 +832,7 @@ const venues = [
     opening_hours: "Mo–So 17:00–1:00",
     website: "",
     beers: [
-      { brand: "Paulaner", size_05: 5.35, size_mass: null, updated: "2025-06-01", reports: 2 }
+      { brand: "Tegernseer", size_05: 5.35, size_mass: null, updated: "2025-06-01", reports: 2 }
     ],
     description_de: "Beliebte Bar im Viertel – entspannte Atmosphäre, gutes Bier.",
     description_en: "Popular neighbourhood bar — relaxed atmosphere, good beer."
@@ -880,7 +880,7 @@ const venues = [
     opening_hours: "Mo–So 17:00–1:00",
     website: "https://kubaschewski.bar/",
     beers: [
-      { brand: "Tegernseer", size_05: 4.95, size_mass: null, updated: "2025-06-01", reports: 6 }
+      { brand: "Crew Republic", size_05: 4.95, size_mass: null, updated: "2025-06-01", reports: 6 }
     ],
     description_de: "Beliebte Bar im Viertel – entspannte Atmosphäre, gutes Bier.",
     description_en: "Popular neighbourhood bar — relaxed atmosphere, good beer."
@@ -896,7 +896,7 @@ const venues = [
     opening_hours: "Mo–So 17:00–1:00",
     website: "",
     beers: [
-      { brand: "Spaten", size_05: 5.1, size_mass: 10.2, updated: "2025-06-01", reports: 3 }
+      { brand: "Hacker-Pschorr", size_05: 5.1, size_mass: 10.2, updated: "2025-06-01", reports: 3 }
     ],
     description_de: "Beliebte Bar im Viertel – entspannte Atmosphäre, gutes Bier.",
     description_en: "Popular neighbourhood bar — relaxed atmosphere, good beer."
@@ -976,7 +976,7 @@ const venues = [
     opening_hours: "Mo–So 10:00–24:00",
     website: "https://www.wintergarten-schwabing.de/",
     beers: [
-      { brand: "Hofbräu", size_05: 6.05, size_mass: 12.1, updated: "2025-06-01", reports: 3 }
+      { brand: "Hofbräu München", size_05: 6.05, size_mass: 12.1, updated: "2025-06-01", reports: 3 }
     ],
     description_de: "Traditionsreiches Wirtshaus mit bayerische Küche und bayerischem Bier vom Fass.",
     description_en: "Traditional Munich inn serving Bavarian cuisine with Bavarian beer on tap."
@@ -1024,7 +1024,7 @@ const venues = [
     opening_hours: "Mo–So 11:30–23:00",
     website: "https://drunkencow.de/",
     beers: [
-      { brand: "Hofbräu", size_05: 6.75, size_mass: 13.5, updated: "2025-06-01", reports: 4 }
+      { brand: "Hofbräu München", size_05: 6.75, size_mass: 13.5, updated: "2025-06-01", reports: 4 }
     ],
     description_de: "Burger- Küche mit gut sortierter Bierkarte.",
     description_en: "burger cuisine with a solid beer selection."
@@ -1056,7 +1056,7 @@ const venues = [
     opening_hours: "Mo–So 11:30–23:00",
     website: "https://www.wirtshaus-maxvorstadt.de/",
     beers: [
-      { brand: "Hofbräu", size_05: 6.75, size_mass: 13.5, updated: "2025-06-01", reports: 4 }
+      { brand: "Hofbräu München", size_05: 6.75, size_mass: 13.5, updated: "2025-06-01", reports: 4 }
     ],
     description_de: "Gehobene Küche mit gut sortierter Bierkarte.",
     description_en: "Well-regarded food with a solid beer selection."
@@ -1136,7 +1136,7 @@ const venues = [
     opening_hours: "Mo–So 17:00–1:00",
     website: "http://www.alter-ofen.de",
     beers: [
-      { brand: "Augustiner", size_05: 5.4, size_mass: 10.8, updated: "2025-06-01", reports: 4 }
+      { brand: "Krombacher", size_05: 5.4, size_mass: 10.8, updated: "2025-06-01", reports: 4 }
     ],
     description_de: "Beliebte Bar im Viertel – entspannte Atmosphäre, gutes Bier.",
     description_en: "Popular neighbourhood bar — relaxed atmosphere, good beer."
@@ -1152,7 +1152,7 @@ const venues = [
     opening_hours: "Mo–So 17:00–1:00",
     website: "https://www.giesinger-braeu.de/",
     beers: [
-      { brand: "Augustiner", size_05: 5.4, size_mass: 10.8, updated: "2025-06-01", reports: 4 }
+      { brand: "Bitburger", size_05: 5.4, size_mass: 10.8, updated: "2025-06-01", reports: 4 }
     ],
     description_de: "Beliebte Bar im Viertel – entspannte Atmosphäre, gutes Bier.",
     description_en: "Popular neighbourhood bar — relaxed atmosphere, good beer."
@@ -1184,7 +1184,7 @@ const venues = [
     opening_hours: "Mo–So 17:00–1:00",
     website: "http://www.freebird-munich.com/",
     beers: [
-      { brand: "Ayinger", size_05: 4.95, size_mass: 9.9, updated: "2025-06-01", reports: 2 }
+      { brand: "Flensburger", size_05: 4.95, size_mass: 9.9, updated: "2025-06-01", reports: 2 }
     ],
     description_de: "Beliebte Bar im Viertel – entspannte Atmosphäre, gutes Bier.",
     description_en: "Popular neighbourhood bar — relaxed atmosphere, good beer."
@@ -1200,7 +1200,7 @@ const venues = [
     opening_hours: "Mo–So 17:00–1:00",
     website: "https://www.vega-bar.de/",
     beers: [
-      { brand: "Augustiner", size_05: 5.3, size_mass: 10.6, updated: "2025-06-01", reports: 4 }
+      { brand: "Paulaner", size_05: 5.3, size_mass: 10.6, updated: "2025-06-01", reports: 4 }
     ],
     description_de: "Beliebte Bar im Viertel – entspannte Atmosphäre, gutes Bier.",
     description_en: "Popular neighbourhood bar — relaxed atmosphere, good beer."
@@ -1328,7 +1328,7 @@ const venues = [
     opening_hours: "Mo–So 11:30–23:00",
     website: "http://www.ohayou.de",
     beers: [
-      { brand: "Hofbräu", size_05: 6.6, size_mass: 13.2, updated: "2025-06-01", reports: 5 }
+      { brand: "Hofbräu München", size_05: 6.6, size_mass: 13.2, updated: "2025-06-01", reports: 5 }
     ],
     description_de: "Japanische Küche mit gut sortierter Bierkarte.",
     description_en: "Japanese cuisine with a solid beer selection."
@@ -1456,7 +1456,7 @@ const venues = [
     opening_hours: "Mo–So 17:00–1:00",
     website: "https://tijuanabar-munich.de/",
     beers: [
-      { brand: "Hofbräu", size_05: 5.65, size_mass: null, updated: "2025-06-01", reports: 7 }
+      { brand: "Tegernseer", size_05: 5.65, size_mass: null, updated: "2025-06-01", reports: 7 }
     ],
     description_de: "Beliebte Bar im Viertel – entspannte Atmosphäre, gutes Bier.",
     description_en: "Popular neighbourhood bar — relaxed atmosphere, good beer."
@@ -1488,7 +1488,7 @@ const venues = [
     opening_hours: "Mo–So 17:00–1:00",
     website: "https://www.cocktailhouse-bar.de/",
     beers: [
-      { brand: "Löwenbräu", size_05: 4.85, size_mass: null, updated: "2025-06-01", reports: 5 }
+      { brand: "Weihenstephaner", size_05: 4.85, size_mass: null, updated: "2025-06-01", reports: 5 }
     ],
     description_de: "Beliebte Bar im Viertel – entspannte Atmosphäre, gutes Bier.",
     description_en: "Popular neighbourhood bar — relaxed atmosphere, good beer."
@@ -1504,7 +1504,7 @@ const venues = [
     opening_hours: "Mo–So 17:00–1:00",
     website: "",
     beers: [
-      { brand: "Hacker-Pschorr", size_05: 5.05, size_mass: null, updated: "2025-06-01", reports: 2 }
+      { brand: "Giesinger Bräu", size_05: 5.05, size_mass: null, updated: "2025-06-01", reports: 2 }
     ],
     description_de: "Beliebte Bar im Viertel – entspannte Atmosphäre, gutes Bier.",
     description_en: "Popular neighbourhood bar — relaxed atmosphere, good beer."
@@ -1520,7 +1520,7 @@ const venues = [
     opening_hours: "Mo–So 17:00–1:00",
     website: "http://www.hopfen-dolde.de/",
     beers: [
-      { brand: "Ayinger", size_05: 5.4, size_mass: 10.8, updated: "2025-06-01", reports: 4 }
+      { brand: "Giesinger Bräu", size_05: 5.4, size_mass: 10.8, updated: "2025-06-01", reports: 4 }
     ],
     description_de: "Beliebte Bar im Viertel – entspannte Atmosphäre, gutes Bier.",
     description_en: "Popular neighbourhood bar — relaxed atmosphere, good beer."
@@ -1536,7 +1536,7 @@ const venues = [
     opening_hours: "Mo–So 17:00–1:00",
     website: "https://www.bar-rennbahn-schwabing.de/",
     beers: [
-      { brand: "Hofbräu", size_05: 5.4, size_mass: 10.8, updated: "2025-06-01", reports: 6 }
+      { brand: "Flensburger", size_05: 5.4, size_mass: 10.8, updated: "2025-06-01", reports: 6 }
     ],
     description_de: "Beliebte Bar im Viertel – entspannte Atmosphäre, gutes Bier.",
     description_en: "Popular neighbourhood bar — relaxed atmosphere, good beer."
@@ -1552,7 +1552,7 @@ const venues = [
     opening_hours: "Mo–So 17:00–1:00",
     website: "https://www.tumultmuc.de/",
     beers: [
-      { brand: "Paulaner", size_05: 5.75, size_mass: null, updated: "2025-06-01", reports: 6 }
+      { brand: "Flensburger", size_05: 5.75, size_mass: null, updated: "2025-06-01", reports: 6 }
     ],
     description_de: "Beliebte Bar im Viertel – entspannte Atmosphäre, gutes Bier.",
     description_en: "Popular neighbourhood bar — relaxed atmosphere, good beer."
@@ -1584,7 +1584,7 @@ const venues = [
     opening_hours: "Mo–So 11:30–23:00",
     website: "https://shoya-imbiss.de/",
     beers: [
-      { brand: "Hofbräu", size_05: 5.85, size_mass: 11.7, updated: "2025-06-01", reports: 8 }
+      { brand: "Hofbräu München", size_05: 5.85, size_mass: 11.7, updated: "2025-06-01", reports: 8 }
     ],
     description_de: "Japanische Küche mit gut sortierter Bierkarte.",
     description_en: "Japanese cuisine with a solid beer selection."
@@ -1712,7 +1712,7 @@ const venues = [
     opening_hours: "Mo–So 17:00–1:00",
     website: "",
     beers: [
-      { brand: "Hofbräu", size_05: 5, size_mass: 10, updated: "2025-06-01", reports: 5 }
+      { brand: "Bitburger", size_05: 5, size_mass: 10, updated: "2025-06-01", reports: 5 }
     ],
     description_de: "Beliebte Bar im Viertel – entspannte Atmosphäre, gutes Bier.",
     description_en: "Popular neighbourhood bar — relaxed atmosphere, good beer."
@@ -1792,7 +1792,7 @@ const venues = [
     opening_hours: "Mo–So 17:00–1:00",
     website: "",
     beers: [
-      { brand: "Paulaner", size_05: 4.95, size_mass: null, updated: "2025-06-01", reports: 7 }
+      { brand: "Schneider Weisse", size_05: 4.95, size_mass: null, updated: "2025-06-01", reports: 7 }
     ],
     description_de: "Beliebte Bar im Viertel – entspannte Atmosphäre, gutes Bier.",
     description_en: "Popular neighbourhood bar — relaxed atmosphere, good beer."
@@ -1808,7 +1808,7 @@ const venues = [
     opening_hours: "Mo–So 17:00–1:00",
     website: "https://www.mcmueller.org/",
     beers: [
-      { brand: "Paulaner", size_05: 5.8, size_mass: 11.6, updated: "2025-06-01", reports: 3 }
+      { brand: "Weihenstephaner", size_05: 5.8, size_mass: 11.6, updated: "2025-06-01", reports: 3 }
     ],
     description_de: "Beliebte Bar im Viertel – entspannte Atmosphäre, gutes Bier.",
     description_en: "Popular neighbourhood bar — relaxed atmosphere, good beer."
@@ -1840,7 +1840,7 @@ const venues = [
     opening_hours: "Mo–So 17:00–1:00",
     website: "",
     beers: [
-      { brand: "Spaten", size_05: 5.2, size_mass: null, updated: "2025-06-01", reports: 3 }
+      { brand: "Paulaner", size_05: 5.2, size_mass: null, updated: "2025-06-01", reports: 3 }
     ],
     description_de: "Beliebte Bar im Viertel – entspannte Atmosphäre, gutes Bier.",
     description_en: "Popular neighbourhood bar — relaxed atmosphere, good beer."
@@ -1856,7 +1856,7 @@ const venues = [
     opening_hours: "Mo–So 17:00–1:00",
     website: "https://www.cafenil.com/",
     beers: [
-      { brand: "Andechs", size_05: 4.95, size_mass: 9.9, updated: "2025-06-01", reports: 7 }
+      { brand: "Krombacher", size_05: 4.95, size_mass: 9.9, updated: "2025-06-01", reports: 7 }
     ],
     description_de: "Beliebte Bar im Viertel – entspannte Atmosphäre, gutes Bier.",
     description_en: "Popular neighbourhood bar — relaxed atmosphere, good beer."
@@ -1872,7 +1872,7 @@ const venues = [
     opening_hours: "Mo–So 17:00–1:00",
     website: "",
     beers: [
-      { brand: "Augustiner", size_05: 5, size_mass: null, updated: "2025-06-01", reports: 6 }
+      { brand: "Erdinger", size_05: 5, size_mass: null, updated: "2025-06-01", reports: 6 }
     ],
     description_de: "Beliebte Bar im Viertel – entspannte Atmosphäre, gutes Bier.",
     description_en: "Popular neighbourhood bar — relaxed atmosphere, good beer."
@@ -1891,7 +1891,7 @@ const venues = [
     opening_hours: "Mo–So 17:00–1:00",
     website: "",
     beers: [
-      { brand: "Löwenbräu", size_05: 5.65, size_mass: 11.30, updated: "2025-06-01", reports: 7 }
+      { brand: "Giesinger Bräu", size_05: 5.65, size_mass: 11.30, updated: "2025-06-01", reports: 7 }
     ],
     description_de: "Beliebte Bar im Viertel – entspannte Atmosphäre, gutes Bier.",
     description_en: "Popular neighbourhood bar — relaxed atmosphere, good beer."
@@ -1907,7 +1907,7 @@ const venues = [
     opening_hours: "Mo–So 17:00–1:00",
     website: "",
     beers: [
-      { brand: "Paulaner", size_05: 5.20, size_mass: null, updated: "2025-06-01", reports: 4 }
+      { brand: "Camba Bavaria", size_05: 5.20, size_mass: null, updated: "2025-06-01", reports: 4 }
     ],
     description_de: "Beliebte Bar im Viertel – entspannte Atmosphäre, gutes Bier.",
     description_en: "Popular neighbourhood bar — relaxed atmosphere, good beer."
@@ -1923,7 +1923,7 @@ const venues = [
     opening_hours: "Mo–So 17:00–1:00",
     website: "",
     beers: [
-      { brand: "Hacker-Pschorr", size_05: 5.15, size_mass: 10.30, updated: "2025-06-01", reports: 4 }
+      { brand: "Giesinger Bräu", size_05: 5.15, size_mass: 10.30, updated: "2025-06-01", reports: 4 }
     ],
     description_de: "Beliebte Bar im Viertel – entspannte Atmosphäre, gutes Bier.",
     description_en: "Popular neighbourhood bar — relaxed atmosphere, good beer."
@@ -1939,7 +1939,7 @@ const venues = [
     opening_hours: "Mo–So 17:00–1:00",
     website: "",
     beers: [
-      { brand: "Andechs", size_05: 5.00, size_mass: null, updated: "2025-06-01", reports: 9 }
+      { brand: "Paulaner", size_05: 5.00, size_mass: null, updated: "2025-06-01", reports: 9 }
     ],
     description_de: "Beliebte Bar im Viertel – entspannte Atmosphäre, gutes Bier.",
     description_en: "Popular neighbourhood bar — relaxed atmosphere, good beer."
@@ -1955,7 +1955,7 @@ const venues = [
     opening_hours: "Mo–So 17:00–1:00",
     website: "",
     beers: [
-      { brand: "Löwenbräu", size_05: 5.75, size_mass: 11.50, updated: "2025-06-01", reports: 2 }
+      { brand: "Erdinger", size_05: 5.75, size_mass: 11.50, updated: "2025-06-01", reports: 2 }
     ],
     description_de: "Beliebte Bar im Viertel – entspannte Atmosphäre, gutes Bier.",
     description_en: "Popular neighbourhood bar — relaxed atmosphere, good beer."
@@ -1971,7 +1971,7 @@ const venues = [
     opening_hours: "Mo–So 17:00–1:00",
     website: "",
     beers: [
-      { brand: "Paulaner", size_05: 5.60, size_mass: null, updated: "2025-06-01", reports: 6 }
+      { brand: "Spaten", size_05: 5.60, size_mass: null, updated: "2025-06-01", reports: 6 }
     ],
     description_de: "Beliebte Bar im Viertel – entspannte Atmosphäre, gutes Bier.",
     description_en: "Popular neighbourhood bar — relaxed atmosphere, good beer."
@@ -1987,7 +1987,7 @@ const venues = [
     opening_hours: "Mo–So 17:00–1:00",
     website: "",
     beers: [
-      { brand: "Paulaner", size_05: 4.70, size_mass: 9.40, updated: "2025-06-01", reports: 6 }
+      { brand: "Tegernseer", size_05: 4.70, size_mass: 9.40, updated: "2025-06-01", reports: 6 }
     ],
     description_de: "Beliebte Bar im Viertel – entspannte Atmosphäre, gutes Bier.",
     description_en: "Popular neighbourhood bar — relaxed atmosphere, good beer."
@@ -2003,7 +2003,7 @@ const venues = [
     opening_hours: "Mo–So 17:00–1:00",
     website: "",
     beers: [
-      { brand: "Spaten", size_05: 5.20, size_mass: null, updated: "2025-06-01", reports: 4 }
+      { brand: "Flensburger", size_05: 5.20, size_mass: null, updated: "2025-06-01", reports: 4 }
     ],
     description_de: "Beliebte Bar im Viertel – entspannte Atmosphäre, gutes Bier.",
     description_en: "Popular neighbourhood bar — relaxed atmosphere, good beer."
@@ -2019,7 +2019,7 @@ const venues = [
     opening_hours: "Mo–So 17:00–1:00",
     website: "",
     beers: [
-      { brand: "Paulaner", size_05: 5.00, size_mass: null, updated: "2025-06-01", reports: 5 }
+      { brand: "Jever", size_05: 5.00, size_mass: null, updated: "2025-06-01", reports: 5 }
     ],
     description_de: "Beliebte Bar im Viertel – entspannte Atmosphäre, gutes Bier.",
     description_en: "Popular neighbourhood bar — relaxed atmosphere, good beer."
@@ -2035,7 +2035,7 @@ const venues = [
     opening_hours: "Mo–So 17:00–1:00",
     website: "",
     beers: [
-      { brand: "Löwenbräu", size_05: 5.90, size_mass: 11.80, updated: "2025-06-01", reports: 2 }
+      { brand: "Giesinger Bräu", size_05: 5.90, size_mass: 11.80, updated: "2025-06-01", reports: 2 }
     ],
     description_de: "Beliebte Bar im Viertel – entspannte Atmosphäre, gutes Bier.",
     description_en: "Popular neighbourhood bar — relaxed atmosphere, good beer."
@@ -2051,7 +2051,7 @@ const venues = [
     opening_hours: "Mo–So 17:00–1:00",
     website: "",
     beers: [
-      { brand: "Augustiner", size_05: 5.20, size_mass: 10.40, updated: "2025-06-01", reports: 6 }
+      { brand: "Flensburger", size_05: 5.20, size_mass: 10.40, updated: "2025-06-01", reports: 6 }
     ],
     description_de: "Beliebte Bar im Viertel – entspannte Atmosphäre, gutes Bier.",
     description_en: "Popular neighbourhood bar — relaxed atmosphere, good beer."
@@ -2067,7 +2067,7 @@ const venues = [
     opening_hours: "Mo–So 17:00–1:00",
     website: "",
     beers: [
-      { brand: "Paulaner", size_05: 5.65, size_mass: null, updated: "2025-06-01", reports: 3 }
+      { brand: "Camba Bavaria", size_05: 5.65, size_mass: null, updated: "2025-06-01", reports: 3 }
     ],
     description_de: "Beliebte Bar im Viertel – entspannte Atmosphäre, gutes Bier.",
     description_en: "Popular neighbourhood bar — relaxed atmosphere, good beer."
@@ -2083,7 +2083,7 @@ const venues = [
     opening_hours: "Mo–So 17:00–1:00",
     website: "",
     beers: [
-      { brand: "Tegernseer", size_05: 5.60, size_mass: 11.20, updated: "2025-06-01", reports: 8 }
+      { brand: "Bitburger", size_05: 5.60, size_mass: 11.20, updated: "2025-06-01", reports: 8 }
     ],
     description_de: "Beliebte Bar im Viertel – entspannte Atmosphäre, gutes Bier.",
     description_en: "Popular neighbourhood bar — relaxed atmosphere, good beer."
@@ -2099,7 +2099,7 @@ const venues = [
     opening_hours: "Mo–So 17:00–1:00",
     website: "",
     beers: [
-      { brand: "Spaten", size_05: 5.70, size_mass: 11.40, updated: "2025-06-01", reports: 4 }
+      { brand: "Veltins", size_05: 5.70, size_mass: 11.40, updated: "2025-06-01", reports: 4 }
     ],
     description_de: "Beliebte Bar im Viertel – entspannte Atmosphäre, gutes Bier.",
     description_en: "Popular neighbourhood bar — relaxed atmosphere, good beer."
@@ -2115,7 +2115,7 @@ const venues = [
     opening_hours: "Mo–So 17:00–1:00",
     website: "",
     beers: [
-      { brand: "Spaten", size_05: 5.00, size_mass: null, updated: "2025-06-01", reports: 5 }
+      { brand: "Astra", size_05: 5.00, size_mass: null, updated: "2025-06-01", reports: 5 }
     ],
     description_de: "Beliebte Bar im Viertel – entspannte Atmosphäre, gutes Bier.",
     description_en: "Popular neighbourhood bar — relaxed atmosphere, good beer."
@@ -2147,7 +2147,7 @@ const venues = [
     opening_hours: "Mo–So 17:00–1:00",
     website: "",
     beers: [
-      { brand: "Augustiner", size_05: 5.05, size_mass: 10.10, updated: "2025-06-01", reports: 6 }
+      { brand: "Warsteiner", size_05: 5.05, size_mass: 10.10, updated: "2025-06-01", reports: 6 }
     ],
     description_de: "Beliebte Bar im Viertel – entspannte Atmosphäre, gutes Bier.",
     description_en: "Popular neighbourhood bar — relaxed atmosphere, good beer."
@@ -2163,7 +2163,7 @@ const venues = [
     opening_hours: "Mo–So 17:00–1:00",
     website: "",
     beers: [
-      { brand: "Spaten", size_05: 5.10, size_mass: null, updated: "2025-06-01", reports: 9 }
+      { brand: "Crew Republic", size_05: 5.10, size_mass: null, updated: "2025-06-01", reports: 9 }
     ],
     description_de: "Beliebte Bar im Viertel – entspannte Atmosphäre, gutes Bier.",
     description_en: "Popular neighbourhood bar — relaxed atmosphere, good beer."
@@ -2179,7 +2179,7 @@ const venues = [
     opening_hours: "Mo–So 17:00–1:00",
     website: "",
     beers: [
-      { brand: "Hacker-Pschorr", size_05: 5.10, size_mass: 10.20, updated: "2025-06-01", reports: 7 }
+      { brand: "Jever", size_05: 5.10, size_mass: 10.20, updated: "2025-06-01", reports: 7 }
     ],
     description_de: "Beliebte Bar im Viertel – entspannte Atmosphäre, gutes Bier.",
     description_en: "Popular neighbourhood bar — relaxed atmosphere, good beer."
@@ -2195,7 +2195,7 @@ const venues = [
     opening_hours: "Mo–So 17:00–1:00",
     website: "",
     beers: [
-      { brand: "Spaten", size_05: 5.90, size_mass: 11.80, updated: "2025-06-01", reports: 4 }
+      { brand: "Veltins", size_05: 5.90, size_mass: 11.80, updated: "2025-06-01", reports: 4 }
     ],
     description_de: "Beliebte Bar im Viertel – entspannte Atmosphäre, gutes Bier.",
     description_en: "Popular neighbourhood bar — relaxed atmosphere, good beer."
@@ -2211,7 +2211,7 @@ const venues = [
     opening_hours: "Mo–So 17:00–1:00",
     website: "",
     beers: [
-      { brand: "Spaten", size_05: 4.85, size_mass: 9.70, updated: "2025-06-01", reports: 5 }
+      { brand: "Warsteiner", size_05: 4.85, size_mass: 9.70, updated: "2025-06-01", reports: 5 }
     ],
     description_de: "Beliebte Bar im Viertel – entspannte Atmosphäre, gutes Bier.",
     description_en: "Popular neighbourhood bar — relaxed atmosphere, good beer."
@@ -2259,7 +2259,7 @@ const venues = [
     opening_hours: "Mo–So 17:00–1:00",
     website: "",
     beers: [
-      { brand: "Spaten", size_05: 4.70, size_mass: null, updated: "2025-06-01", reports: 9 }
+      { brand: "Warsteiner", size_05: 4.70, size_mass: null, updated: "2025-06-01", reports: 9 }
     ],
     description_de: "Beliebte Bar im Viertel – entspannte Atmosphäre, gutes Bier.",
     description_en: "Popular neighbourhood bar — relaxed atmosphere, good beer."
@@ -2291,7 +2291,7 @@ const venues = [
     opening_hours: "Mo–So 17:00–1:00",
     website: "",
     beers: [
-      { brand: "Augustiner", size_05: 5.15, size_mass: 10.30, updated: "2025-06-01", reports: 6 }
+      { brand: "Erdinger", size_05: 5.15, size_mass: 10.30, updated: "2025-06-01", reports: 6 }
     ],
     description_de: "Beliebte Bar im Viertel – entspannte Atmosphäre, gutes Bier.",
     description_en: "Popular neighbourhood bar — relaxed atmosphere, good beer."
@@ -2307,7 +2307,7 @@ const venues = [
     opening_hours: "Mo–So 17:00–1:00",
     website: "",
     beers: [
-      { brand: "Hofbräu", size_05: 5.25, size_mass: 10.50, updated: "2025-06-01", reports: 2 }
+      { brand: "Tegernseer", size_05: 5.25, size_mass: 10.50, updated: "2025-06-01", reports: 2 }
     ],
     description_de: "Beliebte Bar im Viertel – entspannte Atmosphäre, gutes Bier.",
     description_en: "Popular neighbourhood bar — relaxed atmosphere, good beer."
@@ -2323,7 +2323,7 @@ const venues = [
     opening_hours: "Mo–So 17:00–1:00",
     website: "",
     beers: [
-      { brand: "Franziskaner", size_05: 5.90, size_mass: 11.80, updated: "2025-06-01", reports: 7 }
+      { brand: "Flensburger", size_05: 5.90, size_mass: 11.80, updated: "2025-06-01", reports: 7 }
     ],
     description_de: "Beliebte Bar im Viertel – entspannte Atmosphäre, gutes Bier.",
     description_en: "Popular neighbourhood bar — relaxed atmosphere, good beer."
@@ -2339,7 +2339,7 @@ const venues = [
     opening_hours: "Mo–So 17:00–1:00",
     website: "",
     beers: [
-      { brand: "Hofbräu", size_05: 4.95, size_mass: 9.90, updated: "2025-06-01", reports: 6 }
+      { brand: "Veltins", size_05: 4.95, size_mass: 9.90, updated: "2025-06-01", reports: 6 }
     ],
     description_de: "Beliebte Bar im Viertel – entspannte Atmosphäre, gutes Bier.",
     description_en: "Popular neighbourhood bar — relaxed atmosphere, good beer."
@@ -2355,7 +2355,7 @@ const venues = [
     opening_hours: "Mo–So 17:00–1:00",
     website: "",
     beers: [
-      { brand: "Spaten", size_05: 5.10, size_mass: 10.20, updated: "2025-06-01", reports: 5 }
+      { brand: "Weihenstephaner", size_05: 5.10, size_mass: 10.20, updated: "2025-06-01", reports: 5 }
     ],
     description_de: "Beliebte Bar im Viertel – entspannte Atmosphäre, gutes Bier.",
     description_en: "Popular neighbourhood bar — relaxed atmosphere, good beer."
@@ -2371,7 +2371,7 @@ const venues = [
     opening_hours: "Mo–So 17:00–1:00",
     website: "",
     beers: [
-      { brand: "Hacker-Pschorr", size_05: 5.75, size_mass: 11.50, updated: "2025-06-01", reports: 3 }
+      { brand: "Erdinger", size_05: 5.75, size_mass: 11.50, updated: "2025-06-01", reports: 3 }
     ],
     description_de: "Beliebte Bar im Viertel – entspannte Atmosphäre, gutes Bier.",
     description_en: "Popular neighbourhood bar — relaxed atmosphere, good beer."
@@ -2387,7 +2387,7 @@ const venues = [
     opening_hours: "Mo–So 17:00–1:00",
     website: "",
     beers: [
-      { brand: "Ayinger", size_05: 4.85, size_mass: 9.70, updated: "2025-06-01", reports: 2 }
+      { brand: "Krombacher", size_05: 4.85, size_mass: 9.70, updated: "2025-06-01", reports: 2 }
     ],
     description_de: "Beliebte Bar im Viertel – entspannte Atmosphäre, gutes Bier.",
     description_en: "Popular neighbourhood bar — relaxed atmosphere, good beer."
@@ -2403,7 +2403,7 @@ const venues = [
     opening_hours: "Mo–So 17:00–1:00",
     website: "",
     beers: [
-      { brand: "Paulaner", size_05: 5.75, size_mass: 11.50, updated: "2025-06-01", reports: 3 }
+      { brand: "Erdinger", size_05: 5.75, size_mass: 11.50, updated: "2025-06-01", reports: 3 }
     ],
     description_de: "Beliebte Bar im Viertel – entspannte Atmosphäre, gutes Bier.",
     description_en: "Popular neighbourhood bar — relaxed atmosphere, good beer."
@@ -2419,7 +2419,7 @@ const venues = [
     opening_hours: "Mo–So 17:00–1:00",
     website: "",
     beers: [
-      { brand: "Franziskaner", size_05: 5.85, size_mass: 11.70, updated: "2025-06-01", reports: 8 }
+      { brand: "Augustiner", size_05: 5.85, size_mass: 11.70, updated: "2025-06-01", reports: 8 }
     ],
     description_de: "Beliebte Bar im Viertel – entspannte Atmosphäre, gutes Bier.",
     description_en: "Popular neighbourhood bar — relaxed atmosphere, good beer."
@@ -2435,7 +2435,7 @@ const venues = [
     opening_hours: "Mo–So 17:00–1:00",
     website: "",
     beers: [
-      { brand: "Tegernseer", size_05: 5.70, size_mass: 11.40, updated: "2025-06-01", reports: 4 }
+      { brand: "Giesinger Bräu", size_05: 5.70, size_mass: 11.40, updated: "2025-06-01", reports: 4 }
     ],
     description_de: "Beliebte Bar im Viertel – entspannte Atmosphäre, gutes Bier.",
     description_en: "Popular neighbourhood bar — relaxed atmosphere, good beer."
@@ -2451,7 +2451,7 @@ const venues = [
     opening_hours: "Mo–So 17:00–1:00",
     website: "",
     beers: [
-      { brand: "Augustiner", size_05: 5.70, size_mass: 11.40, updated: "2025-06-01", reports: 5 }
+      { brand: "Astra", size_05: 5.70, size_mass: 11.40, updated: "2025-06-01", reports: 5 }
     ],
     description_de: "Beliebte Bar im Viertel – entspannte Atmosphäre, gutes Bier.",
     description_en: "Popular neighbourhood bar — relaxed atmosphere, good beer."
@@ -2467,7 +2467,7 @@ const venues = [
     opening_hours: "Mo–So 11:30–23:00",
     website: "",
     beers: [
-      { brand: "Hofbräu", size_05: 6.60, size_mass: 13.20, updated: "2025-06-01", reports: 2 }
+      { brand: "Hofbräu München", size_05: 6.60, size_mass: 13.20, updated: "2025-06-01", reports: 2 }
     ],
     description_de: "Gehobene Küche mit gut sortierter Bierkarte.",
     description_en: "Well-regarded food with a solid beer selection."
@@ -2483,7 +2483,7 @@ const venues = [
     opening_hours: "Mo–So 18:00–2:00",
     website: "",
     beers: [
-      { brand: "Augustiner", size_05: 5.20, size_mass: 10.40, updated: "2025-06-01", reports: 3 }
+      { brand: "Löwenbräu", size_05: 5.20, size_mass: 10.40, updated: "2025-06-01", reports: 3 }
     ],
     description_de: "Stylische Bar nahe dem Sendlinger Tor mit gutem Bier und entspannter Atmosphäre.",
     description_en: "Stylish bar near Sendlinger Tor with good beer and a relaxed atmosphere."
