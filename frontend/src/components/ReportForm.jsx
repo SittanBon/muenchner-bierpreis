@@ -30,7 +30,7 @@ export default function ReportForm({ venueId, venueName, onSuccess, onCancel }) 
   const showToast = useToast();
   const [topic, setTopic] = useState(null);
   const [form, setForm] = useState({
-    beer_brand: '', size: '0.5L', price: '',
+    beer_brand: '', size: '0.5L', price: '', serve_type: 'unknown',
     visit_date: new Date().toISOString().split('T')[0],
     submitter_name: '', anonymous: false, note: '',
   });
@@ -67,7 +67,7 @@ export default function ReportForm({ venueId, venueName, onSuccess, onCancel }) 
       setError(t('report.errBrandPrice'));
       return;
     }
-    submit({ beer_brand: resolvedBrand, size: form.size, price, visit_date: form.visit_date });
+    submit({ beer_brand: resolvedBrand, size: form.size, price, serve_type: form.serve_type, visit_date: form.visit_date });
   };
 
   const submitClosed = () => submit({});
@@ -136,6 +136,15 @@ export default function ReportForm({ venueId, venueName, onSuccess, onCancel }) 
                 value={form.price} onChange={(e) => set('price', e.target.value)}
               />
             </div>
+          </div>
+          <div className="sf-field">
+            <label>{t('serveType.question')}</label>
+            <select value={form.serve_type} onChange={(e) => set('serve_type', e.target.value)}>
+              <option value="tap">🍺 {t('serveType.tap')}</option>
+              <option value="bottle">🍾 {t('serveType.bottle')}</option>
+              <option value="can">🥫 {t('serveType.can')}</option>
+              <option value="unknown">❓ {t('serveType.dontKnow')}</option>
+            </select>
           </div>
           <div className="sf-field">
             <label>{t('submission.date')}</label>

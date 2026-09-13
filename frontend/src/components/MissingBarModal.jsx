@@ -14,10 +14,13 @@ const NEIGHBOURHOODS = [
   { id: 'isarvorstadt', de: 'Isarvorstadt', en: 'Isarvorstadt' },
 ];
 
+const MAX_BEERS = 5;
+function emptyBeer() { return { brand: '', serve_type: 'unknown', size_05: '', size_mass: '' }; }
+
 function emptyForm() {
   return {
     name: '', type: 'restaurant', address: '', neighbourhood_id: 'altstadt',
-    lat: '', lng: '', beer_brand: '', size_05: '', size_mass: '',
+    lat: '', lng: '', beers: [emptyBeer()],
     submitter_name: '', anonymous: false,
     visit_date: new Date().toISOString().split('T')[0],
     photo: null,
@@ -39,6 +42,11 @@ export default function MissingBarModal({ allVenues, onClose, onCreated }) {
   const [success, setSuccess] = useState(false);
 
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
+  const setBeerField = (i, k, v) => setForm((f) => ({
+    ...f, beers: f.beers.map((b, idx) => (idx === i ? { ...b, [k]: v } : b)),
+  }));
+  const addBeerRow = () => setForm((f) => (f.beers.length >= MAX_BEERS ? f : { ...f, beers: [...f.beers, emptyBeer()] }));
+  const removeBeerRow = (i) => setForm((f) => ({ ...f, beers: f.beers.filter((_, idx) => idx !== i) }));
 
   // Live local match against the existing database — cheap client-side filter,
   // no rate limit to worry about, so this runs on every keystroke.
@@ -79,11 +87,22 @@ export default function MissingBarModal({ allVenues, onClose, onCreated }) {
     setStep(2);
   };
 
+  // Beer #1 is always required. Any additional row left completely blank is
+  // just a "+ Add another beer" click the submitter backed out of — dropped
+  // silently rather than forced to either fill it in or explicitly remove it.
+  // A row that's PARTLY filled in (brand with no price, or vice versa) is a
+  // real error, not something to drop.
+  const cleanExtraBeers = () => form.beers.slice(1).filter((b) => b.brand.trim() || b.size_05.trim());
+
   const step2Error = () => {
     if (!form.name.trim()) return t('missingBar.errName');
     if (!form.neighbourhood_id) return t('missingBar.errNeighbourhood');
-    if (!form.beer_brand.trim()) return t('missingBar.errBrand');
-    if (parsePrice(form.size_05) == null) return t('missingBar.errPrice');
+    if (!form.beers[0].brand.trim()) return t('missingBar.errBrand');
+    if (parsePrice(form.beers[0].size_05) == null) return t('missingBar.errPrice');
+    const extras = cleanExtraBeers();
+    for (const b of extras) {
+      if (!b.brand.trim() || parsePrice(b.size_05) == null) return t('missingBar.errExtraBeer');
+    }
     return '';
   };
 
@@ -104,10 +123,21 @@ export default function MissingBarModal({ allVenues, onClose, onCreated }) {
     fd.append('address', form.address);
     if (form.lat) fd.append('lat', form.lat);
     if (form.lng) fd.append('lng', form.lng);
-    fd.append('beer_brand', form.beer_brand.trim());
-    fd.append('size_05', parsePrice(form.size_05));
-    const mass = parsePrice(form.size_mass);
+    const beer1 = form.beers[0];
+    fd.append('beer_brand', beer1.brand.trim());
+    fd.append('size_05', parsePrice(beer1.size_05));
+    fd.append('serve_type', beer1.serve_type);
+    const mass = parsePrice(beer1.size_mass);
     if (mass != null) fd.append('size_mass', mass);
+
+    const extraBeers = cleanExtraBeers().map((b) => ({
+      brand: b.brand.trim(),
+      size_05: parsePrice(b.size_05),
+      size_mass: parsePrice(b.size_mass),
+      serve_type: b.serve_type,
+    }));
+    if (extraBeers.length) fd.append('extra_beers', JSON.stringify(extraBeers));
+
     fd.append('visit_date', form.visit_date);
     fd.append('submitter_name', form.anonymous ? 'Anonym' : form.submitter_name);
     if (form.photo) fd.append('photo', form.photo);
@@ -124,8 +154,7 @@ export default function MissingBarModal({ allVenues, onClose, onCreated }) {
     setSubmitting(false);
   };
 
-  const resolvedPrice05 = parsePrice(form.size_05);
-  const resolvedPriceMass = parsePrice(form.size_mass);
+  const allBeersForSummary = [form.beers[0], ...cleanExtraBeers()];
   const typeLabel = t(`filters.types.${form.type}`);
   const hoodLabel = de
     ? NEIGHBOURHOODS.find((n) => n.id === form.neighbourhood_id)?.de
@@ -226,26 +255,51 @@ export default function MissingBarModal({ allVenues, onClose, onCreated }) {
                   </div>
                 </div>
 
-                <div className="sf-field">
-                  <label>{t('submission.brand')}</label>
-                  <BrandCombobox
-                    value={form.beer_brand}
-                    onChange={(v) => set('beer_brand', v)}
-                    placeholder={t('brandPicker.placeholder')}
-                    id="missing-bar-brand"
-                  />
-                </div>
-
-                <div className="sf-row">
-                  <div className="sf-field half">
-                    <label>{t('venue.price05')}</label>
-                    <input value={form.size_05} onChange={(e) => set('size_05', e.target.value)} inputMode="decimal" placeholder={pricePlaceholder(i18n.language)} />
+                <div className="vm-beers-title">{t('admin.venues.beers')}</div>
+                {form.beers.map((b, i) => (
+                  <div key={i} className="mb-beer-entry">
+                    <div className="sf-field">
+                      <label>{t('submission.brand')}</label>
+                      <BrandCombobox
+                        value={b.brand}
+                        onChange={(v) => setBeerField(i, 'brand', v)}
+                        placeholder={t('brandPicker.placeholder')}
+                        id={`missing-bar-brand-${i}`}
+                        exclude={form.beers.filter((_, idx) => idx !== i).map((x) => x.brand).filter(Boolean)}
+                      />
+                    </div>
+                    <div className="sf-field">
+                      <label>{t('serveType.question')}</label>
+                      <select value={b.serve_type} onChange={(e) => setBeerField(i, 'serve_type', e.target.value)}>
+                        <option value="tap">🍺 {t('serveType.tap')}</option>
+                        <option value="bottle">🍾 {t('serveType.bottle')}</option>
+                        <option value="can">🥫 {t('serveType.can')}</option>
+                        <option value="unknown">❓ {t('serveType.dontKnow')}</option>
+                      </select>
+                    </div>
+                    <div className="sf-row">
+                      <div className="sf-field half">
+                        <label>{t('venue.price05')}</label>
+                        <input value={b.size_05} onChange={(e) => setBeerField(i, 'size_05', e.target.value)} inputMode="decimal" placeholder={pricePlaceholder(i18n.language)} />
+                      </div>
+                      <div className="sf-field half">
+                        <label>{t('missingBar.priceMassOptional')}</label>
+                        <input value={b.size_mass} onChange={(e) => setBeerField(i, 'size_mass', e.target.value)} inputMode="decimal" placeholder={pricePlaceholder(i18n.language)} />
+                      </div>
+                    </div>
+                    {i > 0 && (
+                      <button type="button" className="mb-remove-beer" onClick={() => removeBeerRow(i)}>
+                        ✕ {t('missingBar.removeBeer')}
+                      </button>
+                    )}
                   </div>
-                  <div className="sf-field half">
-                    <label>{t('missingBar.priceMassOptional')}</label>
-                    <input value={form.size_mass} onChange={(e) => set('size_mass', e.target.value)} inputMode="decimal" placeholder={pricePlaceholder(i18n.language)} />
-                  </div>
-                </div>
+                ))}
+                <button
+                  type="button" className="vm-add-beer-btn" onClick={addBeerRow}
+                  disabled={form.beers.length >= MAX_BEERS}
+                >
+                  + {t('admin.venues.addAnotherBeer')}
+                </button>
 
                 <div className="sf-field">
                   <label>{t('submission.date')}</label>
@@ -288,7 +342,16 @@ export default function MissingBarModal({ allVenues, onClose, onCreated }) {
                   <div className="mb-summary-name">{form.name}</div>
                   <div className="mb-summary-row">{typeLabel} · {hoodLabel}</div>
                   {form.address && <div className="mb-summary-row">📍 {form.address}</div>}
-                  <div className="mb-summary-row">🍺 {form.beer_brand} — {formatEuro(resolvedPrice05, i18n.language)}{resolvedPriceMass != null ? ` / ${formatEuro(resolvedPriceMass, i18n.language)} (Maß)` : ''}</div>
+                  {allBeersForSummary.map((b, i) => {
+                    const p05 = parsePrice(b.size_05);
+                    const pMass = parsePrice(b.size_mass);
+                    return (
+                      <div key={i} className="mb-summary-row">
+                        🍺 {b.brand} — {formatEuro(p05, i18n.language)}{pMass != null ? ` / ${formatEuro(pMass, i18n.language)} (Maß)` : ''}
+                        {' · '}{b.serve_type === 'unknown' ? t('serveType.unknownFull') : t(`serveType.${b.serve_type}`)}
+                      </div>
+                    );
+                  })}
                   <div className="mb-summary-row">📅 {form.visit_date}</div>
                   {form.photo && <div className="mb-summary-row">📷 {form.photo.name}</div>}
                 </div>

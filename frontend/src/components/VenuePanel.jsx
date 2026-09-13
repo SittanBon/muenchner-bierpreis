@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import FreshnessLight from './FreshnessLight';
+import ServeTypeTag from './ServeTypeTag';
 import { formatEuro } from '../utils/price';
 
 const TYPE_ICONS = {
@@ -97,6 +98,7 @@ export default function VenuePanel({ neighbourhood, venues, onVenueClick, onClos
             </div>
             <div className="vc-bottom">
               <span className="vc-brand">🍻 {v.beers[0]?.brand}</span>
+              <ServeTypeTag serveType={v.beers[0]?.serve_type} variant="badge" />
               <ConfidenceBadge reports={v.beers[0].reports || 1} />
               <FreshnessLight date={v.beers[0].updated} />
             </div>

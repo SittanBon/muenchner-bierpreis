@@ -9,8 +9,21 @@ import { useToast } from '../hooks/useToast';
 import BrandCombobox from './BrandCombobox';
 
 const TYPES = ['beer_garden', 'beer_hall', 'bar', 'restaurant'];
+const SERVE_TYPES = ['tap', 'bottle', 'can', 'unknown'];
+const SERVE_EMOJI = { tap: '🍺', bottle: '🍾', can: '🥫', unknown: '❓' };
 
-function emptyBeer() { return { brand: '', size_05: '', size_mass: '' }; }
+function emptyBeer() { return { brand: '', size_05: '', size_mass: '', serve_type: 'unknown' }; }
+
+function ServeTypeSelect({ value, onChange, id }) {
+  const { t } = useTranslation();
+  return (
+    <select id={id} className="vm-serve-select" value={value || 'unknown'} onChange={(e) => onChange(e.target.value)}>
+      {SERVE_TYPES.map((s) => (
+        <option key={s} value={s}>{SERVE_EMOJI[s]} {t(`serveType.${s}`)}</option>
+      ))}
+    </select>
+  );
+}
 
 function detailsFromVenue(venue) {
   return {
@@ -53,7 +66,7 @@ function AddVenueForm({ token, neighbourhoods, onCreated, onCancel }) {
     // Prices may be typed with a comma (German) or dot (English) decimal.
     const cleanBeers = beers
       .filter((b) => b.brand && b.size_05)
-      .map((b) => ({ brand: b.brand, size_05: parsePrice(b.size_05), size_mass: parsePrice(b.size_mass) }));
+      .map((b) => ({ brand: b.brand, size_05: parsePrice(b.size_05), size_mass: parsePrice(b.size_mass), serve_type: b.serve_type }));
     if (cleanBeers.length === 0 || cleanBeers.some((b) => b.size_05 == null)) {
       setError(t('admin.venues.errBeer'));
       return;
@@ -134,6 +147,7 @@ function AddVenueForm({ token, neighbourhoods, onCreated, onCancel }) {
               value={b.size_mass} onChange={(e) => setBeer(i, 'size_mass', e.target.value)}
             />
           </div>
+          <ServeTypeSelect value={b.serve_type} onChange={(v) => setBeer(i, 'serve_type', v)} id={`add-venue-serve-${i}`} />
           {beers.length > 1 && (
             <button type="button" className="vm-remove-beer" onClick={() => removeBeerRow(i)}>✕</button>
           )}
@@ -278,6 +292,7 @@ function EditVenueForm({ token, venue, neighbourhoods, onUpdated, onDeleted, onC
   const { t, i18n } = useTranslation();
   const showToast = useToast();
   const [prices, setPrices] = useState(() => Object.fromEntries(venue.beers.map((b) => [b.id, String(b.size_05)])));
+  const [serveTypes, setServeTypes] = useState(() => Object.fromEntries(venue.beers.map((b) => [b.id, b.serve_type || 'unknown'])));
   const [savingId, setSavingId] = useState(null);
   const [deletingId, setDeletingId] = useState(null);
   const [error, setError] = useState('');
@@ -293,6 +308,11 @@ function EditVenueForm({ token, venue, neighbourhoods, onUpdated, onDeleted, onC
       venue.beers.forEach((b) => { if (!(b.id in next)) next[b.id] = String(b.size_05); });
       return next;
     });
+    setServeTypes((st) => {
+      const next = { ...st };
+      venue.beers.forEach((b) => { if (!(b.id in next)) next[b.id] = b.serve_type || 'unknown'; });
+      return next;
+    });
   }, [venue.beers]);
 
   const existingBrands = venue.beers.map((b) => b.brand);
@@ -303,7 +323,9 @@ function EditVenueForm({ token, venue, neighbourhoods, onUpdated, onDeleted, onC
     if (size_05 == null) { setError(t('admin.venues.errPrice')); return; }
     setSavingId(beer.id);
     try {
-      const updated = await adminUpdateBeerPrice(token, venue.id, beer.id, { size_05, size_mass: beer.size_mass });
+      const updated = await adminUpdateBeerPrice(token, venue.id, beer.id, {
+        size_05, size_mass: beer.size_mass, serve_type: serveTypes[beer.id],
+      });
       onUpdated(updated);
     } catch (err) {
       setError(err.message);
@@ -349,6 +371,7 @@ function EditVenueForm({ token, venue, neighbourhoods, onUpdated, onDeleted, onC
         brand: newBeer.brand,
         size_05,
         size_mass: parsePrice(newBeer.size_mass),
+        serve_type: newBeer.serve_type,
       });
       onUpdated(updated);
       setNewBeer(emptyBeer());
@@ -372,6 +395,11 @@ function EditVenueForm({ token, venue, neighbourhoods, onUpdated, onDeleted, onC
             className="vm-price-input" inputMode="decimal" placeholder={pricePlaceholder(i18n.language)}
             value={prices[b.id] ?? ''}
             onChange={(e) => setPrices((p) => ({ ...p, [b.id]: e.target.value }))}
+          />
+          <ServeTypeSelect
+            value={serveTypes[b.id]}
+            onChange={(v) => setServeTypes((st) => ({ ...st, [b.id]: v }))}
+            id={`edit-venue-serve-${b.id}`}
           />
           <button type="button" className="vm-save-beer" onClick={() => savePrice(b)} disabled={savingId === b.id}>
             {savingId === b.id ? '...' : t('admin.venues.save')}
@@ -409,6 +437,11 @@ function EditVenueForm({ token, venue, neighbourhoods, onUpdated, onDeleted, onC
             value={newBeer.size_mass} onChange={(e) => setNewBeer((b) => ({ ...b, size_mass: e.target.value }))}
           />
         </div>
+        <ServeTypeSelect
+          value={newBeer.serve_type}
+          onChange={(v) => setNewBeer((b) => ({ ...b, serve_type: v }))}
+          id={`edit-venue-new-beer-serve-${venue.id}`}
+        />
         <button type="button" className="vm-save-beer" onClick={addNewBeer} disabled={addingBeer}>
           {addingBeer ? '...' : '+'}
         </button>

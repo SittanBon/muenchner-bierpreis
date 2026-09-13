@@ -6,6 +6,7 @@ import {
 import { fetchVenue } from '../hooks/useApi';
 import ReportForm from './ReportForm';
 import FreshnessLight from './FreshnessLight';
+import ServeTypeTag from './ServeTypeTag';
 import { formatEuro } from '../utils/price';
 
 const TYPE_ICONS = { beer_garden: '🌳', beer_hall: '🏛️', bar: '🍺', restaurant: '🍽️' };
@@ -202,6 +203,7 @@ export default function VenueDetail({ venue: initialVenue, onBack }) {
             <div className="vdp-updated">
               {t('venue.lastUpdated')}: {new Date(headline.updated).toLocaleDateString()}
             </div>
+            <div className="vdp-serve-type"><ServeTypeTag serveType={headline.serve_type} /></div>
             <div className="vdp-freshness">
               <FreshnessLight date={headline.updated} />
             </div>
@@ -217,6 +219,7 @@ export default function VenueDetail({ venue: initialVenue, onBack }) {
             <div key={b.id} className="ob-row">
               <div className="ob-info">
                 <span className="ob-brand">🍺 {b.brand}</span>
+                <ServeTypeTag serveType={b.serve_type} />
                 <FreshnessLight date={b.updated} compact />
               </div>
               <span className="ob-price">{formatEuro(b.size_05, i18n.language)}</span>
@@ -235,7 +238,13 @@ export default function VenueDetail({ venue: initialVenue, onBack }) {
         </div>
       )}
 
-      {/* Info grid */}
+      {/* Info grid. Address is hidden when missing (nothing useful to say);
+          opening hours instead shows a small muted-italic "unknown" line
+          rather than disappearing — a venue with no hours on file is still
+          worth knowing that about, distinct from a field that's simply N/A.
+          Website has no display anywhere on this page by design (hidden
+          completely when absent, same as description below), so there's no
+          markup here to gate on it at all. */}
       <div className="vd-info-grid">
         {venue.address && (
           <div className="vd-info-item">
@@ -246,15 +255,17 @@ export default function VenueDetail({ venue: initialVenue, onBack }) {
             </div>
           </div>
         )}
-        {venue.opening_hours && (
-          <div className="vd-info-item">
-            <span className="vd-info-icon">🕐</span>
-            <div>
-              <div className="vd-info-label">{t('venue.hours')}</div>
+        <div className="vd-info-item">
+          <span className="vd-info-icon">🕐</span>
+          <div>
+            <div className="vd-info-label">{t('venue.hours')}</div>
+            {venue.opening_hours ? (
               <div className="vd-info-value">{venue.opening_hours}</div>
-            </div>
+            ) : (
+              <div className="vd-info-value vd-info-unknown">{t('venue.hoursUnknown')}</div>
+            )}
           </div>
-        )}
+        </div>
       </div>
 
       {/* Actions */}

@@ -714,3 +714,17 @@ body{font-family:'Source Sans 3',sans-serif;background:var(--cream);color:var(--
   .log-filters{flex-direction:column;align-items:stretch}
   .log-details{max-width:none}
 }
+
+/* ===== Serve type (tap/bottle/can/unknown) ===== */
+.vdp-serve-type{margin-top:3px;font-size:11px}
+.vdp-serve-type .serve-type-tag{color:var(--amber-300)}
+.vdp-serve-type .serve-type-unknown{color:var(--amber-400);opacity:0.85}
+.serve-type-tag{font-size:12px;color:var(--text-secondary);white-space:nowrap}
+.serve-type-unknown{font-size:11px;color:var(--text-muted);font-style:italic;white-space:nowrap}
+.serve-badge{display:inline-flex;align-items:center;font-size:10px;padding:1px 6px;border-radius:10px;background:var(--amber-50);color:var(--text-secondary);white-space:nowrap;font-weight:500;flex-shrink:0}
+.serve-badge-unknown{background:var(--border);color:var(--text-muted);font-style:italic}
+.vd-info-unknown{color:var(--text-muted)!important;font-style:italic;font-size:12px!important}
+.vm-serve-select{flex-shrink:0;padding:8px 6px;border:1.5px solid var(--border-md);border-radius:7px;font-family:'Source Sans 3',sans-serif;font-size:12px;background:#fff;color:var(--text-primary);max-width:120px}
+.vm-add-beer-btn:disabled{opacity:0.45;cursor:not-allowed}
+.mb-beer-entry{border:1px solid var(--border);border-radius:8px;padding:10px;margin-bottom:8px;background:var(--amber-50)}
+.mb-remove-beer{margin-top:4px;background:none;border:none;color:#c04040;font-size:12px;cursor:pointer;font-family:'Source Sans 3',sans-serif;padding:2px 0}

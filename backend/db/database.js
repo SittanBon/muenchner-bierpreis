@@ -32,6 +32,17 @@ function migrate() {
   if (!beerCols.includes('active')) {
     db.exec('ALTER TABLE beers ADD COLUMN active INTEGER NOT NULL DEFAULT 1');
   }
+  // DEFAULT 'unknown' backfills every pre-existing beer row in the same statement.
+  if (!beerCols.includes('serve_type')) {
+    db.exec("ALTER TABLE beers ADD COLUMN serve_type TEXT NOT NULL DEFAULT 'unknown'");
+  }
+  const submissionCols = db.prepare('PRAGMA table_info(submissions)').all().map((c) => c.name);
+  if (!submissionCols.includes('serve_type')) {
+    db.exec('ALTER TABLE submissions ADD COLUMN serve_type TEXT');
+  }
+  if (!submissionCols.includes('extra_beers')) {
+    db.exec('ALTER TABLE submissions ADD COLUMN extra_beers TEXT');
+  }
   const venueCols = db.prepare('PRAGMA table_info(venues)').all().map((c) => c.name);
   if (!venueCols.includes('active')) {
     db.exec('ALTER TABLE venues ADD COLUMN active INTEGER NOT NULL DEFAULT 1');
@@ -97,9 +108,14 @@ function isEmpty() {
 // headline price" (stats, map shading, sidebar cards, venue detail) gets the
 // cheapest brand for free, with no special-casing needed at the call site.
 const beersForVenue = db.prepare(
-  `SELECT id, venue_id, brand, size_05, size_mass, updated, reports
+  `SELECT id, venue_id, brand, size_05, size_mass, updated, reports, serve_type
      FROM beers WHERE venue_id = ? AND active = 1 ORDER BY size_05 ASC`
 );
+
+const SERVE_TYPES = ['tap', 'bottle', 'can', 'unknown'];
+function normalizeServeType(v) {
+  return SERVE_TYPES.includes(v) ? v : 'unknown';
+}
 
 const venueBase = `
   SELECT v.*,
@@ -376,11 +392,13 @@ const insertSubmission = db.prepare(`
   INSERT INTO submissions
     (id, report_type, venue_id, venue_name, is_new_venue, beer_brand, size, price,
      visit_date, submitter_name, note, status, is_outlier, created_at,
-     venue_type, neighbourhood_id, address, lat, lng, size_mass, photo_path)
+     venue_type, neighbourhood_id, address, lat, lng, size_mass, photo_path,
+     serve_type, extra_beers)
   VALUES
     (@id, @report_type, @venue_id, @venue_name, @is_new_venue, @beer_brand, @size, @price,
      @visit_date, @submitter_name, @note, @status, @is_outlier, @created_at,
-     @venue_type, @neighbourhood_id, @address, @lat, @lng, @size_mass, @photo_path)
+     @venue_type, @neighbourhood_id, @address, @lat, @lng, @size_mass, @photo_path,
+     @serve_type, @extra_beers)
 `);
 
 const nextSubmissionSeq = db.prepare(
@@ -409,12 +427,16 @@ const approvedHistoryForVenue = db.prepare(`
 
 // Rolls an approved submission's price into THAT SPECIFIC BRAND's row — a venue
 // can list several beers, so this must never just grab "the first beer by id".
+// serve_type only overwrites when the submission actually carried one — an
+// older, pre-serve_type submission (still NULL here) must never reset an
+// already-known 'tap'/'bottle'/'can' back to 'unknown'.
 const updateHeadlinePrice = db.prepare(`
   UPDATE beers
      SET size_05    = CASE WHEN @size = '0.5L' THEN @price ELSE size_05 END,
          size_mass  = CASE WHEN @size = '1L'   THEN @price ELSE size_mass END,
          updated    = @visit_date,
-         reports    = reports + 1
+         reports    = reports + 1,
+         serve_type = CASE WHEN @serve_type IS NOT NULL THEN @serve_type ELSE serve_type END
    WHERE venue_id = @venue_id AND brand = @brand AND active = 1
 `);
 
@@ -505,16 +527,17 @@ function updateVenue(id, fields) {
 }
 
 const insertBeerStmt = db.prepare(`
-  INSERT INTO beers (venue_id, brand, size_05, size_mass, updated, reports, active)
-  VALUES (@venue_id, @brand, @size_05, @size_mass, @updated, 1, 1)
+  INSERT INTO beers (venue_id, brand, size_05, size_mass, updated, reports, active, serve_type)
+  VALUES (@venue_id, @brand, @size_05, @size_mass, @updated, 1, 1, @serve_type)
 `);
 
 const updateBeerPriceStmt = db.prepare(`
-  UPDATE beers SET size_05 = @size_05, size_mass = @size_mass, updated = @updated
+  UPDATE beers SET size_05 = @size_05, size_mass = @size_mass, updated = @updated, serve_type = @serve_type
    WHERE id = @beer_id AND venue_id = @venue_id
 `);
 
 const beerBelongsToVenueStmt = db.prepare('SELECT id FROM beers WHERE id = ? AND venue_id = ?');
+const beerByIdStmt = db.prepare('SELECT * FROM beers WHERE id = ?');
 
 function slugify(s) {
   return String(s).toLowerCase()
@@ -568,6 +591,7 @@ const createVenue = db.transaction((venue, beersInput) => {
       size_05: b.size_05,
       size_mass: b.size_mass ?? null,
       updated: today,
+      serve_type: normalizeServeType(b.serve_type),
     });
   }
 
@@ -582,14 +606,24 @@ function addBeerToVenue(venue_id, beer) {
     size_05: beer.size_05,
     size_mass: beer.size_mass ?? null,
     updated: today,
+    serve_type: normalizeServeType(beer.serve_type),
   });
 }
 
 // Returns false if the beer doesn't exist / doesn't belong to that venue.
-function updateBeerPrice(venue_id, beer_id, { size_05, size_mass }) {
+// serve_type is optional here — a plain price edit (the existing behaviour
+// before serve_type existed) must never silently reset it back to 'unknown',
+// so an omitted value falls back to whatever the beer already has.
+function updateBeerPrice(venue_id, beer_id, { size_05, size_mass, serve_type }) {
   if (!beerBelongsToVenueStmt.get(beer_id, venue_id)) return false;
   const today = new Date().toISOString().slice(0, 10);
-  updateBeerPriceStmt.run({ beer_id, venue_id, size_05, size_mass: size_mass ?? null, updated: today });
+  const resolvedServeType = serve_type !== undefined
+    ? normalizeServeType(serve_type)
+    : beerByIdStmt.get(beer_id).serve_type;
+  updateBeerPriceStmt.run({
+    beer_id, venue_id, size_05, size_mass: size_mass ?? null, updated: today,
+    serve_type: resolvedServeType,
+  });
   return true;
 }
 
@@ -647,6 +681,8 @@ module.exports = {
   DB_PATH,
   initSchema,
   isEmpty,
+  SERVE_TYPES,
+  normalizeServeType,
   getVenues,
   getVenue,
   getVenuesAdmin,

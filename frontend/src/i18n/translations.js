@@ -16,6 +16,15 @@ export const de = {
       missingVenueSuccess: "🍺 Danke! Dein Vorschlag ist in unserer Warteschlange.",
       genericError: "Etwas ist schiefgelaufen. Bitte erneut versuchen."
     },
+    serveType: {
+      tap: "vom Fass",
+      bottle: "Flasche",
+      can: "Dose",
+      unknown: "Unbekannt",
+      unknownFull: "Zapfart unbekannt",
+      question: "Wie wurde es serviert?",
+      dontKnow: "Weiß nicht"
+    },
     search: {
       placeholder: "Lokal, Viertel, Straße, Marke oder Typ suchen...",
       filters: "Filter",
@@ -69,6 +78,7 @@ export const de = {
       current: "aktuell",
       disclaimer: "Preise sind community-gemeldete Schätzungen. Bitte vor dem Besuch vor Ort prüfen.",
       aboutLabel: "Über diesen Ort",
+      hoursUnknown: "Öffnungszeiten unbekannt",
       confidence: {
         low: "Wenig Daten",
         medium: "Einige Meldungen",
@@ -147,6 +157,8 @@ export const de = {
       errNeighbourhood: "Stadtteil ist erforderlich",
       errBrand: "Biermarke ist erforderlich",
       errPrice: "Preis (0,5L) ist erforderlich",
+      errExtraBeer: "Jedes zusätzliche Bier braucht eine Marke und einen gültigen Preis (0,5L) — oder entferne die leere Zeile.",
+      removeBeer: "Entfernen",
       noCoords: "Keine Koordinaten gesetzt — unser Team prüft die Adresse.",
       success: "Danke! Wir prüfen deine Meldung innerhalb von 48 Stunden."
     },
@@ -288,6 +300,15 @@ export const en = {
       missingVenueSuccess: "🍺 Thanks! Your suggestion is in our queue.",
       genericError: "Something went wrong. Please try again."
     },
+    serveType: {
+      tap: "Tap",
+      bottle: "Bottle",
+      can: "Can",
+      unknown: "Unknown",
+      unknownFull: "Serve type unknown",
+      question: "How was it served?",
+      dontKnow: "Don't know"
+    },
     search: {
       placeholder: "Search venue, area, street, brand or type...",
       filters: "Filters",
@@ -341,6 +362,7 @@ export const en = {
       current: "current",
       disclaimer: "Prices are community-reported estimates. Please verify prices on site before visiting.",
       aboutLabel: "About this place",
+      hoursUnknown: "Opening hours unknown",
       confidence: {
         low: "Few reports",
         medium: "Some reports",
@@ -419,6 +441,8 @@ export const en = {
       errNeighbourhood: "Neighbourhood is required",
       errBrand: "Beer brand is required",
       errPrice: "Price (0.5L) is required",
+      errExtraBeer: "Each additional beer needs a brand and a valid 0.5L price — or remove the empty row.",
+      removeBeer: "Remove",
       noCoords: "No coordinates set — our team will verify the address.",
       success: "Thanks! We'll review your submission within 48 hours."
     },

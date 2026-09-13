@@ -56,7 +56,8 @@ CREATE TABLE IF NOT EXISTS beers (
   size_mass  REAL,            -- price for 1 L (Maß), EUR, nullable
   updated    TEXT,            -- ISO date the price was last confirmed
   reports    INTEGER NOT NULL DEFAULT 1,
-  active     INTEGER NOT NULL DEFAULT 1  -- 0 = delisted; kept for price history, hidden from the menu
+  active     INTEGER NOT NULL DEFAULT 1,  -- 0 = delisted; kept for price history, hidden from the menu
+  serve_type TEXT NOT NULL DEFAULT 'unknown'  -- 'tap' | 'bottle' | 'can' | 'unknown'
 );
 
 -- report_type: price_change | new_beer | closed | other_info | new_venue.
@@ -73,6 +74,8 @@ CREATE TABLE IF NOT EXISTS submissions (
   beer_brand    TEXT,
   size          TEXT,                   -- '0.5L' | '1L'
   price         REAL,
+  serve_type    TEXT,                   -- 'tap' | 'bottle' | 'can' | 'unknown', beer #1 only
+  extra_beers   TEXT,                   -- new_venue only: JSON array of beers #2-5, same shape
   visit_date    TEXT,
   submitter_name TEXT,
   note          TEXT,
