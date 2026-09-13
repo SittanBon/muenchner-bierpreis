@@ -28,9 +28,16 @@ body{font-family:'Source Sans 3',sans-serif;background:var(--cream);color:var(--
 .nav-title{font-family:'Playfair Display',serif;font-size:17px;font-weight:700;color:var(--amber-200);letter-spacing:0.3px}
 .nav-subtitle{font-size:11px;color:var(--amber-400);letter-spacing:0.5px;text-transform:uppercase}
 .nav-actions{display:flex;align-items:center;gap:10px}
-.lang-btn,.admin-link-btn{background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);color:var(--amber-100);border-radius:6px;padding:5px 12px;font-size:13px;cursor:pointer;font-family:'Source Sans 3',sans-serif;transition:background 0.2s;white-space:nowrap}
-.lang-btn:hover,.admin-link-btn:hover{background:rgba(255,255,255,0.18)}
-.lang-btn{font-weight:600;letter-spacing:1px}
+.lang-btn{background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);color:var(--amber-100);border-radius:6px;padding:5px 12px;font-size:13px;cursor:pointer;font-family:'Source Sans 3',sans-serif;transition:background 0.2s;white-space:nowrap;font-weight:600;letter-spacing:1px}
+.lang-btn:hover{background:rgba(255,255,255,0.18)}
+/* De-emphasised on purpose — admin is a functional back-door, not a feature
+   to draw the eye to. Muted grey text, no fill, just a faint outline. */
+.admin-link-btn{
+  background:none;border:1px solid rgba(255,255,255,0.15);color:rgba(255,255,255,0.45);
+  border-radius:5px;padding:3px 9px;font-size:11px;cursor:pointer;
+  font-family:'Source Sans 3',sans-serif;transition:color 0.2s,border-color 0.2s;white-space:nowrap;
+}
+.admin-link-btn:hover{color:rgba(255,255,255,0.75);border-color:rgba(255,255,255,0.3)}
 .nav-mobile-menu{display:none} /* shown only on mobile — see media query */
 
 /* City selector — sits next to the logo/title. Only the active city (Munich)
@@ -141,11 +148,13 @@ body{font-family:'Source Sans 3',sans-serif;background:var(--cream);color:var(--
 .add-venue-btn{width:100%;padding:10px;background:var(--amber-50);border:1.5px dashed var(--amber-400);border-radius:8px;color:var(--amber-800);font-size:13px;font-weight:500;cursor:pointer;font-family:'Source Sans 3',sans-serif;transition:all 0.2s}
 .add-venue-btn:hover{background:var(--amber-100);border-style:solid}
 
-/* Desktop trigger for the Price Trends panel — pinned to the very bottom of the
-   sidebar so it's reachable regardless of which sidebar view (hint/panel/detail)
-   is showing. Hidden on mobile, where a pill on the stats bar does this job instead. */
+/* Desktop trigger for the Price Trends panel — pinned right below the search
+   bar, at the top of the sidebar, so it's reachable regardless of which
+   sidebar view (hint/panel/detail) is showing below it, and reads as the key
+   feature it is rather than a footnote. Hidden on mobile, where a pill on
+   the stats bar does this job instead. */
 .sidebar-trends-btn{
-  width:100%;flex-shrink:0;padding:12px;border:none;border-top:1px solid var(--border);
+  width:100%;flex-shrink:0;padding:12px;border:none;border-bottom:1px solid var(--border);
   background:var(--amber-600);color:#fff;font-size:14px;font-weight:600;cursor:pointer;
   font-family:'Source Sans 3',sans-serif;transition:background 0.2s;
 }
@@ -211,7 +220,7 @@ body{font-family:'Source Sans 3',sans-serif;background:var(--cream);color:var(--
 .vd-disclaimer{font-size:11px;color:var(--text-muted);text-align:center;margin:16px 0 14px;line-height:1.5}
 
 /* Unified report button + topic picker */
-.vd-report-btn{display:block;width:100%;padding:12px;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;text-align:center;font-family:'Source Sans 3',sans-serif;transition:background 0.18s;background:var(--amber-900);border:1.5px solid var(--amber-900);color:var(--amber-100)}
+.vd-report-btn{display:block;width:100%;padding:12px;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;text-align:center;font-family:'Source Sans 3',sans-serif;transition:background 0.18s;background:var(--amber-900);border:1.5px solid var(--amber-900);color:var(--amber-100);margin-bottom:14px}
 .vd-report-btn:hover{background:var(--amber-800)}
 .report-form{margin-bottom:0}
 .report-topics{display:flex;flex-direction:column;gap:8px;margin-bottom:4px}

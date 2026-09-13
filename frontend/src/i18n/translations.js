@@ -123,7 +123,7 @@ export const de = {
       noResults: "Keine Treffer für \"{{query}}\" — als neue Marke übernehmen"
     },
     report: {
-      button: "Melden",
+      button: "Preisänderung melden",
       title: "Was möchtest du melden?",
       back: "Zurück",
       topics: {
@@ -407,7 +407,7 @@ export const en = {
       noResults: "No results for \"{{query}}\" — use as a new brand"
     },
     report: {
-      button: "Report",
+      button: "Report a price change",
       title: "What would you like to report?",
       back: "Back",
       topics: {

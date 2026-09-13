@@ -260,6 +260,11 @@ function AppContent() {
             onNeighbourhoodSelect={selectNeighbourhood}
           />
 
+          {/* Desktop-only trigger — mobile shows a pill on the stats bar instead */}
+          <button className="sidebar-trends-btn" onClick={() => setShowTrends(true)}>
+            📊 {t('trends.button')}
+          </button>
+
           {view === 'venue' && selectedVenue ? (
             <div className="sidebar-content scrollable">
               <VenueDetail venue={selectedVenue} onBack={handleBack} />
@@ -314,11 +319,6 @@ function AppContent() {
               )}
             </div>
           )}
-
-          {/* Desktop-only trigger — mobile shows a pill on the stats bar instead */}
-          <button className="sidebar-trends-btn" onClick={() => setShowTrends(true)}>
-            📊 {t('trends.button')}
-          </button>
         </div>
 
         <div className="map-container">

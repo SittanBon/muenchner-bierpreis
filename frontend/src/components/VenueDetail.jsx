@@ -211,6 +211,22 @@ export default function VenueDetail({ venue: initialVenue, onBack }) {
         </div>
       )}
 
+      {/* Unified report entry point — moved right below the price block so
+          it's the first thing offered after seeing the price, not something
+          you have to scroll past everything else to find. */}
+      {showReport ? (
+        <ReportForm
+          venueId={venue.id}
+          venueName={venue.name}
+          onSuccess={handleSubmitSuccess}
+          onCancel={() => setShowReport(false)}
+        />
+      ) : (
+        <button className="vd-report-btn" onClick={() => setShowReport(true)}>
+          📢 {t('report.button')}
+        </button>
+      )}
+
       {/* Other beers at this venue */}
       {otherBeers.length > 0 && (
         <div className="vd-other-beers">
@@ -290,20 +306,6 @@ export default function VenueDetail({ venue: initialVenue, onBack }) {
 
       {/* Disclaimer */}
       <p className="vd-disclaimer">{t('venue.disclaimer')}</p>
-
-      {/* Unified report entry point — always the last element */}
-      {showReport ? (
-        <ReportForm
-          venueId={venue.id}
-          venueName={venue.name}
-          onSuccess={handleSubmitSuccess}
-          onCancel={() => setShowReport(false)}
-        />
-      ) : (
-        <button className="vd-report-btn" onClick={() => setShowReport(true)}>
-          📢 {t('report.button')}
-        </button>
-      )}
     </div>
   );
 }
