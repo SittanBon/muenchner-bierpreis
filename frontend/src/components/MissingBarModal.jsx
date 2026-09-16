@@ -17,11 +17,13 @@ const NEIGHBOURHOODS = [
 const MAX_BEERS = 5;
 function emptyBeer() { return { brand: '', serve_type: 'unknown', size_05: '', size_mass: '' }; }
 
+const DESCRIPTION_MAX_LENGTH = 300;
+
 function emptyForm() {
   return {
     name: '', type: 'restaurant', address: '', neighbourhood_id: 'altstadt',
     lat: '', lng: '', beers: [emptyBeer()],
-    submitter_name: '', anonymous: false,
+    submitter_name: '', anonymous: false, about: '',
     visit_date: new Date().toISOString().split('T')[0],
     photo: null,
   };
@@ -140,6 +142,9 @@ export default function MissingBarModal({ allVenues, onClose, onCreated }) {
 
     fd.append('visit_date', form.visit_date);
     fd.append('submitter_name', form.anonymous ? 'Anonym' : form.submitter_name);
+    // "Tell us about this place" — optional, goes to admin for review before
+    // it ever becomes the venue's public description (never auto-applied).
+    if (form.about.trim()) fd.append('note', form.about.trim().slice(0, DESCRIPTION_MAX_LENGTH));
     if (form.photo) fd.append('photo', form.photo);
 
     try {
@@ -322,6 +327,16 @@ export default function MissingBarModal({ allVenues, onClose, onCreated }) {
                 </div>
 
                 <div className="sf-field">
+                  <label>{t('missingBar.aboutLabel')}</label>
+                  <textarea
+                    rows={2} maxLength={DESCRIPTION_MAX_LENGTH}
+                    placeholder={t('missingBar.aboutPlaceholder')}
+                    value={form.about} onChange={(e) => set('about', e.target.value)}
+                  />
+                  <div className="mb-char-count">{form.about.length}/{DESCRIPTION_MAX_LENGTH}</div>
+                </div>
+
+                <div className="sf-field">
                   <label>{t('missingBar.photoOptional')}</label>
                   <input type="file" accept="image/*" onChange={(e) => set('photo', e.target.files?.[0] || null)} />
                 </div>
@@ -353,6 +368,7 @@ export default function MissingBarModal({ allVenues, onClose, onCreated }) {
                     );
                   })}
                   <div className="mb-summary-row">📅 {form.visit_date}</div>
+                  {form.about.trim() && <div className="mb-summary-row">📝 {form.about.trim()}</div>}
                   {form.photo && <div className="mb-summary-row">📷 {form.photo.name}</div>}
                 </div>
 

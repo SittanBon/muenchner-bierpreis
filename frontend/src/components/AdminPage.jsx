@@ -14,6 +14,7 @@ const REPORT_TYPE_META = {
   new_beer: { icon: '🍺', label: 'New beer' },
   closed: { icon: '🔒', label: 'Closed' },
   other_info: { icon: 'ℹ️', label: 'Other info' },
+  suggest_description: { icon: '📝', label: 'Description suggested' },
 };
 
 export default function AdminPage({ onBack }) {
@@ -82,7 +83,7 @@ export default function AdminPage({ onBack }) {
     if (status === 'approved') {
       if (sub?.report_type === 'closed') {
         showToast('warning', t('admin.toast.markedClosed', { venue: venueName }));
-      } else if (sub?.report_type === 'other_info') {
+      } else if (sub?.report_type === 'other_info' || sub?.report_type === 'suggest_description') {
         showToast('success', t('admin.toast.approvedGeneric'));
       } else {
         showToast('success', t('admin.toast.approved', { venue: venueName }));

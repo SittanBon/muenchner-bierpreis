@@ -40,6 +40,7 @@ const {
   notifyNewVenue,
   notifyClosure,
   notifyIncorrectInfo,
+  notifyDescriptionSuggestion,
   notifyApproved,
   notifyStartup,
 } = require('./backend/notifications');
@@ -211,7 +212,7 @@ app.post('/api/submissions', (req, res) => {
     note,
   } = req.body || {};
 
-  const VALID_TYPES = ['price_change', 'new_beer', 'closed', 'other_info'];
+  const VALID_TYPES = ['price_change', 'new_beer', 'closed', 'other_info', 'suggest_description'];
   if (!VALID_TYPES.includes(report_type)) {
     return res.status(400).json({ error: 'Invalid report_type' });
   }
@@ -229,7 +230,7 @@ app.post('/api/submissions', (req, res) => {
   if (!venue_id) {
     return res.status(400).json({ error: 'venue_id is required' });
   }
-  if (report_type === 'other_info' && !note?.trim()) {
+  if ((report_type === 'other_info' || report_type === 'suggest_description') && !note?.trim()) {
     return res.status(400).json({ error: 'A note is required for this report type' });
   }
 
@@ -307,6 +308,12 @@ app.post('/api/submissions', (req, res) => {
     });
   } else if (report_type === 'other_info') {
     notifyIncorrectInfo({
+      venueName: resolvedName,
+      note: submission.note,
+      submitterName: submission.submitter_name,
+    });
+  } else if (report_type === 'suggest_description') {
+    notifyDescriptionSuggestion({
       venueName: resolvedName,
       note: submission.note,
       submitterName: submission.submitter_name,
@@ -457,6 +464,12 @@ app.patch('/api/admin/submissions/:id', authMiddleware, (req, res) => {
           address: sub.address,
           lat: sub.lat,
           lng: sub.lng,
+          // The submitter's optional "Tell us about this place" note (never
+          // auto-generated — a human wrote it, and an admin is approving it
+          // right now, which is the review step) becomes the description.
+          // German by default since that's what Munich submitters mostly write
+          // in; the EN field is left for an admin to translate later.
+          description_de: sub.note || null,
         },
         [{ brand: sub.beer_brand, size_05: sub.price, size_mass: sub.size_mass, serve_type: sub.serve_type }],
       );
@@ -499,6 +512,19 @@ app.patch('/api/admin/submissions/:id', authMiddleware, (req, res) => {
         venueId: sub.venue_id,
         venueName: sub.venue_name,
         details: { venue_name: sub.venue_name },
+      });
+    } else if (sub.report_type === 'suggest_description' && sub.venue_id && sub.note) {
+      // Approving IS the human-review step — a submitted description is never
+      // shown until an admin explicitly approves this exact submission.
+      // German field by default, same reasoning as the new-venue "about this
+      // place" note; the admin can add/adjust the EN field afterwards.
+      const venueBefore = getVenueAdmin(sub.venue_id);
+      const oldDescription = venueBefore?.description_de ?? null;
+      S.setVenueDescriptionDe.run({ venue_id: sub.venue_id, description_de: sub.note });
+      logAdminAction('EDIT_VENUE', {
+        venueId: sub.venue_id,
+        venueName: sub.venue_name,
+        details: { field: 'description_de', old_value: oldDescription, new_value: sub.note },
       });
     }
     // 'other_info' reports carry no automated DB action — the admin reads the

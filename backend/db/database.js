@@ -5,7 +5,6 @@
 const fs = require('fs');
 const path = require('path');
 const Database = require('better-sqlite3');
-const { generateDescription } = require('./descriptions');
 
 const DEFAULT_PATH = path.join(__dirname, 'bierpreis.db');
 const DB_PATH = process.env.DATABASE_PATH
@@ -65,34 +64,6 @@ function migrate() {
         (4, 'Wien',    'Vienna',  'AT', 48.2082, 16.3738, 12, 0, 1)
     `);
   }
-  backfillDescriptions();
-}
-
-// Fills in description_de/description_en for any venue missing either one —
-// every existing non-empty description is left exactly as-is. Runs on every
-// boot but is a no-op once nothing needs it (the WHERE clause matches zero
-// rows), so it's cheap to leave in the regular migration path.
-function backfillDescriptions() {
-  const rows = db.prepare(`
-    SELECT id, name, type, neighbourhood_id, address, description_de, description_en
-      FROM venues
-     WHERE description_de IS NULL OR TRIM(description_de) = ''
-        OR description_en IS NULL OR TRIM(description_en) = ''
-  `).all();
-  if (rows.length === 0) return;
-
-  const updateDesc = db.prepare(
-    'UPDATE venues SET description_de = @description_de, description_en = @description_en WHERE id = @id'
-  );
-  const txn = db.transaction((list) => {
-    for (const v of list) {
-      const description_de = v.description_de && v.description_de.trim() ? v.description_de : generateDescription(v, 'de');
-      const description_en = v.description_en && v.description_en.trim() ? v.description_en : generateDescription(v, 'en');
-      updateDesc.run({ id: v.id, description_de, description_en });
-    }
-  });
-  txn(rows);
-  console.log(`📝 Generated description(s) for ${rows.length} venue(s) that were missing one.`);
 }
 
 // Ensure tables exist before any prepared statement below is compiled.
@@ -440,6 +411,12 @@ const updateHeadlinePrice = db.prepare(`
    WHERE venue_id = @venue_id AND brand = @brand AND active = 1
 `);
 
+// Applies an approved "suggest a description" report — the one place a
+// venue's description is ever set outside the admin edit form itself.
+const setVenueDescriptionDe = db.prepare(
+  'UPDATE venues SET description_de = @description_de WHERE id = @venue_id'
+);
+
 // Monthly average Helles price per neighbourhood, from approved submissions —
 // powers the Price Trends chart. Each row is one (month, neighbourhood) average.
 // Grouped by v.neighbourhood_id explicitly — submissions now has its own
@@ -563,12 +540,11 @@ const createVenue = db.transaction((venue, beersInput) => {
   const id = uniqueVenueId(venue.name);
   const today = new Date().toISOString().slice(0, 10);
 
-  // A venue created without a description (admin form left blank, or a
-  // user-submitted new-venue proposal, which never asks for one) still gets
-  // one — same generator the startup backfill uses for pre-existing venues.
-  const descSeed = { id, name: venue.name, type: venue.type, neighbourhood_id: venue.neighbourhood_id, address: venue.address };
-  const description_de = venue.description_de?.trim() || generateDescription(descSeed, 'de');
-  const description_en = venue.description_en?.trim() || generateDescription(descSeed, 'en');
+  // Descriptions are never auto-generated — a venue created without one (admin
+  // form left blank, or a user-submitted new-venue proposal with no "about
+  // this place" text) simply stays empty until a human writes one.
+  const description_de = venue.description_de?.trim() || null;
+  const description_en = venue.description_en?.trim() || null;
 
   insertVenueStmt.run({
     id,
@@ -714,6 +690,7 @@ module.exports = {
     setSubmissionVenueId,
     approvedHistoryForVenue,
     updateHeadlinePrice,
+    setVenueDescriptionDe,
     countVenues,
     countSubmissionsByStatus,
     countPendingOutliers,

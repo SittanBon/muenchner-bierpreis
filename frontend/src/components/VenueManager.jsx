@@ -267,13 +267,20 @@ function VenueDetailsForm({ token, venue, neighbourhoods, onUpdated }) {
           </label>
         </div>
         <div className="sf-field vm-full-width">
-          <label>{t('admin.venues.descDe')}</label>
-          <textarea rows={2} value={details.description_de} onChange={(e) => set('description_de', e.target.value)} />
+          <label>📝 {t('admin.venues.descDe')}</label>
+          <textarea
+            rows={2} value={details.description_de} onChange={(e) => set('description_de', e.target.value)}
+            placeholder={t('admin.venues.descDePlaceholder')}
+          />
         </div>
         <div className="sf-field vm-full-width">
-          <label>{t('admin.venues.descEn')}</label>
-          <textarea rows={2} value={details.description_en} onChange={(e) => set('description_en', e.target.value)} />
+          <label>📝 {t('admin.venues.descEn')}</label>
+          <textarea
+            rows={2} value={details.description_en} onChange={(e) => set('description_en', e.target.value)}
+            placeholder={t('admin.venues.descEnPlaceholder')}
+          />
         </div>
+        <div className="vm-desc-warning">⚠️ {t('admin.venues.descWarning')}</div>
       </div>
 
       {error && <div className="sf-error">{error}</div>}

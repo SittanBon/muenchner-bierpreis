@@ -56,6 +56,9 @@ Railway auto-deploys from main branch.
 6. Always wrap Telegram calls in try/catch
 7. Nominatim: 1100ms delay between API calls
 8. User-Agent: Bierpreis/1.0 on Nominatim calls
+9. Never auto-generate descriptions — descriptions are written by
+   humans only (admin edit form, or a user submission an admin
+   approves); a venue with none stays empty, never a filler blurb
 
 ## Features Completed ✅
 - Interactive map with colour-coded pins by type
@@ -79,11 +82,12 @@ Railway auto-deploys from main branch.
 - Disclaimer on venue detail page
 - Navbar: Admin de-emphasised, Price Trends in sidebar
 - Report button prominent below price block
+- Admin audit log (table + Activity Log tab + CSV)
+- Fixed 14 venue coordinates (real addresses, geocoded)
 
 ## Still To Do ❌
-- Admin audit log (table + Activity Log tab + CSV)
 - Venue descriptions DE+EN for all 170 venues
-- Fix 14 venue coordinates (placeholder pins)
+  (human-written only — see Global Rules)
 - Buy domain bierpreis.beer (€1.71/yr)
 - Connect domain to Railway
 - Impressum + Datenschutzerklärung (legal)

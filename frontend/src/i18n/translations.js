@@ -138,7 +138,10 @@ export const de = {
       confirmClosed: "Ja, geschlossen",
       noteOptional: "Anmerkung (optional)",
       noteLabel: "Was ist falsch?",
-      notePlaceholder: "Beschreibe das Problem..."
+      notePlaceholder: "Beschreibe das Problem...",
+      suggestDescription: "Beschreibung vorschlagen",
+      descriptionPlaceholder: "Schreibe eine kurze, genaue Beschreibung dieses Lokals...",
+      descriptionHint: "Deine Beschreibung wird von einem Admin geprüft, bevor sie auf der Lokalseite erscheint."
     },
     missingBar: {
       fab: "Fehlt ein Lokal?",
@@ -151,6 +154,8 @@ export const de = {
       didYouMean: "Meintest du: {{name}}?",
       addManually: "Nicht gefunden? Manuell hinzufügen",
       priceMassOptional: "Preis Maß (1L, optional)",
+      aboutLabel: "Erzähl uns von diesem Ort (optional)",
+      aboutPlaceholder: "z.B. Gemütliche Studentenkneipe mit günstigem Augustiner vom Fass...",
       photoOptional: "Foto (optional)",
       continue: "Weiter",
       errName: "Name ist erforderlich",
@@ -208,7 +213,10 @@ export const de = {
         inactive: "Inaktiv",
         discard: "Verwerfen",
         descDe: "Beschreibung (Deutsch)",
-        descEn: "Beschreibung (Englisch)"
+        descDePlaceholder: "Schreibe eine kurze, genaue Beschreibung dieses Lokals...",
+        descEn: "Beschreibung (Englisch)",
+        descEnPlaceholder: "Write a short, accurate description of this venue...",
+        descWarning: "Nur Beschreibungen hinzufügen, die du persönlich bestätigen kannst. Nicht raten oder Details erfinden."
       },
       cities: {
         tab: "Städte",
@@ -422,7 +430,10 @@ export const en = {
       confirmClosed: "Yes, closed",
       noteOptional: "Note (optional)",
       noteLabel: "What's wrong?",
-      notePlaceholder: "Describe the issue..."
+      notePlaceholder: "Describe the issue...",
+      suggestDescription: "Suggest a description",
+      descriptionPlaceholder: "Write a short, accurate description of this venue...",
+      descriptionHint: "Your description will be reviewed by an admin before it appears on the venue page."
     },
     missingBar: {
       fab: "Missing a bar?",
@@ -435,6 +446,8 @@ export const en = {
       didYouMean: "Did you mean: {{name}}?",
       addManually: "Not finding it? Add manually",
       priceMassOptional: "Price Maß (1L, optional)",
+      aboutLabel: "Tell us about this place (optional)",
+      aboutPlaceholder: "e.g. Cosy student bar with cheap Augustiner on tap...",
       photoOptional: "Photo (optional)",
       continue: "Continue",
       errName: "Name is required",
@@ -492,7 +505,10 @@ export const en = {
         inactive: "Inactive",
         discard: "Discard",
         descDe: "Description (German)",
-        descEn: "Description (English)"
+        descDePlaceholder: "Schreibe eine kurze, genaue Beschreibung dieses Lokals...",
+        descEn: "Description (English)",
+        descEnPlaceholder: "Write a short, accurate description of this venue...",
+        descWarning: "Only add descriptions you can personally verify. Do not guess or make up details."
       },
       cities: {
         tab: "Cities",

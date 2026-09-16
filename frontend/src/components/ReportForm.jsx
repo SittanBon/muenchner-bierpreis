@@ -11,6 +11,7 @@ const SUCCESS_TOAST_KEY = {
   new_beer: 'toast.priceReportSuccess',
   closed: 'toast.closedSuccess',
   other_info: 'toast.wrongInfoSuccess',
+  suggest_description: 'toast.wrongInfoSuccess',
 };
 
 const TOPICS = [
@@ -29,6 +30,9 @@ export default function ReportForm({ venueId, venueName, onSuccess, onCancel }) 
   const { t } = useTranslation();
   const showToast = useToast();
   const [topic, setTopic] = useState(null);
+  // Only meaningful while topic === 'other_info' — null shows the sub-menu
+  // ("something else is wrong" vs "suggest a description") before either form.
+  const [otherSubtopic, setOtherSubtopic] = useState(null);
   const [form, setForm] = useState({
     beer_brand: '', size: '0.5L', price: '', serve_type: 'unknown',
     visit_date: new Date().toISOString().split('T')[0],
@@ -39,19 +43,23 @@ export default function ReportForm({ venueId, venueName, onSuccess, onCancel }) 
 
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
 
-  const submit = async (extra) => {
+  // reportTypeOverride covers 'suggest_description' — a sub-option nested
+  // under the 'other_info' topic card, not its own top-level TOPICS entry, so
+  // it can't just fall out of the `topic` state like every other report_type.
+  const submit = async (extra, reportTypeOverride) => {
+    const reportType = reportTypeOverride || topic;
     setLoading(true);
     setError('');
     try {
       await submitReport({
-        report_type: topic,
+        report_type: reportType,
         venue_id: venueId,
         venue_name: venueName,
         submitter_name: form.anonymous ? 'Anonym' : form.submitter_name,
         note: form.note,
         ...extra,
       });
-      showToast('success', t(SUCCESS_TOAST_KEY[topic] || 'toast.priceReportSuccess'));
+      showToast('success', t(SUCCESS_TOAST_KEY[reportType] || 'toast.priceReportSuccess'));
       onSuccess();
     } catch (err) {
       setError(err.message || t('submission.error'));
@@ -75,6 +83,11 @@ export default function ReportForm({ venueId, venueName, onSuccess, onCancel }) 
   const submitOtherInfo = () => {
     if (!form.note.trim()) { setError(t('report.errNote')); return; }
     submit({});
+  };
+
+  const submitDescription = () => {
+    if (!form.note.trim()) { setError(t('report.errNote')); return; }
+    submit({}, 'suggest_description');
   };
 
   const nameRow = (
@@ -102,7 +115,10 @@ export default function ReportForm({ venueId, venueName, onSuccess, onCancel }) 
       {!topic && (
         <div className="report-topics">
           {TOPICS.map((tp) => (
-            <button key={tp.key} type="button" className="report-topic-btn" onClick={() => setTopic(tp.key)}>
+            <button
+              key={tp.key} type="button" className="report-topic-btn"
+              onClick={() => { setTopic(tp.key); setOtherSubtopic(null); setForm((f) => ({ ...f, note: '' })); }}
+            >
               <span className="report-topic-icon">{tp.icon}</span>
               {t(`report.topics.${tp.key}`)}
             </button>
@@ -179,7 +195,23 @@ export default function ReportForm({ venueId, venueName, onSuccess, onCancel }) 
         </>
       )}
 
-      {topic === 'other_info' && (
+      {topic === 'other_info' && otherSubtopic === null && (
+        <div className="report-topics">
+          <button type="button" className="report-topic-btn" onClick={() => setOtherSubtopic('generic')}>
+            <span className="report-topic-icon">ℹ️</span>
+            {t('report.topics.other_info')}
+          </button>
+          <button type="button" className="report-topic-btn" onClick={() => setOtherSubtopic('suggest_description')}>
+            <span className="report-topic-icon">📝</span>
+            {t('report.suggestDescription')}
+          </button>
+          <div className="sf-actions">
+            <button className="sf-cancel" onClick={() => setTopic(null)}>← {t('report.back')}</button>
+          </div>
+        </div>
+      )}
+
+      {topic === 'other_info' && otherSubtopic === 'generic' && (
         <>
           <div className="sf-field">
             <label>{t('report.noteLabel')}</label>
@@ -188,8 +220,26 @@ export default function ReportForm({ venueId, venueName, onSuccess, onCancel }) 
           {nameRow}
           {error && <div className="sf-error">{error}</div>}
           <div className="sf-actions">
-            <button className="sf-cancel" onClick={() => setTopic(null)}>← {t('report.back')}</button>
+            <button className="sf-cancel" onClick={() => setOtherSubtopic(null)}>← {t('report.back')}</button>
             <button className="sf-submit" onClick={submitOtherInfo} disabled={loading}>
+              {loading ? '...' : t('submission.submit')}
+            </button>
+          </div>
+        </>
+      )}
+
+      {topic === 'other_info' && otherSubtopic === 'suggest_description' && (
+        <>
+          <div className="sf-field">
+            <label>📝 {t('report.suggestDescription')}</label>
+            <textarea rows={3} value={form.note} onChange={(e) => set('note', e.target.value)} placeholder={t('report.descriptionPlaceholder')} />
+          </div>
+          <p className="report-closed-text">{t('report.descriptionHint')}</p>
+          {nameRow}
+          {error && <div className="sf-error">{error}</div>}
+          <div className="sf-actions">
+            <button className="sf-cancel" onClick={() => setOtherSubtopic(null)}>← {t('report.back')}</button>
+            <button className="sf-submit" onClick={submitDescription} disabled={loading}>
               {loading ? '...' : t('submission.submit')}
             </button>
           </div>

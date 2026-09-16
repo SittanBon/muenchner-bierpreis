@@ -121,6 +121,16 @@ function notifyIncorrectInfo({ venueName, note, submitterName }) {
   );
 }
 
+function notifyDescriptionSuggestion({ venueName, note, submitterName }) {
+  return sendTelegramMessage(
+    `📝 <b>Description Suggested</b>\n` +
+    `📍 ${esc(venueName)}\n` +
+    `💬 "${esc(note)}"\n` +
+    `👤 ${esc(submitterName)}\n` +
+    `→ ${ADMIN_URL}`
+  );
+}
+
 function notifyApproved({ venueName, price }) {
   return sendTelegramMessage(
     `✅ <b>Approved</b>\n` +
@@ -143,6 +153,7 @@ module.exports = {
   notifyNewVenue,
   notifyClosure,
   notifyIncorrectInfo,
+  notifyDescriptionSuggestion,
   notifyApproved,
   notifyStartup,
 };
