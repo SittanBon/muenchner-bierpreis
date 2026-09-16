@@ -4,7 +4,7 @@
 Bilingual (DE/EN) Munich beer price web app.
 Users find Helles beer prices across bars, 
 restaurants and beer gardens on an interactive map.
-Live: https://muenchner-bierpreis-production.up.railway.app
+Live: https://bierpreis.beer
 Repo: https://github.com/SittanBon/muenchner-bierpreis
 
 ## Tech Stack
@@ -85,12 +85,11 @@ Railway auto-deploys from main branch.
 - Admin audit log (table + Activity Log tab + CSV)
 - Fixed 14 venue coordinates (real addresses, geocoded)
 - Impressum + Datenschutzerklärung (legal)
+- Custom domain bierpreis.beer connected to Railway
 
 ## Still To Do ❌
 - Venue descriptions DE+EN for all 170 venues
   (human-written only — see Global Rules)
-- Buy domain bierpreis.beer (€1.71/yr)
-- Connect domain to Railway
 - Post in r/munich for first real users
 - Analytics (Plausible — GDPR compliant)
 - Sentry error monitoring
