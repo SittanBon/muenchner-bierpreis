@@ -4,6 +4,9 @@ import react from '@vitejs/plugin-react'
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react()],
+  test: {
+    environment: 'node', // pure-logic unit tests only (utils/) — no DOM needed
+  },
   server: {
     // useApi.js now calls same-origin relative "/api" paths (so the built app
     // works served from the Node backend in production). In dev the frontend

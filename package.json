@@ -9,7 +9,7 @@
     "seed": "node backend/db/seed.js",
     "seed:force": "node backend/db/seed.js --force",
     "geocode": "node backend/db/geocode.js",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "node --test backend/*.test.js && cd frontend && npm test"
   },
   "keywords": [],
   "author": "",

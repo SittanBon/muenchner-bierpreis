@@ -44,6 +44,7 @@ const {
   notifyApproved,
   notifyStartup,
 } = require('./backend/notifications');
+const { filterVenues } = require('./backend/filterVenues');
 
 const UPLOADS_DIR = path.join(__dirname, 'backend', 'uploads');
 fs.mkdirSync(UPLOADS_DIR, { recursive: true });
@@ -129,47 +130,8 @@ app.get('/api/stats/trends', (req, res) => {
 
 // ─── VENUES ──────────────────────────────────────────────────────────────────
 
-// German + English words that should match each venue `type` in free-text search.
-const TYPE_SEARCH_TERMS = {
-  beer_garden: ['biergarten', 'beer garden', 'garden'],
-  beer_hall: ['wirtshaus', 'bierhalle', 'bierhaus', 'beer hall', 'inn'],
-  bar: ['bar', 'kneipe'],
-  restaurant: ['restaurant', 'gaststätte', 'gaststaette'],
-};
-
-// Every string a free-text query (`q`) is matched against, lower-cased.
-function venueSearchHaystack(v) {
-  return [
-    v.name,
-    v.address,
-    v.neighbourhood_id,
-    v.neighbourhood_name_de,
-    v.neighbourhood_name_en,
-    ...v.beers.map((b) => b.brand),
-    ...(TYPE_SEARCH_TERMS[v.type] || [v.type]),
-  ]
-    .filter(Boolean)
-    .map((s) => String(s).toLowerCase());
-}
-
 app.get('/api/venues', (req, res) => {
-  let result = getVenues();
-  const { neighbourhood, type, brand, min_price, max_price, q } = req.query;
-
-  if (neighbourhood) result = result.filter((v) => v.neighbourhood_id === neighbourhood);
-  if (type) result = result.filter((v) => v.type === type);
-  if (brand) {
-    const bl = brand.toLowerCase();
-    result = result.filter((v) => v.beers.some((b) => b.brand.toLowerCase().includes(bl)));
-  }
-  if (min_price) result = result.filter((v) => v.beers[0] && v.beers[0].size_05 >= parseFloat(min_price));
-  if (max_price) result = result.filter((v) => v.beers[0] && v.beers[0].size_05 <= parseFloat(max_price));
-  if (q && q.trim()) {
-    const ql = q.trim().toLowerCase();
-    result = result.filter((v) => venueSearchHaystack(v).some((s) => s.includes(ql)));
-  }
-
-  res.json(result);
+  res.json(filterVenues(getVenues(), req.query));
 });
 
 app.get('/api/venues/:id', (req, res) => {

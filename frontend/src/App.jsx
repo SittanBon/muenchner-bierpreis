@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo, Suspense, lazy } from 'react';
 import { useTranslation } from 'react-i18next';
 import './i18n/i18n.js';
 import MunichMap from './components/MunichMap';
@@ -11,13 +11,16 @@ import StatsBar from './components/StatsBar';
 import CitySelector from './components/CitySelector';
 import ToastContainer from './components/ToastContainer';
 import { ToastProvider } from './hooks/ToastProvider';
-import PriceTrends from './components/PriceTrends';
+// Lazy-loaded: PriceTrends pulls in recharts, a sizeable dependency only
+// needed when a user actually opens the trends modal (brief Section 12).
+const PriceTrends = lazy(() => import('./components/PriceTrends'));
 import FreshnessLight from './components/FreshnessLight';
 import Footer from './components/Footer';
 import Impressum from './pages/Impressum';
 import Datenschutz from './pages/Datenschutz';
 import { fetchNeighbourhoods, fetchVenues, fetchStats } from './hooks/useApi';
 import { formatEuro } from './utils/price';
+import { createSequencedLoader } from './utils/sequencedLoader';
 
 // Query params for GET /api/venues. Neighbourhood is deliberately NOT included —
 // the focused-neighbourhood list is scoped client-side from the full venue set so
@@ -114,24 +117,71 @@ function AppContent({ navigate }) {
   const searchRef = useRef(searchQuery);
   useEffect(() => { filtersRef.current = filters; searchRef.current = searchQuery; });
 
+  // Root cause of the "type/max-price filter ignored" reports: this effect
+  // re-fires a fetch on every keystroke/dropdown change with no debounce and
+  // no request sequencing, so a user changing a filter quickly (e.g. typing
+  // a 2-digit price, or clicking through venue types) fires several
+  // concurrent requests — and on real-world network latency (unlike an
+  // instant localhost), an EARLIER, now-stale request can resolve AFTER a
+  // later one and silently overwrite the correct result with wrong data.
+  // Reproduced directly: delaying the intermediate "max_price=5" response
+  // behind the final "max_price=5.20" one made the UI show the stale
+  // (wrong) count even though the input/chip already read "5.20". Fixed with
+  // createSequencedLoader (see its own tests) — only the response for the
+  // MOST RECENTLY ISSUED request is ever applied to state.
+  const sequencedFetchVenues = useMemo(() => createSequencedLoader(fetchVenues), []);
   const loadFiltered = useCallback((f, q) => {
-    return fetchVenues(venueParams(f, q)).then(setFilteredVenues).catch(() => {});
+    return sequencedFetchVenues(venueParams(f, q))
+      .then((data) => { if (data !== undefined) setFilteredVenues(data); })
+      .catch(() => {});
+  }, [sequencedFetchVenues]);
+
+  // Initial load ( `loading` starts true ). `loadAttempt` exists purely to
+  // give the retry button something to change — bumping it re-runs this
+  // effect. Previously every one of these four requests silently swallowed
+  // its own error (`.catch(() => {})` inside loadFiltered; the other three
+  // had none at all), so a failed/offline initial load just left the app on
+  // "Loading…" forever with no feedback and no way to recover without a hard
+  // refresh — exactly the "indefinite spinner" the brief calls out.
+  const [loadAttempt, setLoadAttempt] = useState(0);
+  const [loadError, setLoadError] = useState(false);
+  // Clears any prior error synchronously (in the click handler, not the
+  // effect) before bumping loadAttempt to re-trigger the fetch below.
+  const retryInitialLoad = useCallback(() => {
+    setLoadError(false);
+    setLoadAttempt((n) => n + 1);
   }, []);
 
-  // Initial load ( `loading` starts true )
   useEffect(() => {
     Promise.allSettled([
       fetchNeighbourhoods().then(setNeighbourhoods),
       fetchVenues().then(setAllVenues),
       fetchStats().then(setStats),
       loadFiltered(filtersRef.current, searchRef.current),
-    ]).finally(() => setLoading(false));
+    ]).then((results) => {
+      // Any settled-but-undefined result (loadFiltered's own catch) or an
+      // outright rejection both count as "this request failed".
+      if (results.some((r) => r.status === 'rejected')) setLoadError(true);
+    }).finally(() => setLoading(false));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [loadAttempt]);
 
-  // Re-run the filtered fetch whenever a non-neighbourhood filter or the search changes
+  // Re-run the filtered fetch whenever a non-neighbourhood filter or the search
+  // changes — debounced (300ms) so typing a search query or a price value
+  // doesn't fire a request per keystroke. This is on top of, not instead of,
+  // the request-sequencing above: the debounce cuts down how OFTEN stale
+  // requests can even happen; the sequencing guarantees correctness even
+  // when they still do (e.g. two dropdown changes in quick succession).
+  // Skipped on the very first render — the initial-load effect above already
+  // issues that exact same (empty filters/search) request immediately;
+  // without this guard every page load would fire it a redundant second time.
+  const didMountRef = useRef(false);
   useEffect(() => {
-    loadFiltered(filters, searchQuery);
+    if (!didMountRef.current) { didMountRef.current = true; return; }
+    const timer = setTimeout(() => {
+      loadFiltered(filters, searchQuery);
+    }, 300);
+    return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filters.type, filters.brand, filters.min_price, filters.max_price, searchQuery, loadFiltered]);
 
@@ -170,6 +220,24 @@ function AppContent({ navigate }) {
     setSearchQuery(val);
     if (val.trim()) setSheetLevel('half');
   }, []);
+
+  // Enter still works as an immediate, undebounced trigger — search updates
+  // live as you type either way, this just lets an impatient/keyboard user
+  // skip the 300ms wait. Reads refs (not closed-over state) so it always
+  // fires with whatever's actually in the fields right now.
+  const handleSearchNow = useCallback(() => {
+    loadFiltered(filtersRef.current, searchRef.current);
+  }, [loadFiltered]);
+
+  // The zero-results empty state's "Clear filters" action — deliberately
+  // leaves the search query alone (SearchBar owns that as local, uncontrolled
+  // state, so clearing it from outside the component isn't safe without a
+  // bigger controlled-input refactor); loosening filters while keeping the
+  // search term is usually what someone actually wants first anyway.
+  const clearFiltersOnly = useCallback(() => {
+    setFilters((f) => ({ ...f, type: '', brand: '', min_price: '', max_price: '' }));
+    selectNeighbourhood(null);
+  }, [selectNeighbourhood]);
 
   const handleVenueClick = (venue) => { setSelectedVenue(venue); setView('venue'); setSheetLevel('full'); };
   const handleBack = () => { setView('map'); setSelectedVenue(null); };
@@ -222,7 +290,10 @@ function AppContent({ navigate }) {
           <div className="nav-brand" onClick={() => { setView('map'); selectNeighbourhood(null); setMobileMenuOpen(false); }}>
             <span className="nav-logo">🍺</span>
             <div>
-              <div className="nav-title">{t('nav.title')}</div>
+              {/* Site-wide H1 (brief Section 14) — the app is a single page with
+                  no per-route document, so the brand name is the one page-level
+                  heading; VenueDetail's own heading is an h2 under it. */}
+              <h1 className="nav-title">{t('nav.title')}</h1>
               <div className="nav-subtitle">{t('nav.subtitle')}</div>
             </div>
           </div>
@@ -293,10 +364,12 @@ function AppContent({ navigate }) {
 
           <SearchBar
             onSearch={handleSearch}
+            onSearchNow={handleSearchNow}
             onFocus={() => setSheetLevel('half')}
             onFilterChange={setFilters}
             filters={filters}
             onNeighbourhoodSelect={selectNeighbourhood}
+            resultCount={filteredVenues.length}
           />
 
           {/* Desktop-only trigger — mobile shows a pill on the stats bar instead */}
@@ -318,8 +391,25 @@ function AppContent({ navigate }) {
             />
           ) : (
             <div className="sidebar-hint">
-              {loading ? (
-                <div className="loading-state"><div className="loading-spinner">🍺</div><div>{t('loading')}</div></div>
+              {loadError ? (
+                <div className="load-error-state">
+                  <div className="load-error-icon">⚠️</div>
+                  <div className="load-error-text">{t('loadError')}</div>
+                  <button className="load-error-retry" onClick={retryInitialLoad}>{t('retry')}</button>
+                </div>
+              ) : loading ? (
+                <div className="loading-state">
+                  <div className="loading-spinner">🍺</div>
+                  <div>{t('loadingVenues')}</div>
+                  <div className="venue-skeleton-list" aria-hidden="true">
+                    {Array.from({ length: 6 }).map((_, i) => (
+                      <div key={i} className="venue-skeleton-item">
+                        <div className="skeleton-line skeleton-line-name" />
+                        <div className="skeleton-line skeleton-line-price" />
+                      </div>
+                    ))}
+                  </div>
+                </div>
               ) : (
                 <div className="hint-content">
                   <div className="hint-icon">👆</div>
@@ -351,7 +441,16 @@ function AppContent({ navigate }) {
                             </span>
                           </div>
                         ))}
-                      {filteredVenues.length === 0 && <div className="no-venues">{t('search.noResults')}</div>}
+                      {filteredVenues.length === 0 && (
+                        <div className="no-venues-block">
+                          <div className="no-venues">{t('search.noResults')}</div>
+                          {(filters.type || filters.brand || filters.neighbourhood || filters.min_price || filters.max_price) && (
+                            <button className="no-venues-clear-btn" onClick={clearFiltersOnly}>
+                              {t('search.clear')}
+                            </button>
+                          )}
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -361,7 +460,14 @@ function AppContent({ navigate }) {
         </div>
 
         <div className="map-container">
-          {!loading && (
+          {/* Mounts as soon as neighbourhood polygons exist — decoupled from
+              the full `loading` flag (which also waits on venues + stats)
+              so the map, the single most prominent element on the page,
+              shows up as early as possible instead of behind a blank box
+              for the duration of the slowest of four parallel requests.
+              Venue pins simply pop in once filteredVenues arrives — MunichMap
+              already reacts to that prop changing after mount. */}
+          {neighbourhoods.length > 0 && (
             <MunichMap
               neighbourhoods={neighbourhoods}
               venues={filteredVenues}
@@ -388,7 +494,9 @@ function AppContent({ navigate }) {
       )}
 
       {showTrends && (
-        <PriceTrends neighbourhoods={neighbourhoods} onClose={() => setShowTrends(false)} />
+        <Suspense fallback={null}>
+          <PriceTrends neighbourhoods={neighbourhoods} onClose={() => setShowTrends(false)} />
+        </Suspense>
       )}
 
       <Footer navigate={navigate} />

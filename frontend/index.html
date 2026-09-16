@@ -5,11 +5,43 @@
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🍺</text></svg>" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Bierpreis – Faires Bier für Alle</title>
-    <meta name="description" content="Faires Bier für Alle — vergleiche Bierpreise in Münchens Vierteln." />
-    <meta property="og:title" content="Bierpreis" />
-    <meta property="og:description" content="Faires Bier für Alle" />
+    <meta name="description" content="Faires Bier für Alle — vergleiche Bierpreise in Münchens Vierteln auf einer interaktiven Karte, mit über 150 Lokalen von der Altstadt bis Schwabing." />
+    <!-- Site is a single-page app with no per-route static HTML, so canonical
+         always points at the homepage (brief Section 14). Update this once
+         the custom domain (bierpreis.beer, see CLAUDE.md "Still To Do") is
+         live — it currently points at the Railway URL actually serving the
+         site today rather than an aspirational one. -->
+    <link rel="canonical" href="https://muenchner-bierpreis-production.up.railway.app/" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Bierpreis" />
+    <meta property="og:title" content="Bierpreis – Faires Bier für Alle" />
+    <meta property="og:description" content="Vergleiche Bierpreise in Münchens Vierteln auf einer interaktiven Karte — 170 Lokale von der Altstadt bis Schwabing." />
+    <meta property="og:url" content="https://muenchner-bierpreis-production.up.railway.app/" />
+    <meta property="og:image" content="https://muenchner-bierpreis-production.up.railway.app/og-image.jpg" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:locale" content="de_DE" />
+    <meta property="og:locale:alternate" content="en_US" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Bierpreis – Faires Bier für Alle" />
+    <meta name="twitter:description" content="Vergleiche Bierpreise in Münchens Vierteln auf einer interaktiven Karte." />
+    <meta name="twitter:image" content="https://muenchner-bierpreis-production.up.railway.app/og-image.jpg" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <!-- Structured data (brief Section 14): only facts the app can actually
+         stand behind — no aggregateRating/review schema, since the site has
+         no rating or review feature to report on. -->
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "WebSite",
+        "name": "Bierpreis",
+        "alternateName": "Münchner Bierpreis",
+        "url": "https://muenchner-bierpreis-production.up.railway.app/",
+        "description": "Vergleiche Bierpreise in Münchens Vierteln auf einer interaktiven Karte.",
+        "inLanguage": ["de", "en"]
+      }
+    </script>
   </head>
   <body>
     <div id="root"></div>

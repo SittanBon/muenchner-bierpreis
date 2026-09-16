@@ -30,6 +30,7 @@ export const de = {
       filters: "Filter",
       clear: "Alle zurücksetzen",
       results: "Ergebnisse",
+      resultsFor: "{{count}} Ergebnisse für „{{query}}“",
       noResults: "Keine Lokale gefunden"
     },
     filters: {
@@ -280,6 +281,9 @@ export const de = {
     sortName: "Name",
     backToMap: "Zurück zur Karte",
     loading: "Wird geladen...",
+    loadingVenues: "München-Lokale werden geladen…",
+    loadError: "Daten konnten nicht geladen werden.",
+    retry: "Erneut versuchen",
     trends: {
       button: "Preistrends",
       title: "Preistrends",
@@ -317,10 +321,11 @@ export const de = {
       collect1Title: "1. Technische Zugriffsdaten",
       collect1Body: "Unser Hosting-Anbieter Railway speichert automatisch Server-Logs (IP-Adresse, Browsertyp, Zugriffszeit). Diese Daten werden von Railway verwaltet und sind für uns nicht einsehbar.",
       collect1LinkLabel: "Datenschutzerklärung Railway:",
-      collect2Title: "2. Freiwillige Preismeldungen",
-      collect2Intro: "Wenn Sie einen Bierpreis melden, speichern wir:",
+      collect2Title: "2. Preismeldungen & Lokal-Vorschläge",
+      collect2Intro: "Wenn Sie einen Bierpreis melden oder ein neues Lokal vorschlagen, speichern wir:",
       collect2Items: [
-        "Den gemeldeten Preis und das Besuchsdatum",
+        "Die gemeldeten Angaben (Preis, Besuchsdatum, bei einem Lokal-Vorschlag auch Name und Adresse des Lokals)",
+        "Ein optional hochgeladenes Foto des Lokals — wird nach Freigabe öffentlich auf der Website angezeigt",
         "Ihren Namen — NUR wenn Sie ihn freiwillig angeben. Die anonyme Meldung ist immer möglich."
       ],
       noShare: "Wir verkaufen oder teilen diese Daten niemals mit Dritten.",
@@ -378,6 +383,7 @@ export const en = {
       filters: "Filters",
       clear: "Clear all",
       results: "Results",
+      resultsFor: "{{count}} results for \"{{query}}\"",
       noResults: "No venues found"
     },
     filters: {
@@ -628,6 +634,9 @@ export const en = {
     sortName: "Name",
     backToMap: "Back to map",
     loading: "Loading...",
+    loadingVenues: "Loading Munich venues…",
+    loadError: "Couldn't load data.",
+    retry: "Retry",
     trends: {
       button: "Price Trends",
       title: "Price Trends",
@@ -665,10 +674,11 @@ export const en = {
       collect1Title: "1. Technical access data",
       collect1Body: "Our hosting provider Railway automatically stores server logs (IP address, browser type, access time). This data is managed by Railway and is not accessible to us.",
       collect1LinkLabel: "Railway privacy policy:",
-      collect2Title: "2. Voluntary price reports",
-      collect2Intro: "When you submit a beer price, we store:",
+      collect2Title: "2. Price reports & venue suggestions",
+      collect2Intro: "When you submit a beer price or suggest a new venue, we store:",
       collect2Items: [
-        "The reported price and visit date",
+        "The reported details (price, visit date, and — for a venue suggestion — the venue's name and address)",
+        "An optionally uploaded photo of the venue — shown publicly on the site once approved",
         "Your name — ONLY if you voluntarily provide it. Anonymous reporting is always available."
       ],
       noShare: "We never sell or share this data with third parties.",

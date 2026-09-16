@@ -16,7 +16,7 @@ const NEIGHBOURHOODS = [
   { id: 'isarvorstadt', de: 'Isarvorstadt', en: 'Isarvorstadt' }
 ];
 
-export default function SearchBar({ onSearch, onFocus, onFilterChange, filters, onNeighbourhoodSelect }) {
+export default function SearchBar({ onSearch, onSearchNow, onFocus, onFilterChange, filters, onNeighbourhoodSelect, resultCount }) {
   const { t, i18n } = useTranslation();
   const [query, setQuery] = useState('');
   const [showFilters, setShowFilters] = useState(false);
@@ -24,6 +24,15 @@ export default function SearchBar({ onSearch, onFocus, onFilterChange, filters, 
   const handleSearch = (val) => {
     setQuery(val);
     onSearch(val);
+  };
+
+  // Search already updates live on every keystroke (debounced ~300ms
+  // upstream) — Enter is an extra, undebounced "search now", and Escape
+  // clears the field, both explicitly called for even though search was
+  // never actually Enter-only to begin with.
+  const handleKeyDown = (e) => {
+    if (e.key === 'Enter') onSearchNow?.();
+    else if (e.key === 'Escape' && query) handleSearch('');
   };
 
   const setFilter = (k, v) => {
@@ -49,6 +58,7 @@ export default function SearchBar({ onSearch, onFocus, onFilterChange, filters, 
             value={query}
             onChange={e => handleSearch(e.target.value)}
             onFocus={onFocus}
+            onKeyDown={handleKeyDown}
           />
           {query && (
             <button className="search-clear" onClick={() => handleSearch('')}>✕</button>
@@ -62,6 +72,15 @@ export default function SearchBar({ onSearch, onFocus, onFilterChange, filters, 
           {activeFilterCount > 0 && <span className="filter-count">{activeFilterCount}</span>}
         </button>
       </div>
+
+      {/* Live result count — visible right where the query is, not just
+          buried in the "all venues" list further down, so a new user gets
+          immediate confirmation search is doing something as they type. */}
+      {query.trim() && typeof resultCount === 'number' && (
+        <div className="search-result-count">
+          {t('search.resultsFor', { count: resultCount, query: query.trim() })}
+        </div>
+      )}
 
       {/* Active filter chips */}
       {activeFilterCount > 0 && (

@@ -175,7 +175,9 @@ export default function VenueDetail({ venue: initialVenue, onBack }) {
       <div className="vd-hero">
         <div className="vd-icon-big">{TYPE_ICONS[venue.type] || '🍺'}</div>
         <div className="vd-hero-info">
-          <h1 className="vd-name">{venue.name}</h1>
+          {/* h2, not h1 — this view is rendered inline under the app's own
+              site-title h1 (brief Section 14 calls for one h1 per page). */}
+          <h2 className="vd-name">{venue.name}</h2>
           <div className="vd-meta">
             <span className="vd-type-badge">{t(`filters.types.${venue.type}`)}</span>
             <span className="vd-neighbourhood">
