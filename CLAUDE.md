@@ -84,13 +84,13 @@ Railway auto-deploys from main branch.
 - Report button prominent below price block
 - Admin audit log (table + Activity Log tab + CSV)
 - Fixed 14 venue coordinates (real addresses, geocoded)
+- Impressum + Datenschutzerklärung (legal)
 
 ## Still To Do ❌
 - Venue descriptions DE+EN for all 170 venues
   (human-written only — see Global Rules)
 - Buy domain bierpreis.beer (€1.71/yr)
 - Connect domain to Railway
-- Impressum + Datenschutzerklärung (legal)
 - Post in r/munich for first real users
 - Analytics (Plausible — GDPR compliant)
 - Sentry error monitoring

@@ -739,3 +739,70 @@ body{font-family:'Source Sans 3',sans-serif;background:var(--cream);color:var(--
 .mb-remove-beer{margin-top:4px;background:none;border:none;color:#c04040;font-size:12px;cursor:pointer;font-family:'Source Sans 3',sans-serif;padding:2px 0}
 .vm-desc-warning{grid-column:1/-1;background:#fff3d6;border:1px solid var(--amber-400);border-radius:8px;padding:8px 11px;font-size:11.5px;color:#8a6800;margin-top:2px}
 .mb-char-count{text-align:right;font-size:10.5px;color:var(--text-muted);margin-top:2px}
+
+/* ===== Footer — present on every page, deliberately understated ===== */
+.app-footer{
+  height:32px;flex-shrink:0;background:var(--amber-900);
+  color:rgba(255,255,255,0.25);font-size:11px;
+  display:flex;align-items:center;justify-content:center;gap:6px;
+  font-family:'Source Sans 3',sans-serif;
+}
+.app-footer-sep{opacity:0.5}
+.app-footer a{color:rgba(255,255,255,0.25);font-size:10px;text-decoration:none;transition:color 0.2s}
+.app-footer a:hover{color:rgba(255,255,255,0.5)}
+
+@media (max-width:768px){
+  /* The bottom sheet is position:fixed and, in every stop (collapsed/half/
+     full), its box extends to the true viewport bottom — only how much of
+     its TOP is revealed changes. So the footer's own 32px strip always sits
+     geometrically "under" the sheet's box, in every state. Rather than
+     fight that with pixel-perfect transform math (risking the sheet's
+     already-tuned, bug-prone geometry), the footer just wins the paint
+     order — position:relative is required for z-index to apply to an
+     element that's otherwise in normal flow. z-index:1201 clears the
+     sheet's 1200 by exactly one, matching the existing app-wide precedent
+     that sheet-adjacent chrome sits above modal overlays (the sheet itself
+     is already above .modal-overlay's 1000) rather than inventing a new one. */
+  .app-footer{position:relative;z-index:1201}
+}
+
+/* ===== Legal pages (Impressum / Datenschutz) ===== */
+.legal-page{display:flex;flex-direction:column;height:100vh;overflow:hidden;background:var(--cream)}
+.legal-header{
+  height:58px;flex-shrink:0;background:var(--amber-900);
+  display:flex;align-items:center;justify-content:space-between;padding:0 20px;
+  box-shadow:0 2px 12px rgba(0,0,0,0.25);
+}
+.legal-back-btn{
+  background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);
+  color:var(--amber-100);border-radius:6px;padding:6px 14px;font-size:13px;
+  cursor:pointer;font-family:'Source Sans 3',sans-serif;transition:background 0.2s;
+  text-decoration:none;display:inline-flex;align-items:center;
+}
+.legal-back-btn:hover{background:rgba(255,255,255,0.18)}
+.legal-header-brand{
+  display:flex;align-items:center;gap:8px;color:var(--amber-200);
+  font-family:'Playfair Display',serif;font-weight:700;font-size:16px;
+}
+.legal-content{flex:1;overflow-y:auto;padding:32px 20px 48px}
+.legal-content-inner{max-width:680px;margin:0 auto}
+.legal-content h1{font-family:'Playfair Display',serif;font-size:26px;color:var(--text-primary);margin-bottom:6px}
+.legal-lede{color:var(--text-secondary);font-size:14px;margin-bottom:24px;line-height:1.6}
+.legal-content h2{font-family:'Playfair Display',serif;font-size:18px;color:var(--amber-800);margin:28px 0 10px}
+.legal-content h3{font-size:15px;font-weight:700;color:var(--text-primary);margin:18px 0 6px}
+.legal-content p{font-size:14px;line-height:1.7;color:var(--text-primary);margin-bottom:10px}
+.legal-content ul{margin:0 0 14px 0;padding-left:20px}
+.legal-content li{font-size:14px;line-height:1.7;color:var(--text-primary);margin-bottom:4px}
+.legal-checklist{list-style:none;padding-left:0}
+.legal-checklist li{color:#2d7a2d;font-weight:500}
+.legal-address{background:var(--amber-50);border:1px solid var(--border);border-radius:10px;padding:14px 16px;font-size:14px;line-height:1.7;margin-bottom:24px}
+.legal-emphasis{font-weight:600;color:var(--amber-800)}
+.legal-updated{color:var(--text-muted);font-size:12.5px;margin-top:24px;font-style:italic}
+.legal-content a{color:var(--amber-600);text-decoration:underline}
+.legal-content a:hover{color:var(--amber-800)}
+
+@media (max-width:768px){
+  .legal-header{padding:0 14px}
+  .legal-header-brand{display:none}
+  .legal-content{padding:24px 16px 40px}
+}

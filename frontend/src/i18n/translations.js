@@ -286,6 +286,62 @@ export const de = {
       subtitle: "Ø Preis für 0,5L Helles pro Viertel, über Zeit",
       error: "Trends konnten nicht geladen werden.",
       noData: "Noch keine Trenddaten vorhanden."
+    },
+    footer: {
+      copyright: "© 2026 Bierpreis",
+      impressum: "Impressum",
+      datenschutz: "Datenschutz",
+      kontakt: "Kontakt"
+    },
+    impressum: {
+      title: "Impressum",
+      intro: "Angaben gemäß § 5 TMG",
+      name: "Sittan Charoensuwan",
+      addressLine1: "Ruppertstr. 30",
+      addressLine2: "80337 München",
+      country: "Deutschland",
+      contactTitle: "Kontakt",
+      emailLabel: "E-Mail",
+      responsibleTitle: "Verantwortlich für den Inhalt nach § 55 Abs. 2 RStV",
+      priceNoticeTitle: "Hinweis zu Preisangaben",
+      priceNoticeBody: "Alle Preisangaben auf dieser Website sind community-gemeldete Schätzungen. Wir übernehmen keine Gewähr für deren Richtigkeit oder Aktualität. Bitte verifizieren Sie Preise vor Ihrem Besuch vor Ort."
+    },
+    datenschutz: {
+      title: "Datenschutzerklärung",
+      intro: "Wir nehmen den Schutz Ihrer Daten ernst. Diese Website wurde bewusst datenschutzfreundlich gestaltet.",
+      controllerTitle: "Verantwortlicher",
+      emailLabel: "E-Mail",
+      notCollectTitle: "Was wir NICHT sammeln",
+      notCollect: ["Keine Cookies", "Kein Tracking", "Keine Nutzerkonten", "Keine Zahlungsdaten", "Keine E-Mail-Adressen", "Kein Social-Media-Tracking"],
+      collectTitle: "Was wir sammeln",
+      collect1Title: "1. Technische Zugriffsdaten",
+      collect1Body: "Unser Hosting-Anbieter Railway speichert automatisch Server-Logs (IP-Adresse, Browsertyp, Zugriffszeit). Diese Daten werden von Railway verwaltet und sind für uns nicht einsehbar.",
+      collect1LinkLabel: "Datenschutzerklärung Railway:",
+      collect2Title: "2. Freiwillige Preismeldungen",
+      collect2Intro: "Wenn Sie einen Bierpreis melden, speichern wir:",
+      collect2Items: [
+        "Den gemeldeten Preis und das Besuchsdatum",
+        "Ihren Namen — NUR wenn Sie ihn freiwillig angeben. Die anonyme Meldung ist immer möglich."
+      ],
+      noShare: "Wir verkaufen oder teilen diese Daten niemals mit Dritten.",
+      thirdPartyTitle: "Drittanbieter",
+      thirdParty: [
+        "Hosting: Railway (railway.app)",
+        "Kartenmaterial: OpenStreetMap (openstreetmap.org)",
+        "Adresssuche: Nominatim/OpenStreetMap Foundation"
+      ],
+      noAds: "Keine dieser Dienste verwendet Ihre Daten für Werbezwecke.",
+      rightsTitle: "Ihre Rechte",
+      rightsIntro: "Sie haben das Recht auf:",
+      rights: [
+        "Auskunft über Ihre gespeicherten Daten",
+        "Berichtigung unrichtiger Daten",
+        "Löschung Ihrer Daten",
+        "Widerspruch gegen die Verarbeitung"
+      ],
+      requestsNote: "Für alle Anfragen:",
+      responseTime: "Wir antworten innerhalb von 48 Stunden.",
+      lastUpdated: "Stand: September 2026"
     }
   }
 };
@@ -578,6 +634,62 @@ export const en = {
       subtitle: "Avg. price for 0.5L Helles per neighbourhood, over time",
       error: "Couldn't load trend data.",
       noData: "No trend data yet."
+    },
+    footer: {
+      copyright: "© 2026 Bierpreis",
+      impressum: "Legal Notice",
+      datenschutz: "Privacy",
+      kontakt: "Contact"
+    },
+    impressum: {
+      title: "Legal Notice (Impressum)",
+      intro: "According to § 5 TMG (German Telemedia Act)",
+      name: "Sittan Charoensuwan",
+      addressLine1: "Ruppertstr. 30",
+      addressLine2: "80337 München",
+      country: "Germany",
+      contactTitle: "Contact",
+      emailLabel: "Email",
+      responsibleTitle: "Responsible for content according to § 55 Abs. 2 RStV",
+      priceNoticeTitle: "Note on prices",
+      priceNoticeBody: "All prices on this website are community-reported estimates. We make no guarantee of accuracy or currentness. Please verify prices on site before visiting."
+    },
+    datenschutz: {
+      title: "Privacy Policy",
+      intro: "We take your privacy seriously. This website was designed to be as privacy-friendly as possible.",
+      controllerTitle: "Controller",
+      emailLabel: "Email",
+      notCollectTitle: "What we do NOT collect",
+      notCollect: ["No cookies", "No tracking", "No user accounts", "No payment data", "No email addresses", "No social media tracking"],
+      collectTitle: "What we do collect",
+      collect1Title: "1. Technical access data",
+      collect1Body: "Our hosting provider Railway automatically stores server logs (IP address, browser type, access time). This data is managed by Railway and is not accessible to us.",
+      collect1LinkLabel: "Railway privacy policy:",
+      collect2Title: "2. Voluntary price reports",
+      collect2Intro: "When you submit a beer price, we store:",
+      collect2Items: [
+        "The reported price and visit date",
+        "Your name — ONLY if you voluntarily provide it. Anonymous reporting is always available."
+      ],
+      noShare: "We never sell or share this data with third parties.",
+      thirdPartyTitle: "Third party services",
+      thirdParty: [
+        "Hosting: Railway (railway.app)",
+        "Maps: OpenStreetMap (openstreetmap.org)",
+        "Address search: Nominatim/OpenStreetMap Foundation"
+      ],
+      noAds: "None of these services use your data for advertising.",
+      rightsTitle: "Your rights",
+      rightsIntro: "You have the right to:",
+      rights: [
+        "Access your stored data",
+        "Correct inaccurate data",
+        "Delete your data",
+        "Object to processing"
+      ],
+      requestsNote: "For all requests:",
+      responseTime: "We respond within 48 hours.",
+      lastUpdated: "Last updated: September 2026"
     }
   }
 };

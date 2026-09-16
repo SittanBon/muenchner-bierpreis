@@ -13,6 +13,9 @@ import ToastContainer from './components/ToastContainer';
 import { ToastProvider } from './hooks/ToastProvider';
 import PriceTrends from './components/PriceTrends';
 import FreshnessLight from './components/FreshnessLight';
+import Footer from './components/Footer';
+import Impressum from './pages/Impressum';
+import Datenschutz from './pages/Datenschutz';
 import { fetchNeighbourhoods, fetchVenues, fetchStats } from './hooks/useApi';
 import { formatEuro } from './utils/price';
 
@@ -29,10 +32,46 @@ function venueParams(filters, q) {
   return p;
 }
 
+// Deliberately not a routing library — just two static legal pages need real
+// URLs (/impressum, /datenschutz), so a minimal history-API router avoids
+// pulling in react-router for two routes. Production's static-file server
+// already falls back to index.html for any non-/api GET (so a hard refresh
+// on /impressum works); Vite's dev server does the same SPA fallback by default.
+function useRoute() {
+  const [route, setRoute] = useState(window.location.pathname);
+
+  useEffect(() => {
+    const onPopState = () => setRoute(window.location.pathname);
+    window.addEventListener('popstate', onPopState);
+    return () => window.removeEventListener('popstate', onPopState);
+  }, []);
+
+  // Pass the click event through so a modified click (cmd/ctrl/shift-click,
+  // middle-click) still opens a new tab like a real link instead of being
+  // hijacked into a same-tab client-side navigation.
+  const navigate = (e, path) => {
+    if (e) {
+      if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) return;
+      e.preventDefault();
+    }
+    window.history.pushState({}, '', path);
+    setRoute(path);
+  };
+
+  return [route, navigate];
+}
+
 export default function App() {
+  const [route, navigate] = useRoute();
+
+  let page;
+  if (route === '/impressum') page = <Impressum onBack={(e) => navigate(e, '/')} navigate={navigate} />;
+  else if (route === '/datenschutz') page = <Datenschutz onBack={(e) => navigate(e, '/')} navigate={navigate} />;
+  else page = <AppContent navigate={navigate} />;
+
   return (
     <ToastProvider>
-      <AppContent />
+      {page}
       <ToastContainer />
     </ToastProvider>
   );
@@ -41,7 +80,7 @@ export default function App() {
 // The actual app — split out so ToastProvider wraps both the admin dashboard
 // and the main map view (App used to `return <AdminPage/>` early, which would
 // otherwise have skipped the provider entirely for that branch).
-function AppContent() {
+function AppContent({ navigate }) {
   const { t, i18n } = useTranslation();
   const [neighbourhoods, setNeighbourhoods] = useState([]);
   const [allVenues, setAllVenues] = useState([]);       // every venue in the DB
@@ -351,6 +390,8 @@ function AppContent() {
       {showTrends && (
         <PriceTrends neighbourhoods={neighbourhoods} onClose={() => setShowTrends(false)} />
       )}
+
+      <Footer navigate={navigate} />
     </div>
   );
 }
