@@ -190,18 +190,6 @@ body{font-family:'Source Sans 3',sans-serif;background:var(--cream);color:var(--
 .add-venue-btn{width:100%;padding:10px;background:var(--amber-50);border:1.5px dashed var(--amber-400);border-radius:8px;color:var(--amber-800);font-size:13px;font-weight:500;cursor:pointer;font-family:'Source Sans 3',sans-serif;transition:all 0.2s}
 .add-venue-btn:hover{background:var(--amber-100);border-style:solid}
 
-/* Desktop trigger for the Price Trends panel — pinned right below the search
-   bar, at the top of the sidebar, so it's reachable regardless of which
-   sidebar view (hint/panel/detail) is showing below it, and reads as the key
-   feature it is rather than a footnote. Hidden on mobile, where a pill on
-   the stats bar does this job instead. */
-.sidebar-trends-btn{
-  width:100%;flex-shrink:0;padding:12px;border:none;border-bottom:1px solid var(--border);
-  background:var(--amber-600);color:#fff;font-size:14px;font-weight:600;cursor:pointer;
-  font-family:'Source Sans 3',sans-serif;transition:background 0.2s;
-}
-.sidebar-trends-btn:hover{background:var(--amber-500)}
-
 /* Venue Detail */
 .sidebar-content.scrollable{flex:1;overflow-y:auto}
 .venue-detail{padding:16px 14px}
@@ -432,7 +420,18 @@ body{font-family:'Source Sans 3',sans-serif;background:var(--cream);color:var(--
 .vm-no-results{text-align:center;color:var(--text-muted);padding:24px 0}
 
 /* Modal */
-.modal-overlay{position:fixed;inset:0;background:rgba(26,9,0,0.5);z-index:1000;display:flex;align-items:center;justify-content:center;padding:20px}
+/* z-index:1500, not the old 1000 — found while checking the Price Trends
+   modal on mobile: at 1000 this sat BELOW .sidebar's 1200 (the mobile bottom
+   sheet, always z-index:1200 even collapsed), so wherever the collapsed
+   sheet's peek visually overlapped an open modal, the sheet painted on top
+   of it — the modal looked cut off, and the sheet's own controls underneath
+   stayed clickable through it. Pre-existing, not new; surfaced now because
+   the Trends modal's chart doesn't fill its full-height mobile card, making
+   the gap (and the bug) visible. 1500 clears every other persistent-chrome
+   z-index (sidebar 1200, footer 1201, missing-bar-fab 1250, mobile menu
+   1300/1400) while staying below toasts (2000), which should stay visible
+   even over an open modal. */
+.modal-overlay{position:fixed;inset:0;background:rgba(26,9,0,0.5);z-index:1500;display:flex;align-items:center;justify-content:center;padding:20px}
 .modal-card{background:var(--surface);border-radius:var(--radius-lg);width:100%;max-width:420px;box-shadow:var(--shadow-lg);overflow:hidden}
 .modal-card .submission-form{margin:0;border:none;border-radius:0}
 
@@ -495,12 +494,29 @@ body{font-family:'Source Sans 3',sans-serif;background:var(--cream);color:var(--
 .trends-header{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;padding:18px 20px 12px;border-bottom:1px solid var(--border)}
 .trends-title{font-family:'Playfair Display',serif;font-size:19px;font-weight:700;color:var(--text-primary)}
 .trends-subtitle{font-size:12.5px;color:var(--text-muted);margin-top:2px}
+/* View-mode switch (By Area / By Brand) — a segmented control, visually
+   distinct from the per-line legend toggles below it so the two different
+   kinds of choice ("which question" vs. "which line") don't blur together. */
+.trends-mode-toggle{display:flex;gap:8px;padding:14px 20px 0}
+.trends-mode-btn{padding:7px 16px;border-radius:20px;border:1.5px solid var(--border-md);background:var(--amber-50);color:var(--text-secondary);font-size:13px;font-weight:600;cursor:pointer;font-family:'Source Sans 3',sans-serif;transition:all 0.15s}
+.trends-mode-btn.active{background:var(--amber-900);border-color:var(--amber-900);color:var(--amber-100)}
+.trends-mode-btn:hover:not(.active){border-color:var(--amber-400);background:var(--amber-100)}
 .trends-toggles{display:flex;flex-wrap:wrap;gap:8px;padding:14px 20px 0}
 .trends-toggle{display:flex;align-items:center;gap:7px;padding:5px 12px 5px 8px;border-radius:20px;border:1.5px solid var(--border-md);background:none;font-size:12.5px;color:var(--text-muted);cursor:pointer;font-family:'Source Sans 3',sans-serif;transition:all 0.15s;opacity:0.55}
 .trends-toggle.active{opacity:1;color:var(--text-primary);border-color:var(--tc);background:color-mix(in srgb, var(--tc) 10%, transparent)}
 .trends-swatch{width:10px;height:10px;border-radius:50%;background:var(--tc);flex-shrink:0}
 .trends-swatch-dashed{border-radius:0;height:2px;background:repeating-linear-gradient(to right, var(--tc) 0 4px, transparent 4px 7px)}
 .trends-chart{padding:12px 12px 20px;flex:1;overflow:hidden;min-height:280px}
+
+/* Custom trends tooltip — price + date + data-point count (or the
+   no-history-yet note for a fallback line), one row per visible series. */
+.trends-tooltip{background:var(--amber-900);border-radius:10px;padding:10px 12px;box-shadow:var(--shadow-lg);min-width:180px;max-height:320px;overflow-y:auto}
+.trends-tooltip-date{font-weight:700;color:var(--amber-200);font-size:12.5px;margin-bottom:6px}
+.trends-tooltip-row{display:grid;grid-template-columns:8px 1fr auto;column-gap:7px;row-gap:1px;align-items:baseline;padding:3px 0}
+.trends-tooltip-swatch{width:8px;height:8px;border-radius:50%;align-self:center}
+.trends-tooltip-name{color:var(--amber-100);font-size:12px;font-weight:600}
+.trends-tooltip-price{color:var(--amber-100);font-size:12px;font-weight:700;text-align:right}
+.trends-tooltip-meta{grid-column:2 / -1;color:rgba(255,255,255,0.55);font-size:10.5px}
 
 /* Leaflet */
 .leaflet-container{background:#f5f0e8;font-family:'Source Sans 3',sans-serif}
@@ -578,9 +594,6 @@ body{font-family:'Source Sans 3',sans-serif;background:var(--cream);color:var(--
 .stat-tile-btn:disabled{opacity:0.55;cursor:default}
 .stat-tile.cheapest{border-left:3px solid #3a9d3a}
 .stat-tile.priciest{border-left:3px solid #c8442c}
-/* Mobile-only pill trigger for Price Trends — desktop uses the sidebar-bottom
-   button instead, so this stays hidden until the mobile media query flips it on. */
-.trends-pill-mobile{display:none}
 .stat-tile-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted)}
 .stat-tile-value{font-family:'Playfair Display',serif;font-size:19px;font-weight:700;color:var(--amber-800);line-height:1.15}
 .stat-tile-sub{font-size:11px;color:var(--text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:150px}
@@ -598,6 +611,13 @@ body{font-family:'Source Sans 3',sans-serif;background:var(--cream);color:var(--
 .stats-pill-name{font-weight:600}
 .stats-pill-price{font-weight:700}
 .stats-pill.active .stats-pill-price{color:var(--amber-200)}
+/* Always-amber, distinct from the neutral/active neighbourhood pills beside
+   it — this one opens the Trends modal rather than toggling a filter, so it
+   reads as a different kind of action at a glance. One element for both
+   desktop (sits at the end of this row, after the neighbourhood pills) and
+   mobile (this row is already the horizontally-scrollable one). */
+.stats-pill-trends{background:var(--amber-900);border-color:var(--amber-900);color:var(--amber-100);font-weight:600}
+.stats-pill-trends:hover{background:var(--amber-800);border-color:var(--amber-800)}
 
 /* ===== Price-freshness traffic light ===== */
 .freshness{display:inline-flex;align-items:center;gap:4px;font-size:11px;color:var(--text-muted);white-space:nowrap}
@@ -676,18 +696,7 @@ body{font-family:'Source Sans 3',sans-serif;background:var(--cream);color:var(--
   .stat-tile-sub{max-width:none}
   .stats-pills{flex-wrap:nowrap;overflow-x:auto;padding-bottom:2px;-webkit-overflow-scrolling:touch}
   .stats-pills-label{display:none}
-
-  /* Trends moved out of the hamburger menu and onto its own pill here */
-  .trends-pill-mobile{
-    display:flex;align-items:center;justify-content:center;gap:6px;
-    grid-column:1 / -1;padding:8px 12px;border-radius:20px;border:1.5px solid var(--amber-400);
-    background:var(--amber-50);color:var(--amber-800);font-size:12.5px;font-weight:600;
-    cursor:pointer;font-family:'Source Sans 3',sans-serif;
-  }
-  .trends-pill-mobile:active{background:var(--amber-100)}
-
-  /* Desktop-only trigger — mobile uses the pill above instead */
-  .sidebar-trends-btn{display:none}
+  .stats-pill-trends:active{background:var(--amber-800)}
 
   .main-layout{position:relative}
   .map-container{position:absolute;inset:0}

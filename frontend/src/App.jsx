@@ -29,6 +29,7 @@ function venueParams(filters, q) {
   const p = {};
   if (filters.type) p.type = filters.type;
   if (filters.brand) p.brand = filters.brand;
+  if (filters.serve_type) p.serve_type = filters.serve_type;
   if (filters.min_price) p.min_price = filters.min_price;
   if (filters.max_price) p.max_price = filters.max_price;
   if (q) p.q = q;
@@ -94,7 +95,7 @@ function AppContent({ navigate }) {
   const [view, setView] = useState('map');
   const [showMissingBar, setShowMissingBar] = useState(false);
   const [showTrends, setShowTrends] = useState(false);
-  const [filters, setFilters] = useState({ type: '', brand: '', neighbourhood: '', min_price: '', max_price: '' });
+  const [filters, setFilters] = useState({ type: '', brand: '', serve_type: '', neighbourhood: '', min_price: '', max_price: '' });
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
   // Mobile bottom sheet has 3 stops: 'collapsed' (~15%, just the handle),
@@ -183,7 +184,7 @@ function AppContent({ navigate }) {
     }, 300);
     return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filters.type, filters.brand, filters.min_price, filters.max_price, searchQuery, loadFiltered]);
+  }, [filters.type, filters.brand, filters.serve_type, filters.min_price, filters.max_price, searchQuery, loadFiltered]);
 
   // Keep everything in step with the live DB when the tab regains focus
   useEffect(() => {
@@ -235,7 +236,7 @@ function AppContent({ navigate }) {
   // bigger controlled-input refactor); loosening filters while keeping the
   // search term is usually what someone actually wants first anyway.
   const clearFiltersOnly = useCallback(() => {
-    setFilters((f) => ({ ...f, type: '', brand: '', min_price: '', max_price: '' }));
+    setFilters((f) => ({ ...f, type: '', brand: '', serve_type: '', min_price: '', max_price: '' }));
     selectNeighbourhood(null);
   }, [selectNeighbourhood]);
 
@@ -273,7 +274,7 @@ function AppContent({ navigate }) {
   // Venues in the focused neighbourhood — always derived from the full DB set,
   // then narrowed by the active filters/search so the panel matches the map.
   const filteredIds = new Set(filteredVenues.map((v) => v.id));
-  const anyFilterActive = !!(filters.type || filters.brand || filters.min_price || filters.max_price || searchQuery);
+  const anyFilterActive = !!(filters.type || filters.brand || filters.serve_type || filters.min_price || filters.max_price || searchQuery);
   const panelVenues = activeNeighbourhood
     ? allVenues
         .filter((v) => v.neighbourhood_id === activeNeighbourhood)
@@ -372,11 +373,6 @@ function AppContent({ navigate }) {
             resultCount={filteredVenues.length}
           />
 
-          {/* Desktop-only trigger — mobile shows a pill on the stats bar instead */}
-          <button className="sidebar-trends-btn" onClick={() => setShowTrends(true)}>
-            📊 {t('trends.button')}
-          </button>
-
           {view === 'venue' && selectedVenue ? (
             <div className="sidebar-content scrollable">
               <VenueDetail venue={selectedVenue} onBack={handleBack} />
@@ -444,7 +440,7 @@ function AppContent({ navigate }) {
                       {filteredVenues.length === 0 && (
                         <div className="no-venues-block">
                           <div className="no-venues">{t('search.noResults')}</div>
-                          {(filters.type || filters.brand || filters.neighbourhood || filters.min_price || filters.max_price) && (
+                          {(filters.type || filters.brand || filters.serve_type || filters.neighbourhood || filters.min_price || filters.max_price) && (
                             <button className="no-venues-clear-btn" onClick={clearFiltersOnly}>
                               {t('search.clear')}
                             </button>

@@ -10,20 +10,23 @@ const { filterVenues, parsePriceBound } = require('./filterVenues');
 
 // A small, hand-built fixture — deliberately NOT the live DB — so these tests
 // never depend on (or mutate) real venue data and stay fast/deterministic.
-function venue({ id, type, neighbourhood_id, brand, price, name = id, address = '' }) {
+function venue({ id, type, neighbourhood_id, brand, price, name = id, address = '', serve_type = 'unknown', extraBeer = null }) {
+  const beers = [{ brand, size_05: price, serve_type }];
+  if (extraBeer) beers.push(extraBeer);
   return {
     id, name, type, neighbourhood_id, address,
     neighbourhood_name_de: neighbourhood_id, neighbourhood_name_en: neighbourhood_id,
-    beers: [{ brand, size_05: price }],
+    beers,
   };
 }
 
 const FIXTURE = [
-  venue({ id: 'v1', type: 'beer_garden', neighbourhood_id: 'altstadt', brand: 'Augustiner', price: 4.80, name: 'Alter Simpl' }),
-  venue({ id: 'v2', type: 'bar', neighbourhood_id: 'schwabing', brand: 'Paulaner', price: 5.00 }),
-  venue({ id: 'v3', type: 'restaurant', neighbourhood_id: 'maxvorstadt', brand: 'Augustiner', price: 5.20 }),
-  venue({ id: 'v4', type: 'beer_hall', neighbourhood_id: 'isarvorstadt', brand: 'Spaten', price: 5.30, name: 'Casa Nostra' }),
-  venue({ id: 'v5', type: 'beer_garden', neighbourhood_id: 'schwabing', brand: 'Hofbräu München', price: 6.95, address: 'Schwabinger Str. 1' }),
+  venue({ id: 'v1', type: 'beer_garden', neighbourhood_id: 'altstadt', brand: 'Augustiner', price: 4.80, name: 'Alter Simpl', serve_type: 'tap' }),
+  venue({ id: 'v2', type: 'bar', neighbourhood_id: 'schwabing', brand: 'Paulaner', price: 5.00, serve_type: 'bottle' }),
+  venue({ id: 'v3', type: 'restaurant', neighbourhood_id: 'maxvorstadt', brand: 'Augustiner', price: 5.20, serve_type: 'can' }),
+  venue({ id: 'v4', type: 'beer_hall', neighbourhood_id: 'isarvorstadt', brand: 'Spaten', price: 5.30, name: 'Casa Nostra', serve_type: 'unknown' }),
+  venue({ id: 'v5', type: 'beer_garden', neighbourhood_id: 'schwabing', brand: 'Hofbräu München', price: 6.95, address: 'Schwabinger Str. 1', serve_type: 'unknown',
+    extraBeer: { brand: 'Tegernseer', size_05: 5.10, serve_type: 'tap' } }),
 ];
 const TYPES = ['beer_garden', 'beer_hall', 'bar', 'restaurant'];
 
@@ -53,6 +56,43 @@ describe('filterVenues — venue-type filter (Section 3.1)', () => {
 
   test('type + price range combine with AND logic', () => {
     const result = filterVenues(FIXTURE, { type: 'beer_garden', max_price: '5.00' });
+    assert.deepEqual(result.map((v) => v.id), ['v1']);
+  });
+});
+
+describe('filterVenues — serve type filter (Improvement 1)', () => {
+  test('selecting tap returns only venues with a tap beer', () => {
+    const result = filterVenues(FIXTURE, { serve_type: 'tap' });
+    // v1's headline beer is tap; v5's headline is 'unknown' but its SECOND
+    // beer is tap — matching on any of a venue's beers, not just the headline.
+    assert.deepEqual(result.map((v) => v.id).sort(), ['v1', 'v5']);
+  });
+
+  test('selecting bottle/can isolate their own venue', () => {
+    assert.deepEqual(filterVenues(FIXTURE, { serve_type: 'bottle' }).map((v) => v.id), ['v2']);
+    assert.deepEqual(filterVenues(FIXTURE, { serve_type: 'can' }).map((v) => v.id), ['v3']);
+  });
+
+  test('selecting unknown matches v4 (headline) and v5 (headline is also unknown, despite its 2nd beer being tap)', () => {
+    assert.deepEqual(filterVenues(FIXTURE, { serve_type: 'unknown' }).map((v) => v.id).sort(), ['v4', 'v5']);
+  });
+
+  test('no serve_type filter (the "Alle" case) returns the complete dataset', () => {
+    assert.equal(filterVenues(FIXTURE, {}).length, FIXTURE.length);
+    assert.equal(filterVenues(FIXTURE, { serve_type: '' }).length, FIXTURE.length);
+  });
+
+  test('an unrecognised serve_type value behaves like no filter, not zero results', () => {
+    assert.equal(filterVenues(FIXTURE, { serve_type: 'draught' }).length, FIXTURE.length);
+  });
+
+  test('serve_type combines with type using AND logic', () => {
+    const result = filterVenues(FIXTURE, { serve_type: 'tap', type: 'beer_garden' });
+    assert.deepEqual(result.map((v) => v.id).sort(), ['v1', 'v5']);
+  });
+
+  test('serve_type combines with price range using AND logic', () => {
+    const result = filterVenues(FIXTURE, { serve_type: 'tap', max_price: '5.00' });
     assert.deepEqual(result.map((v) => v.id), ['v1']);
   });
 });

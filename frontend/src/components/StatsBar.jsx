@@ -47,12 +47,15 @@ export default function StatsBar({ stats, neighbourhoods, activeNeighbourhood, o
           <span className="stat-tile-sub stat-tile-tappable">{stats.most_expensive?.name || '—'} <span className="stat-tile-arrow">→</span></span>
         </button>
 
-        {/* Mobile-only — desktop keeps its trigger at the bottom of the sidebar */}
-        <button type="button" className="trends-pill-mobile" onClick={onShowTrends}>
-          📊 {t('trends.button')}
-        </button>
       </div>
 
+      {/* Trends pill lives at the end of this same row on every breakpoint —
+          .stats-pills is already the horizontally-scrollable row on mobile
+          (see index.css), so one element covers both the desktop "pill at
+          the right end, after the neighbourhood pills" spec and mobile's
+          "same style, in the scrollable row" spec, rather than maintaining
+          two separate buttons (the old sidebar button + a mobile-only pill)
+          that could drift out of sync. */}
       <div className="stats-pills" role="group" aria-label={t('stats.byNeighbourhood')}>
         <span className="stats-pills-label">{t('stats.byNeighbourhood')}:</span>
         {(stats.by_neighbourhood || []).map((n) => {
@@ -70,6 +73,9 @@ export default function StatsBar({ stats, neighbourhoods, activeNeighbourhood, o
             </button>
           );
         })}
+        <button type="button" className="stats-pill stats-pill-trends" onClick={onShowTrends}>
+          📊 {t('trends.pillLabel')}
+        </button>
       </div>
     </div>
   );

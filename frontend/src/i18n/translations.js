@@ -37,6 +37,7 @@ export const de = {
       type: "Art des Lokals",
       priceRange: "Preisbereich (0,5L)",
       brand: "Biermarke",
+      serveType: "Zapfart",
       neighbourhood: "Stadtteil",
       all: "Alle",
       types: {
@@ -287,10 +288,16 @@ export const de = {
     retry: "Erneut versuchen",
     trends: {
       button: "Preistrends",
+      pillLabel: "Trends",
       title: "Preistrends",
       subtitle: "Ø Preis für 0,5L Helles pro Viertel, über Zeit",
       error: "Trends konnten nicht geladen werden.",
-      noData: "Noch keine Trenddaten vorhanden."
+      noData: "Noch keine Trenddaten vorhanden.",
+      byArea: "Nach Viertel",
+      byBrand: "Nach Marke",
+      others: "Andere",
+      noHistoryTooltip: "Basiert auf dem aktuellen Durchschnitt — noch keine historischen Daten",
+      dataPoints: "{{count}} Meldungen"
     },
     footer: {
       copyright: "© 2026 Bierpreis",
@@ -391,6 +398,7 @@ export const en = {
       type: "Venue type",
       priceRange: "Price range (0.5L)",
       brand: "Beer brand",
+      serveType: "Serve Type",
       neighbourhood: "Neighbourhood",
       all: "All",
       types: {
@@ -641,10 +649,16 @@ export const en = {
     retry: "Retry",
     trends: {
       button: "Price Trends",
+      pillLabel: "Trends",
       title: "Price Trends",
       subtitle: "Avg. price for 0.5L Helles per neighbourhood, over time",
       error: "Couldn't load trend data.",
-      noData: "No trend data yet."
+      noData: "No trend data yet.",
+      byArea: "By Area",
+      byBrand: "By Brand",
+      others: "Others",
+      noHistoryTooltip: "Based on current average — no historical data yet",
+      dataPoints: "{{count}} reports"
     },
     footer: {
       copyright: "© 2026 Bierpreis",

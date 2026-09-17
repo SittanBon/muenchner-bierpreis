@@ -3,6 +3,12 @@ import { useTranslation } from 'react-i18next';
 import { BRAND_GROUPS } from '../constants/brands';
 
 const TYPES = ['beer_garden', 'beer_hall', 'bar', 'restaurant'];
+const SERVE_TYPES = [
+  { id: 'tap', icon: '🍺' },
+  { id: 'bottle', icon: '🍾' },
+  { id: 'can', icon: '🥫' },
+  { id: 'unknown', icon: '❓' },
+];
 // "Other / Andere" and "Craft Beer (lokal)" are free-text catch-alls for
 // reporting a brand — they never match an actual venue's data, so they're
 // meaningless as filter options here.
@@ -39,10 +45,10 @@ export default function SearchBar({ onSearch, onSearchNow, onFocus, onFilterChan
     onFilterChange({ ...filters, [k]: v === '__all__' ? '' : v });
   };
 
-  const activeFilterCount = [filters.type, filters.brand, filters.neighbourhood, filters.min_price].filter(Boolean).length;
+  const activeFilterCount = [filters.type, filters.brand, filters.serve_type, filters.neighbourhood, filters.min_price].filter(Boolean).length;
 
   const clearAll = () => {
-    onFilterChange({ type: '', brand: '', neighbourhood: '', min_price: '', max_price: '' });
+    onFilterChange({ type: '', brand: '', serve_type: '', neighbourhood: '', min_price: '', max_price: '' });
     handleSearch('');
   };
 
@@ -91,6 +97,12 @@ export default function SearchBar({ onSearch, onSearchNow, onFocus, onFilterChan
           {filters.brand && (
             <span className="chip">{filters.brand} <button onClick={() => setFilter('brand', '__all__')}>✕</button></span>
           )}
+          {filters.serve_type && (
+            <span className="chip">
+              {SERVE_TYPES.find(s => s.id === filters.serve_type)?.icon} {t(`serveType.${filters.serve_type}`)}
+              <button onClick={() => setFilter('serve_type', '__all__')}>✕</button>
+            </span>
+          )}
           {filters.neighbourhood && (
             <span className="chip">
               {NEIGHBOURHOODS.find(n => n.id === filters.neighbourhood)?.[i18n.language === 'de' ? 'de' : 'en']}
@@ -129,6 +141,15 @@ export default function SearchBar({ onSearch, onSearchNow, onFocus, onFilterChan
                     {g.brands.map(b => <option key={b} value={b}>{b}</option>)}
                   </optgroup>
                 ))}
+              </select>
+            </div>
+
+            {/* Serve type */}
+            <div className="filter-group">
+              <label className="filter-label">{t('filters.serveType')}</label>
+              <select value={filters.serve_type || '__all__'} onChange={e => setFilter('serve_type', e.target.value)}>
+                <option value="__all__">{t('filters.all')}</option>
+                {SERVE_TYPES.map(s => <option key={s.id} value={s.id}>{s.icon} {t(`serveType.${s.id}`)}</option>)}
               </select>
             </div>
 

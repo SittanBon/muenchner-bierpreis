@@ -36,10 +36,12 @@ function parsePriceBound(raw) {
   return Number.isNaN(n) ? null : n;
 }
 
-// query: { neighbourhood, type, brand, min_price, max_price, q } — every key
-// optional. Price bounds are inclusive on both ends.
+const SERVE_TYPES = ['tap', 'bottle', 'can', 'unknown'];
+
+// query: { neighbourhood, type, brand, serve_type, min_price, max_price, q } —
+// every key optional. Price bounds are inclusive on both ends.
 function filterVenues(venues, query = {}) {
-  const { neighbourhood, type, brand, min_price, max_price, q } = query;
+  const { neighbourhood, type, brand, serve_type, min_price, max_price, q } = query;
   let result = venues;
 
   if (neighbourhood) result = result.filter((v) => v.neighbourhood_id === neighbourhood);
@@ -47,6 +49,14 @@ function filterVenues(venues, query = {}) {
   if (brand) {
     const bl = String(brand).toLowerCase();
     result = result.filter((v) => v.beers.some((b) => b.brand.toLowerCase().includes(bl)));
+  }
+  // Matches on ANY of the venue's beers, not just the headline (cheapest)
+  // one — a venue listing both a tap and a bottled brand should still show
+  // up under "Tap" for that first beer even if a cheaper bottled one sorts
+  // first. Unrecognised values behave like "no filter" rather than matching
+  // nothing, same NaN-safety spirit as parsePriceBound below.
+  if (serve_type && SERVE_TYPES.includes(serve_type)) {
+    result = result.filter((v) => v.beers.some((b) => b.serve_type === serve_type));
   }
 
   const min = parsePriceBound(min_price);
@@ -62,4 +72,4 @@ function filterVenues(venues, query = {}) {
   return result;
 }
 
-module.exports = { filterVenues, venueSearchHaystack, parsePriceBound, TYPE_SEARCH_TERMS };
+module.exports = { filterVenues, venueSearchHaystack, parsePriceBound, TYPE_SEARCH_TERMS, SERVE_TYPES };

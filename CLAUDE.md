@@ -70,7 +70,7 @@ Railway auto-deploys from main branch.
 - Interactive map with colour-coded pins by type
 - Stats bar (avg, cheapest, priciest, area pills)
 - Search (name, address, brand, type, neighbourhood)
-- Filters (type, brand, price range, neighbourhood)
+- Filters (type, brand, serve type, price range, neighbourhood)
 - Venue detail (price, brand, serve type, freshness)
 - Price history with days at each price
 - Unified report button (4 topics)
@@ -86,7 +86,7 @@ Railway auto-deploys from main branch.
 - Mobile responsive (bottom sheet, clusters)
 - Geocoded coordinates for all 170 venues
 - Disclaimer on venue detail page
-- Navbar: Admin de-emphasised, Price Trends in sidebar
+- Navbar: Admin de-emphasised
 - Report button prominent below price block
 - Admin audit log (table + Activity Log tab + CSV)
 - Fixed 14 venue coordinates (real addresses, geocoded)
@@ -96,6 +96,9 @@ Railway auto-deploys from main branch.
 - SEO metadata (canonical URL, full Open Graph + Twitter Card, JSON-LD, single page H1)
 - Self-hosted fonts (Playfair Display + Source Sans 3 — no third-party Google Fonts requests)
 - Complete admin audit log coverage (every admin mutation logged, incl. direct beer-price edits)
+- Serve type filter (tap/bottle/can/unknown, filter panel + GET /api/venues?serve_type=)
+- Price Trends in stats bar (amber pill after the neighbourhood pills, replacing the old sidebar button)
+- Price Trends dual view (By Area + By Brand, top-10 fixed brands, per-line no-history fallback)
 
 ## Still To Do ❌
 - Venue descriptions DE+EN for all venues

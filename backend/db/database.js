@@ -436,11 +436,13 @@ const setVenueDescriptionDe = db.prepare(
 // powers the Price Trends chart. Each row is one (month, neighbourhood) average.
 // Grouped by v.neighbourhood_id explicitly — submissions now has its own
 // neighbourhood_id too (for new_venue proposals), so the bare column name is
-// ambiguous once both tables are joined.
+// ambiguous once both tables are joined. `n` (row count behind the average)
+// powers the trend chart's "X data points" tooltip line.
 const trendsByNeighbourhood = db.prepare(`
   SELECT strftime('%Y-%m', s.visit_date) AS month,
          v.neighbourhood_id            AS neighbourhood_id,
-         ROUND(AVG(s.price), 2)        AS avg_price
+         ROUND(AVG(s.price), 2)        AS avg_price,
+         COUNT(*)                      AS n
     FROM submissions s
     JOIN venues v ON v.id = s.venue_id
    WHERE s.status = 'approved' AND s.visit_date IS NOT NULL
@@ -451,7 +453,8 @@ const trendsByNeighbourhood = db.prepare(`
 // Same, collapsed across all neighbourhoods — the Munich city-wide line.
 const trendsCityWide = db.prepare(`
   SELECT strftime('%Y-%m', s.visit_date) AS month,
-         ROUND(AVG(s.price), 2)          AS avg_price
+         ROUND(AVG(s.price), 2)          AS avg_price,
+         COUNT(*)                        AS n
     FROM submissions s
     JOIN venues v ON v.id = s.venue_id
    WHERE s.status = 'approved' AND s.visit_date IS NOT NULL
@@ -459,21 +462,79 @@ const trendsCityWide = db.prepare(`
    ORDER BY month
 `);
 
+// The "By Brand" trend view's fixed 10 brands + colour order (a deliberate,
+// fixed categorical order — never a dynamically-computed "most common right
+// now" ranking, same reasoning as NEIGHBOURHOOD_COLORS on the frontend: a
+// line's identity/colour must never shift just because a filter or a new
+// submission changed the ranking). Every other brand collapses into 'others'.
+const TREND_BRANDS = [
+  'Augustiner', 'Paulaner', 'Hofbräu München', 'Hacker-Pschorr', 'Löwenbräu',
+  'Spaten', 'Tegernseer', 'Weihenstephaner', 'Giesinger Bräu', 'Ayinger',
+];
+function brandBucketSql(column) {
+  const whens = TREND_BRANDS
+    .map((b) => `WHEN ${column} = '${b.replace(/'/g, "''")}' THEN '${b.replace(/'/g, "''")}'`)
+    .join(' ');
+  return `CASE ${whens} ELSE 'others' END`;
+}
+
+const trendsByBrand = db.prepare(`
+  SELECT strftime('%Y-%m', s.visit_date) AS month,
+         ${brandBucketSql('s.beer_brand')} AS brand,
+         ROUND(AVG(s.price), 2)            AS avg_price,
+         COUNT(*)                          AS n
+    FROM submissions s
+   WHERE s.status = 'approved' AND s.visit_date IS NOT NULL
+     AND s.beer_brand IS NOT NULL AND s.beer_brand != ''
+   GROUP BY month, brand
+   ORDER BY month
+`);
+
+// "Current average" fallback source for a brand with no submission history
+// at all yet — same live beers table the map/stats bar already reads from.
+const currentByBrandStmt = db.prepare(`
+  SELECT ${brandBucketSql('brand')} AS brand,
+         ROUND(AVG(size_05), 2)     AS avg_price
+    FROM beers
+   WHERE active = 1 AND size_05 IS NOT NULL
+   GROUP BY brand
+`);
+
 function getTrends() {
   const byHood = trendsByNeighbourhood.all();
   const city = trendsCityWide.all();
+  const byBrand = trendsByBrand.all();
+  const currentByBrand = Object.fromEntries(currentByBrandStmt.all().map((r) => [r.brand, r.avg_price]));
+  // Reuses getNeighbourhoods()'s own live-average calculation rather than a
+  // second query — same "current price right now" number the stats bar and
+  // map shading already show, so the fallback line can never disagree with
+  // the rest of the app about what "the current average" is.
+  const currentByNeighbourhood = Object.fromEntries(getNeighbourhoods().map((n) => [n.id, n.avg_price]));
 
-  const months = [...new Set([...byHood.map((r) => r.month), ...city.map((r) => r.month)])].sort();
+  const months = [...new Set([
+    ...byHood.map((r) => r.month), ...city.map((r) => r.month), ...byBrand.map((r) => r.month),
+  ])].sort();
+
   const series = {};
   for (const row of byHood) {
-    (series[row.neighbourhood_id] ||= {})[row.month] = row.avg_price;
+    (series[row.neighbourhood_id] ||= {})[row.month] = { avg: row.avg_price, n: row.n };
   }
-  const cityByMonth = Object.fromEntries(city.map((r) => [r.month, r.avg_price]));
+  const cityByMonth = {};
+  for (const row of city) cityByMonth[row.month] = { avg: row.avg_price, n: row.n };
+
+  const brandSeries = {};
+  for (const row of byBrand) {
+    (brandSeries[row.brand] ||= {})[row.month] = { avg: row.avg_price, n: row.n };
+  }
 
   return {
     months,
-    series,      // { [neighbourhood_id]: { [month]: avg_price } }
-    city: cityByMonth, // { [month]: avg_price }
+    series,               // { [neighbourhood_id]: { [month]: {avg, n} } }
+    city: cityByMonth,    // { [month]: {avg, n} }
+    brandSeries,          // { [brandOrBucket]: { [month]: {avg, n} } }
+    brandOrder: [...TREND_BRANDS, 'others'],
+    currentByNeighbourhood, // { [neighbourhood_id]: avg } — no-history fallback
+    currentByBrand,         // { [brandOrBucket]: avg } — no-history fallback
   };
 }
 
