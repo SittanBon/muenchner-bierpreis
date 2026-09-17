@@ -73,6 +73,15 @@ if (isEmpty()) {
   require('./backend/db/seed');
 }
 
+// One-time production backfill (see the file for the full story): 18 venues
+// added to local dev in an earlier session but never migrated to production.
+// Deliberately NOT gated on a venue-count threshold — migrate.js checks each
+// of its 18 venues by name before inserting, so calling it unconditionally
+// on every boot is a safe, cheap no-op once they're all present, and (unlike
+// a "< 170" check) it can never mistake a deliberate admin deletion for
+// missing data and silently re-add something a human removed on purpose.
+require('./backend/db/migrate').runMigration();
+
 const app = express();
 app.set('etag', false); // API responses are always regenerated from the live DB
 app.use(cors());

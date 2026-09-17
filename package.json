@@ -8,6 +8,7 @@
     "build": "cd frontend && npm install && npm run build",
     "seed": "node backend/db/seed.js",
     "seed:force": "node backend/db/seed.js --force",
+    "migrate": "node backend/db/migrate.js",
     "geocode": "node backend/db/geocode.js",
     "test": "node --test backend/*.test.js && cd frontend && npm test"
   },
