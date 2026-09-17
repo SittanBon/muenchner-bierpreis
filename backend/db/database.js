@@ -6,12 +6,27 @@ const fs = require('fs');
 const path = require('path');
 const Database = require('better-sqlite3');
 
-const DEFAULT_PATH = path.join(__dirname, 'bierpreis.db');
+// Railway mounts the persistent volume at /app/data — without DATABASE_PATH
+// explicitly pointing there, a production deploy would silently fall back to
+// a path inside the container's own (ephemeral) filesystem, and every
+// redeploy would wipe the database. Defaulting the production path itself to
+// the volume is a safety net for exactly that case: DATABASE_PATH is still
+// the source of truth when set (e.g. to override the volume's mount point),
+// but production is never one missing env var away from losing its data.
+const DEFAULT_PATH = process.env.NODE_ENV === 'production'
+  ? '/app/data/bierpreis.db'
+  : path.join(__dirname, 'bierpreis.db'); // ./backend/db/bierpreis.db in development
 const DB_PATH = process.env.DATABASE_PATH
   ? path.resolve(process.cwd(), process.env.DATABASE_PATH)
   : DEFAULT_PATH;
 
-fs.mkdirSync(path.dirname(DB_PATH), { recursive: true });
+// Creates the volume's directory on first boot if it isn't there yet —
+// recursive:true makes this a no-op (not an error) on every later boot once
+// it already exists.
+const dbDir = path.dirname(DB_PATH);
+if (!fs.existsSync(dbDir)) {
+  fs.mkdirSync(dbDir, { recursive: true });
+}
 
 const db = new Database(DB_PATH);
 db.pragma('journal_mode = WAL');

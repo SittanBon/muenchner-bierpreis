@@ -10,7 +10,7 @@ Repo: https://github.com/SittanBon/muenchner-bierpreis
 ## Tech Stack
 - Frontend: React + Vite (frontend/ folder)
 - Backend: Node.js + Express (server.js)
-- Database: SQLite (backend/db/bierpreis.db)
+- Database: SQLite (dev: backend/db/bierpreis.db, prod: /app/data/bierpreis.db)
 - Map: Leaflet + OpenStreetMap
 - Hosting: Railway (auto-deploys from GitHub main)
 - i18n: i18next (DE default, EN toggle)
@@ -26,6 +26,8 @@ JWT_SECRET, TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID in the local
   venue_beers, submissions, admin_logs
 - Run locally: npm run seed
 - Geocode: npm run geocode
+- Production DB: /app/data/bierpreis.db
+- Volume: muenchner-bierpreis-volume
 
 ## Tier 1 Stadtteile
 Altstadt, Maxvorstadt, Schwabing, Isarvorstadt
@@ -86,6 +88,7 @@ Railway auto-deploys from main branch.
 - Fixed 14 venue coordinates (real addresses, geocoded)
 - Impressum + Datenschutzerklärung (legal)
 - Custom domain bierpreis.beer connected to Railway
+- Persistent database (Railway volume — survives redeploys)
 
 ## Still To Do ❌
 - Venue descriptions DE+EN for all 170 venues
