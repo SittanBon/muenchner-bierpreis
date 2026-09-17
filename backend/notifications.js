@@ -60,7 +60,7 @@ async function sendTelegramMessage(message) {
   }
 }
 
-const ADMIN_URL = 'https://muenchner-bierpreis-production.up.railway.app/admin';
+const ADMIN_URL = 'https://bierpreis.beer/admin';
 
 // A venue/brand/note can contain characters that break Telegram's HTML
 // parse_mode (<, >, &) — escape anything interpolated into a message.
