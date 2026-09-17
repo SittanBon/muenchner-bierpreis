@@ -497,9 +497,10 @@ app.patch('/api/admin/submissions/:id', authMiddleware, (req, res) => {
       venueName: sub.venue_name,
       details: { submission_id: sub.id, old_price: oldPrice, new_price: sub.price, brand: sub.beer_brand },
     });
-    if (sub.price != null) {
-      notifyApproved({ venueName: sub.venue_name, price: sub.price });
-    }
+    // Every approved submission gets a Telegram confirmation, not just the
+    // price-bearing ones — previously a "closed" or "suggest_description"
+    // approval sent nothing at all.
+    notifyApproved({ venueName: sub.venue_name, price: sub.price, reportType: sub.report_type });
   } else if (status === 'rejected') {
     logAdminAction('REJECT', {
       venueId: sub.venue_id,
@@ -691,6 +692,12 @@ app.patch('/api/admin/venues/:id/beers/:beerId', authMiddleware, (req, res) => {
   if (size_05 == null || Number.isNaN(parseFloat(size_05))) {
     return res.status(400).json({ error: 'size_05 is required' });
   }
+  // Captured before the write so a genuine change can be logged (and a no-op
+  // save — e.g. clicking "Save" without touching anything — doesn't leave a
+  // spurious entry in the Activity Log).
+  const venueBefore = getVenueAdmin(req.params.id);
+  const beerBefore = venueBefore?.beers.find((b) => b.id === Number(req.params.beerId));
+
   const ok = updateBeerPrice(req.params.id, Number(req.params.beerId), {
     size_05: parseFloat(size_05),
     size_mass: size_mass ? parseFloat(size_mass) : null,
@@ -699,6 +706,25 @@ app.patch('/api/admin/venues/:id/beers/:beerId', authMiddleware, (req, res) => {
     ...(serve_type !== undefined ? { serve_type } : {}),
   });
   if (!ok) return res.status(404).json({ error: 'Beer not found for this venue' });
+
+  // This is a direct admin override with no submission/approval step, so this
+  // EDIT_BEER entry is the ONLY audit trail a beer-price change like this ever
+  // gets — unlike ADD_BEER/DELETE_BEER below, this route previously logged
+  // nothing at all.
+  if (beerBefore) {
+    const newPrice = parseFloat(size_05);
+    const newMass = size_mass ? parseFloat(size_mass) : null;
+    const newServe = serve_type !== undefined ? normalizeServeType(serve_type) : beerBefore.serve_type;
+    const changed = beerBefore.size_05 !== newPrice || beerBefore.size_mass !== newMass || beerBefore.serve_type !== newServe;
+    if (changed) {
+      logAdminAction('EDIT_BEER', {
+        venueId: req.params.id,
+        venueName: venueBefore.name,
+        details: { brand: beerBefore.brand, old_price: beerBefore.size_05, new_price: newPrice },
+      });
+    }
+  }
+
   res.json(getVenueAdmin(req.params.id));
 });
 

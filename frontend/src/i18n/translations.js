@@ -270,6 +270,7 @@ export const de = {
           DELETE_VENUE: "Lokal gelöscht",
           ADD_BEER: "Bier hinzugefügt",
           DELETE_BEER: "Bier gelöscht",
+          EDIT_BEER: "Bierpreis bearbeitet",
           TOGGLE_ACTIVE: "Sichtbarkeit geändert",
           MARK_CLOSED: "Als geschlossen markiert"
         }
@@ -623,6 +624,7 @@ export const en = {
           DELETE_VENUE: "Venue deleted",
           ADD_BEER: "Beer added",
           DELETE_BEER: "Beer deleted",
+          EDIT_BEER: "Beer price edited",
           TOGGLE_ACTIVE: "Visibility toggled",
           MARK_CLOSED: "Marked closed"
         }

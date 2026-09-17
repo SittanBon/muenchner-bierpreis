@@ -131,10 +131,16 @@ function notifyDescriptionSuggestion({ venueName, note, submitterName }) {
   );
 }
 
-function notifyApproved({ venueName, price }) {
+// `price` is only present for price_change/new_beer/new_venue approvals — a
+// closed/suggest_description/other_info approval still confirms via Telegram,
+// just without a price line, since it has none to report.
+function notifyApproved({ venueName, price, reportType }) {
+  const line = price != null
+    ? `📍 ${esc(venueName)} price updated → €${price}`
+    : `📍 ${esc(venueName)}${reportType ? ` — ${esc(reportType)}` : ''}`;
   return sendTelegramMessage(
     `✅ <b>Approved</b>\n` +
-    `📍 ${esc(venueName)} price updated → €${price}\n` +
+    `${line}\n` +
     `🕐 ${formatTimestamp()}`
   );
 }
