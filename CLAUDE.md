@@ -21,7 +21,11 @@ JWT_SECRET, TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID in the local
 .env file and in Railway's project variables.
 
 ## Database
-- 170 venues across 4 Munich Stadtteile
+- 153 venues across 4 Munich Stadtteile as of the last health check
+  (17 Sep 2026) — grows via approved community submissions, so treat
+  this as a snapshot; check GET /api/stats for the live count. Local
+  dev's seed DB and production have diverged independently — don't
+  assume they match.
 - Tables: cities, neighbourhoods, venues, beers,
   venue_beers, submissions, admin_logs
 - Run locally: npm run seed
@@ -89,9 +93,12 @@ Railway auto-deploys from main branch.
 - Impressum + Datenschutzerklärung (legal)
 - Custom domain bierpreis.beer connected to Railway
 - Persistent database (Railway volume — survives redeploys)
+- SEO metadata (canonical URL, full Open Graph + Twitter Card, JSON-LD, single page H1)
+- Self-hosted fonts (Playfair Display + Source Sans 3 — no third-party Google Fonts requests)
+- Complete admin audit log coverage (every admin mutation logged, incl. direct beer-price edits)
 
 ## Still To Do ❌
-- Venue descriptions DE+EN for all 170 venues
+- Venue descriptions DE+EN for all venues
   (human-written only — see Global Rules)
 - Post in r/munich for first real users
 - Analytics (Plausible — GDPR compliant)
