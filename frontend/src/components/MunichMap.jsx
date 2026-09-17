@@ -120,27 +120,41 @@ export default function MunichMap({ neighbourhoods, venues, onNeighbourhoodClick
       }
     });
 
+    // Single source of truth for a polygon's style, keyed by (id, hover/active
+    // state) — both the initial `style:` callback below AND the imperative
+    // mouseover/mouseout handlers call this exact function, so they can never
+    // drift out of sync again. (They previously did: the style callback capped
+    // hover fillOpacity at 0.25, but mouseover hardcoded 0.72 — a dark, opaque
+    // overlay that covered the map tiles underneath, directly contradicting
+    // this function's own "stay subtle" intent.)
+    //
+    // Overlays stay subtle at all times so the map tiles/street names/landmarks
+    // underneath always read clearly — a light fill tint plus the border
+    // colour/weight does the feedback work, never a dark opaque wash.
+    function neighbourhoodStyle(id, stat, isActiveNow, isHoveredNow) {
+      const hasFilteredData = !!stat;
+      // When a search is running, ring the neighbourhoods that still have
+      // matches — its own distinct state, only shown when neither hovered nor
+      // active (hover/active still take priority, same as before).
+      const isMatch = highlight && hasFilteredData;
+
+      if (isActiveNow) {
+        return { fillColor: hasFilteredData ? priceToColor(stat.avg) : '#d4cfc8', fillOpacity: 0.25, color: '#3d2200', weight: 3, dashArray: null };
+      }
+      if (isHoveredNow) {
+        return { fillColor: hasFilteredData ? priceToColor(stat.avg) : '#d4cfc8', fillOpacity: 0.20, color: '#7a4a06', weight: 2.5, dashArray: hasFilteredData ? null : '4 4' };
+      }
+      if (isMatch) {
+        return { fillColor: priceToColor(stat.avg), fillOpacity: 0.22, color: '#c88010', weight: 3, dashArray: null };
+      }
+      return { fillColor: hasFilteredData ? priceToColor(stat.avg) : '#d4cfc8', fillOpacity: 0.12, color: '#b87310', weight: 1.5, dashArray: hasFilteredData ? null : '4 4' };
+    }
+
     layerRef.current = L.geoJSON(neighbourhoodGeoJSON, {
       style: (feature) => {
         const id = feature.properties.id;
         const stat = filteredStats[id];
-        const isActive = activeId === id;
-        const isHovered = hoveredId === id;
-        const hasFilteredData = !!stat;
-        // When a search is running, ring the neighbourhoods that still have matches.
-        const isMatch = highlight && hasFilteredData;
-
-        // Overlays stay subtle at all times so the map tiles underneath read clearly —
-        // only a light fill tint plus a crisp border communicates state. Fill opacity
-        // never exceeds ~0.3 even when active/hovered/matched; the border colour/weight
-        // does the heavy lifting for feedback instead.
-        return {
-          fillColor: hasFilteredData ? priceToColor(stat.avg) : '#d4cfc8',
-          fillOpacity: isActive ? 0.30 : isHovered ? 0.25 : isMatch ? 0.22 : hasFilteredData ? 0.15 : 0.08,
-          color: isActive ? '#1a0a00' : isHovered ? '#3d1f00' : isMatch ? '#c88010' : '#6b4c1e',
-          weight: isActive ? 2.5 : isHovered ? 2 : isMatch ? 3 : 1.5,
-          dashArray: hasFilteredData ? null : '4 4'
-        };
+        return neighbourhoodStyle(id, stat, activeId === id, hoveredId === id);
       },
       onEachFeature: (feature, layer) => {
         const id = feature.properties.id;
@@ -151,11 +165,7 @@ export default function MunichMap({ neighbourhoods, venues, onNeighbourhoodClick
         layer.on({
           mouseover: () => {
             setHoveredId(id);
-            layer.setStyle({
-              fillOpacity: 0.72,
-              weight: 2,
-              color: '#3d1f00'
-            });
+            layer.setStyle(neighbourhoodStyle(id, stat, activeId === id, true));
 
             // Show tooltip
             if (tooltipRef.current) {
@@ -184,12 +194,7 @@ export default function MunichMap({ neighbourhoods, venues, onNeighbourhoodClick
           },
           mouseout: () => {
             setHoveredId(null);
-            const isMatch = highlight && stat;
-            layer.setStyle({
-              fillOpacity: activeId === id ? 0.30 : isMatch ? 0.22 : stat ? 0.15 : 0.08,
-              weight: activeId === id ? 2.5 : isMatch ? 3 : 1.5,
-              color: activeId === id ? '#1a0a00' : isMatch ? '#c88010' : '#6b4c1e'
-            });
+            layer.setStyle(neighbourhoodStyle(id, stat, activeId === id, false));
             if (tooltipRef.current) tooltipRef.current.style.display = 'none';
           },
           click: () => {
