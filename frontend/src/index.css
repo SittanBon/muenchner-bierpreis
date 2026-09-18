@@ -537,28 +537,39 @@ body{font-family:var(--font-body);background:var(--cream);color:var(--text-prima
    desktop, and independent of the attribution control sharing that corner. */
 .leaflet-control-zoom{position:absolute!important;bottom:160px!important;right:10px!important;top:auto!important;left:auto!important;margin:0!important}
 
-/* Venue pins — colour-coded circular markers, one per venue type. The
-   divIcon's own box is always 44x44 (set in MunichMap.jsx) so the tap target
-   never shrinks below the mobile-accessibility minimum; the visible circle
-   inside is sized independently below and centred via flexbox, so it can be
-   32px on desktop / 38px on mobile without the anchor point ever shifting. */
+/* Venue pins — a white circle, coloured border and centred Lucide icon, one
+   colour per venue type. The divIcon's own box is always 44x44 (set in
+   MunichMap.jsx) so the tap target never shrinks below the mobile-
+   accessibility minimum; the visible circle inside is sized independently
+   below and centred via flexbox, so it can be 36px on desktop / 42px on
+   mobile without the anchor point ever shifting. The border/icon colour
+   comes in as the --pin-color custom property (set inline per marker,
+   per-type) rather than a plain inline border-color/color, specifically so
+   the .selected rule below can still override just the border colour via
+   normal CSS cascade — an inline style beats any stylesheet rule for the
+   same property, custom-property indirection is what makes it overridable. */
 .venue-pin{background:none;border:none}
 .venue-pin-wrap{
   width:100%;height:100%;display:flex;align-items:center;justify-content:center;
   position:relative;
 }
 .venue-pin-circle{
-  width:32px;height:32px;border-radius:50%;
+  width:36px;height:36px;border-radius:50%;
   display:flex;align-items:center;justify-content:center;
-  border:2px solid var(--cream);
-  box-shadow:0 1px 5px rgba(26,9,0,0.5);
-  cursor:pointer;transition:transform 0.15s,box-shadow 0.15s;
+  background:#fff;border:2.5px solid var(--pin-color);color:var(--pin-color);
+  box-shadow:0 2px 8px rgba(0,0,0,0.25);
+  cursor:pointer;transition:transform 0.15s,box-shadow 0.15s,border-width 0.15s;
 }
-.venue-pin-wrap:hover .venue-pin-circle{transform:scale(1.15)}
-.venue-pin-emoji{font-size:15px;line-height:1;filter:drop-shadow(0 1px 1px rgba(0,0,0,0.35))}
-/* Selected pin — a white ring around the coloured circle */
+.venue-pin-circle svg{display:block}
+.venue-pin-wrap:hover .venue-pin-circle{transform:scale(1.08)}
+/* Selected pin (marker clicked — popup open, or its full detail is showing
+   in the sidebar/bottom sheet): darker/thicker border, a white ring just
+   outside it, a stronger shadow, and 1.15x scale — all per the design spec,
+   layered as one box-shadow (ring first, then the drop shadow). */
 .venue-pin-wrap.selected .venue-pin-circle{
-  box-shadow:0 0 0 3px #fff, 0 0 0 5px rgba(26,9,0,0.35), 0 1px 5px rgba(26,9,0,0.5);
+  border-width:3.5px;border-color:#3d2200;
+  box-shadow:0 0 0 2px #fff,0 4px 12px rgba(0,0,0,0.35);
+  transform:scale(1.15);
 }
 /* Venue name label under the pin — only shown (via the mobile media query
    below) while that venue's neighbourhood is the active one. */
@@ -568,26 +579,55 @@ body{font-family:var(--font-body);background:var(--cream);color:var(--text-prima
   background:rgba(26,9,0,0.75);color:#fff;font-size:10px;font-weight:600;
   font-family:var(--font-body);pointer-events:none;
 }
-/* Cluster pin — venues stacked within ~25m collapse into one numbered marker */
+/* Cluster pin — venues stacked within ~25m collapse into one numbered marker.
+   Same footprint as a regular pin, solid amber, white DM Sans number. */
 .venue-cluster-wrap{width:100%;height:100%;display:flex;align-items:center;justify-content:center}
 .venue-cluster-circle{
-  width:34px;height:34px;border-radius:50%;
+  width:36px;height:36px;border-radius:50%;
   display:flex;align-items:center;justify-content:center;
-  background:var(--amber-600);border:2px solid var(--cream);color:#fff;
-  font-size:13px;font-weight:700;font-family:var(--font-body);
-  box-shadow:0 1px 5px rgba(26,9,0,0.5);cursor:pointer;transition:transform 0.15s;
+  background:var(--amber-400);color:#fff;
+  font-family:var(--font-heading);font-size:13px;font-weight:600;
+  box-shadow:0 2px 8px rgba(0,0,0,0.25);cursor:pointer;transition:transform 0.15s;
 }
-.venue-cluster-wrap:hover .venue-cluster-circle{transform:scale(1.15)}
+.venue-cluster-wrap:hover .venue-cluster-circle{transform:scale(1.1)}
 
 .leaflet-tooltip{background:var(--amber-900);color:var(--amber-100);border:none;border-radius:8px;padding:6px 10px;box-shadow:var(--shadow-md);font-family:var(--font-body)}
 .leaflet-tooltip-top::before{border-top-color:var(--amber-900)}
 .pin-tt-name{font-weight:600;font-size:12.5px}
 .pin-tt-price{font-size:11.5px;color:var(--amber-300);margin-top:2px}
 
+/* Pin popup card — desktop-only (MunichMap.jsx never opens one on a mobile
+   viewport), a small white card above the clicked pin with the venue's
+   headline info and a link into the full detail view. Built on Leaflet's own
+   popup (closeButton:false — the spec's only dismiss method is clicking
+   elsewhere on the map, which Leaflet's default closeOnClick already does),
+   so the triangle pointer is Leaflet's own .leaflet-popup-tip, just
+   recoloured to match the card. */
+.venue-popup .leaflet-popup-content-wrapper{
+  background:#fff;border:1.5px solid var(--amber-400);border-radius:10px;
+  box-shadow:0 4px 16px rgba(0,0,0,0.2);padding:0;
+}
+.venue-popup .leaflet-popup-content{margin:0}
+.venue-popup .leaflet-popup-tip{background:#fff;border:1.5px solid var(--amber-400);box-shadow:none}
+.venue-popup-card{padding:12px 14px;min-width:180px;max-width:220px}
+.vpc-header{display:flex;align-items:center;gap:7px;margin-bottom:3px}
+.vpc-icon{display:flex;flex-shrink:0}
+.vpc-icon svg{display:block}
+.vpc-name{font-family:var(--font-heading);font-weight:600;font-size:14px;color:var(--text-primary);line-height:1.25}
+.vpc-meta{font-family:var(--font-body);font-weight:400;font-size:11px;color:var(--text-muted);margin-bottom:6px}
+.vpc-price-line{margin-bottom:8px}
+.vpc-price{font-family:var(--font-heading);font-weight:700;font-size:16px;color:var(--amber-600)}
+.vpc-brand{font-family:var(--font-body);font-weight:400;font-size:11px;color:var(--text-secondary)}
+.vpc-link{
+  display:block;width:100%;text-align:left;background:none;border:none;padding:0;
+  font-family:var(--font-body);font-weight:500;font-size:12px;color:var(--amber-600);
+  cursor:pointer;
+}
+.vpc-link:hover{text-decoration:underline}
+
 @media (max-width:768px){
-  .venue-pin-circle{width:38px;height:38px}
-  .venue-pin-emoji{font-size:17px}
-  .venue-cluster-circle{width:40px;height:40px;font-size:14px}
+  .venue-pin-circle{width:42px;height:42px}
+  .venue-cluster-circle{width:42px;height:42px;font-size:14px}
   .venue-pin-label{display:block}
 }
 

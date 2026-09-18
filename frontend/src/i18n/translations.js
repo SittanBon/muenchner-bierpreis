@@ -52,6 +52,7 @@ export const de = {
       avgPrice: "Ø Preis (0,5L)",
       venues: "Lokale",
       noData: "Noch keine Daten",
+      viewDetails: "Details ansehen",
       legend: {
         title: "Preis pro 0,5L",
         cheap: "Günstig",
@@ -415,6 +416,7 @@ export const en = {
       avgPrice: "Avg price (0.5L)",
       venues: "venues",
       noData: "No data yet",
+      viewDetails: "View details",
       legend: {
         title: "Price per 0.5L",
         cheap: "Cheap",
