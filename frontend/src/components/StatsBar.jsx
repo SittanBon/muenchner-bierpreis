@@ -12,9 +12,18 @@ export default function StatsBar({ stats, neighbourhoods, activeNeighbourhood, o
   const de = i18n.language === 'de';
   const eur = (n) => formatEuro(n, i18n.language);
 
+  // short_name_de/short_name_en pin one literal pill label shared by both
+  // languages (e.g. "Altstadt-Lehel" — the official district name, not the
+  // longer translated name_en "Old Town & Lehel" used elsewhere in the UI);
+  // falls back to the regular translated name when a neighbourhood has none.
   const nameById = {};
-  (neighbourhoods || []).forEach((n) => { nameById[n.id] = de ? n.name_de : n.name_en; });
-  const pillName = (row) => nameById[row.id] || (de ? row.name_de : row.name_en) || row.id;
+  (neighbourhoods || []).forEach((n) => {
+    nameById[n.id] = (de ? n.short_name_de : n.short_name_en) || (de ? n.name_de : n.name_en);
+  });
+  const pillName = (row) => nameById[row.id]
+    || (de ? row.short_name_de : row.short_name_en)
+    || (de ? row.name_de : row.name_en)
+    || row.id;
 
   return (
     <div className="stats-bar">

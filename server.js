@@ -91,6 +91,16 @@ require('./backend/db/migrate').runMigration();
 // id/name, safe to call unconditionally on every boot.
 require('./backend/db/expandLudwigsvorstadt').runExpansion();
 
+// Aligns the neighbourhood structure with Munich's real Stadtbezirke:
+// merges "lehel" into "altstadt" (officially one district, Altstadt-Lehel)
+// and splits "schwabing" into "schwabing_west"/"schwabing_freimann"
+// (officially two separate districts). Runs BEFORE reassignVenues below —
+// that step's point-in-polygon pass targets the new schwabing_west/
+// schwabing_freimann features, so those neighbourhood rows (inserted here)
+// must already exist or its UPDATE would violate the neighbourhood_id
+// foreign key. Idempotent (DB-only, no network calls), safe on every boot.
+require('./backend/db/restructureNeighbourhoods').run();
+
 // Reassigns every venue's neighbourhood_id against the REAL OpenStreetMap
 // administrative boundaries in frontend/src/data/neighbourhoodGeoJSON.js
 // (superseding the two hand-drawn polygon attempts above) — idempotent

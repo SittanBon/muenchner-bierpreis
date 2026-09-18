@@ -16,11 +16,11 @@ const FILTERABLE_GROUPS = BRAND_GROUPS
   .map((g) => ({ ...g, brands: g.brands.filter((b) => b !== 'Other / Andere' && b !== 'Craft Beer (lokal)') }))
   .filter((g) => g.brands.length > 0);
 const NEIGHBOURHOODS = [
-  { id: 'altstadt', de: 'Altstadt', en: 'Old Town' },
+  { id: 'altstadt', de: 'Altstadt-Lehel', en: 'Old Town & Lehel' },
   { id: 'maxvorstadt', de: 'Maxvorstadt', en: 'Maxvorstadt' },
-  { id: 'schwabing', de: 'Schwabing', en: 'Schwabing' },
+  { id: 'schwabing_west', de: 'Schwabing-West', en: 'Schwabing West' },
+  { id: 'schwabing_freimann', de: 'Schwabing-Freimann', en: 'Schwabing & Freimann' },
   { id: 'isarvorstadt', de: 'Isarvorstadt', en: 'Isarvorstadt' },
-  { id: 'lehel', de: 'Lehel', en: 'Lehel' },
   { id: 'schwanthalerhoehe', de: 'Schwanthalerhöhe', en: 'Schwanthalerhöhe' }
 ];
 

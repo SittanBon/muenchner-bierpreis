@@ -11,20 +11,26 @@ import { formatEuro } from '../utils/price';
 // the dataviz skill's validator (worst adjacent ΔE 9.1 CVD / 22.9 normal-vision,
 // all PASS); lehel/schwanthalerhoehe were added later (validator wasn't
 // available in that session) picked to sit in distinct hue families (magenta,
-// purple) from the existing blue/orange/aqua/yellow — re-run the validator on
-// the full 5-colour set before trusting it as rigorously as the original 4.
+// purple) from the existing blue/orange/aqua/yellow. "schwabing" then split
+// into schwabing_west/schwabing_freimann (Altstadt-Lehel merge + Schwabing
+// split, see restructureNeighbourhoods.js): schwabing_west keeps the old
+// schwabing aqua, schwabing_freimann reuses lehel's freed-up magenta (lehel
+// no longer exists as its own entity, having merged into altstadt) so the
+// set stays at 6 distinct hues rather than growing. Validator still wasn't
+// available in this session either — re-run it on the full 6-colour set
+// before trusting it as rigorously as the original 4.
 // Assigned by entity (neighbourhood id), never by rank, so toggling a line
 // off never repaints the survivors.
 const NEIGHBOURHOOD_COLORS = {
-  altstadt: '#2a78d6',      // blue
+  altstadt: '#2a78d6',      // blue (now Altstadt-Lehel, combined)
   maxvorstadt: '#eb6834',   // orange
-  schwabing: '#1baf7a',     // aqua
+  schwabing_west: '#1baf7a', // aqua (was schwabing's colour)
+  schwabing_freimann: '#c23b8f', // magenta (was lehel's colour)
   isarvorstadt: '#eda100',  // yellow
-  lehel: '#c23b8f',         // magenta
   schwanthalerhoehe: '#7a4ed6', // purple
 };
 const CITY_COLOR = '#5a3d1e'; // muted, dashed reference line — distinct from the categorical set
-const NEIGHBOURHOOD_ORDER = ['altstadt', 'maxvorstadt', 'schwabing', 'isarvorstadt', 'lehel', 'schwanthalerhoehe'];
+const NEIGHBOURHOOD_ORDER = ['altstadt', 'maxvorstadt', 'schwabing_west', 'schwabing_freimann', 'isarvorstadt', 'schwanthalerhoehe'];
 
 // ── By Brand (new) ────────────────────────────────────────────────────────────
 // Fixed order + colours, exactly as specified — not a dynamically-computed

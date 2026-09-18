@@ -45,7 +45,10 @@ JWT_SECRET, TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID in the local
 - Volume: muenchner-bierpreis-volume
 
 ## Tier 1 Stadtteile
-Altstadt, Maxvorstadt, Schwabing, Isarvorstadt (now the full
+Altstadt-Lehel, Maxvorstadt, Schwabing-West, Schwabing-Freimann,
+Ludwigsvorstadt-Isarvorstadt, Schwanthalerhöhe
+(matches Munich's official Stadtbezirk structure — Altstadt+Lehel are one
+district, Schwabing-West/Schwabing-Freimann are two separate ones) (now the full
 Ludwigsvorstadt-Isarvorstadt district), Lehel, Schwanthalerhöhe
 
 ## Cities (future expansion)
@@ -113,6 +116,11 @@ Railway auto-deploys from main branch.
 - Price Trends dual view (By Area + By Brand, top-10 fixed brands, per-line no-history fallback)
 - Lehel + Schwanthalerhöhe added as Stadtteile (6 total)
 - Isarvorstadt polygon expanded to the full Ludwigsvorstadt-Isarvorstadt boundary
+- Neighbourhood polygons replaced with real OpenStreetMap admin boundaries
+  (Overpass API), venue coordinates verified against Nominatim
+- Altstadt + Lehel merged into one "Altstadt-Lehel" district; Schwabing split
+  into "Schwabing-West" + "Schwabing-Freimann" — now matches Munich's real
+  Stadtbezirk structure (still 6 Stadtteile total)
 
 ## Still To Do ❌
 - Venue descriptions DE+EN for all venues

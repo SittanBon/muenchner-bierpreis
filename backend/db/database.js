@@ -75,6 +75,17 @@ function migrate() {
   if (!neighbourhoodCols.includes('city_id')) {
     db.exec('ALTER TABLE neighbourhoods ADD COLUMN city_id INTEGER DEFAULT 1');
   }
+  // Optional short display name for the stats-bar pill — a neighbourhood
+  // whose official long name_en reads awkwardly as a pill label (e.g.
+  // "Altstadt-Lehel" / "Old Town & Lehel") can pin one literal string for
+  // both languages via short_name_de/short_name_en; StatsBar falls back to
+  // name_de/name_en when these are NULL.
+  if (!neighbourhoodCols.includes('short_name_de')) {
+    db.exec('ALTER TABLE neighbourhoods ADD COLUMN short_name_de TEXT');
+  }
+  if (!neighbourhoodCols.includes('short_name_en')) {
+    db.exec('ALTER TABLE neighbourhoods ADD COLUMN short_name_en TEXT');
+  }
   // One-time seed of the cities table itself (schema.sql only creates the table,
   // it doesn't populate it) — guarded so a re-run never duplicates rows.
   const cityCount = db.prepare('SELECT COUNT(*) AS n FROM cities').get().n;
@@ -181,6 +192,8 @@ function getNeighbourhoods() {
       id: n.id,
       name_de: n.name_de,
       name_en: n.name_en,
+      short_name_de: n.short_name_de,
+      short_name_en: n.short_name_en,
       center: [n.center_lat, n.center_lng],
       description_de: n.description_de,
       description_en: n.description_en,
@@ -368,6 +381,8 @@ function getStats() {
       id: n.id,
       name_de: n.name_de,
       name_en: n.name_en,
+      short_name_de: n.short_name_de,
+      short_name_en: n.short_name_en,
       avg_price: n.avg_price,
       venue_count: n.venue_count,
     }));

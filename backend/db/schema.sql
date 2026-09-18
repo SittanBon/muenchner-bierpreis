@@ -23,6 +23,8 @@ CREATE TABLE IF NOT EXISTS neighbourhoods (
   id             TEXT PRIMARY KEY,
   name_de        TEXT NOT NULL,
   name_en        TEXT NOT NULL,
+  short_name_de  TEXT,
+  short_name_en  TEXT,
   center_lat     REAL,
   center_lng     REAL,
   description_de TEXT,
