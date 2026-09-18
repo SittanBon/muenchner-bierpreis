@@ -82,6 +82,15 @@ if (isEmpty()) {
 // missing data and silently re-add something a human removed on purpose.
 require('./backend/db/migrate').runMigration();
 
+// One-time Ludwigsvorstadt-Isarvorstadt boundary fix (see the file for the
+// full story, including which of the request's original ~29 candidate
+// venues turned out not to check out): adds Lehel + Schwanthalerhöhe,
+// reassigns a specific, hand-verified list of existing venues into the
+// now-corrected boundary, and adds a small number of Nominatim-confirmed
+// real venues. Same reasoning as migrate.js above — idempotent by
+// id/name, safe to call unconditionally on every boot.
+require('./backend/db/expandLudwigsvorstadt').runExpansion();
+
 const app = express();
 app.set('etag', false); // API responses are always regenerated from the live DB
 app.use(cors());

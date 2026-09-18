@@ -21,11 +21,22 @@ JWT_SECRET, TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID in the local
 .env file and in Railway's project variables.
 
 ## Database
-- 153 venues across 4 Munich Stadtteile as of the last health check
-  (17 Sep 2026) — grows via approved community submissions, so treat
-  this as a snapshot; check GET /api/stats for the live count. Local
-  dev's seed DB and production have diverged independently — don't
-  assume they match.
+- ~181 venues across 6 Munich Stadtteile as of 18 Sep 2026 (local dev) —
+  grows via approved community submissions, so treat this as a snapshot;
+  check GET /api/stats for the live count. Local dev's seed DB and
+  production have diverged independently — don't assume they match, and
+  re-run `npm run expand:ludwigsvorstadt` reasoning below against
+  production's own count before trusting it there.
+- The Isarvorstadt polygon (frontend/src/data/neighbourhoodGeoJSON.js) was
+  expanded from just the district's eastern half to the full official
+  "Ludwigsvorstadt-Isarvorstadt" district — it now overlaps the older,
+  hand-approximated Altstadt/Maxvorstadt polygons in places (those two
+  weren't redrawn); the new polygon is ordered last so it wins the visual
+  and click precedence in the overlap. See backend/db/expandLudwigsvorstadt.js
+  for the full reasoning, including which venues were reassigned and which
+  were deliberately left alone despite matching on paper (several turned
+  out to be real Haidhausen/Untergiesing/Westend addresses — none of which
+  are modelled neighbourhoods yet).
 - Tables: cities, neighbourhoods, venues, beers,
   venue_beers, submissions, admin_logs
 - Run locally: npm run seed
@@ -34,7 +45,8 @@ JWT_SECRET, TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID in the local
 - Volume: muenchner-bierpreis-volume
 
 ## Tier 1 Stadtteile
-Altstadt, Maxvorstadt, Schwabing, Isarvorstadt
+Altstadt, Maxvorstadt, Schwabing, Isarvorstadt (now the full
+Ludwigsvorstadt-Isarvorstadt district), Lehel, Schwanthalerhöhe
 
 ## Cities (future expansion)
 München (active), Berlin/Hamburg/Wien (coming soon)
@@ -99,6 +111,8 @@ Railway auto-deploys from main branch.
 - Serve type filter (tap/bottle/can/unknown, filter panel + GET /api/venues?serve_type=)
 - Price Trends in stats bar (amber pill after the neighbourhood pills, replacing the old sidebar button)
 - Price Trends dual view (By Area + By Brand, top-10 fixed brands, per-line no-history fallback)
+- Lehel + Schwanthalerhöhe added as Stadtteile (6 total)
+- Isarvorstadt polygon expanded to the full Ludwigsvorstadt-Isarvorstadt boundary
 
 ## Still To Do ❌
 - Venue descriptions DE+EN for all venues

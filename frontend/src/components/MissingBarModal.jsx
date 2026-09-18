@@ -12,6 +12,8 @@ const NEIGHBOURHOODS = [
   { id: 'maxvorstadt', de: 'Maxvorstadt', en: 'Maxvorstadt' },
   { id: 'schwabing', de: 'Schwabing', en: 'Schwabing' },
   { id: 'isarvorstadt', de: 'Isarvorstadt', en: 'Isarvorstadt' },
+  { id: 'lehel', de: 'Lehel', en: 'Lehel' },
+  { id: 'schwanthalerhoehe', de: 'Schwanthalerhöhe', en: 'Schwanthalerhöhe' },
 ];
 
 const MAX_BEERS = 5;

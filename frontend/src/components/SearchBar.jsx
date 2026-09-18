@@ -19,7 +19,9 @@ const NEIGHBOURHOODS = [
   { id: 'altstadt', de: 'Altstadt', en: 'Old Town' },
   { id: 'maxvorstadt', de: 'Maxvorstadt', en: 'Maxvorstadt' },
   { id: 'schwabing', de: 'Schwabing', en: 'Schwabing' },
-  { id: 'isarvorstadt', de: 'Isarvorstadt', en: 'Isarvorstadt' }
+  { id: 'isarvorstadt', de: 'Isarvorstadt', en: 'Isarvorstadt' },
+  { id: 'lehel', de: 'Lehel', en: 'Lehel' },
+  { id: 'schwanthalerhoehe', de: 'Schwanthalerhöhe', en: 'Schwanthalerhöhe' }
 ];
 
 export default function SearchBar({ onSearch, onSearchNow, onFocus, onFilterChange, filters, onNeighbourhoodSelect, resultCount }) {

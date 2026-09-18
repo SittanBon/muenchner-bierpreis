@@ -7,18 +7,24 @@ import { fetchTrends } from '../hooks/useApi';
 import { formatEuro } from '../utils/price';
 
 // ── By Area (existing) ───────────────────────────────────────────────────────
-// Fixed categorical order (validated for CVD-safety via the dataviz skill's
-// validator — worst adjacent ΔE 9.1 CVD / 22.9 normal-vision, all PASS). Assigned
-// by entity (neighbourhood id), never by rank, so toggling a line off never
-// repaints the survivors.
+// Fixed categorical order — the original 4 were validated for CVD-safety via
+// the dataviz skill's validator (worst adjacent ΔE 9.1 CVD / 22.9 normal-vision,
+// all PASS); lehel/schwanthalerhoehe were added later (validator wasn't
+// available in that session) picked to sit in distinct hue families (magenta,
+// purple) from the existing blue/orange/aqua/yellow — re-run the validator on
+// the full 5-colour set before trusting it as rigorously as the original 4.
+// Assigned by entity (neighbourhood id), never by rank, so toggling a line
+// off never repaints the survivors.
 const NEIGHBOURHOOD_COLORS = {
   altstadt: '#2a78d6',      // blue
   maxvorstadt: '#eb6834',   // orange
   schwabing: '#1baf7a',     // aqua
   isarvorstadt: '#eda100',  // yellow
+  lehel: '#c23b8f',         // magenta
+  schwanthalerhoehe: '#7a4ed6', // purple
 };
 const CITY_COLOR = '#5a3d1e'; // muted, dashed reference line — distinct from the categorical set
-const NEIGHBOURHOOD_ORDER = ['altstadt', 'maxvorstadt', 'schwabing', 'isarvorstadt'];
+const NEIGHBOURHOOD_ORDER = ['altstadt', 'maxvorstadt', 'schwabing', 'isarvorstadt', 'lehel', 'schwanthalerhoehe'];
 
 // ── By Brand (new) ────────────────────────────────────────────────────────────
 // Fixed order + colours, exactly as specified — not a dynamically-computed
