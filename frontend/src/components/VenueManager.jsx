@@ -553,7 +553,14 @@ export default function VenueManager({ token, initialQuery = '' }) {
                 <Fragment key={v.id}>
                   <tr className={v.active === false ? 'vm-row-inactive' : ''}>
                     <td>{v.name}</td>
-                    <td>{v.neighbourhood_name_de}</td>
+                    <td>
+                      {v.neighbourhood_name_de}
+                      {v.outside_modelled_area && (
+                        <span className="vm-approx-badge" title={t('admin.venues.outsideModelledAreaHint')}>
+                          {t('admin.venues.outsideModelledArea')}
+                        </span>
+                      )}
+                    </td>
                     <td>
                       <div className="vm-tags">
                         {v.beers.map((b) => <span key={b.id} className="vm-tag">{b.brand}</span>)}

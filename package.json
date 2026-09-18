@@ -11,6 +11,8 @@
     "migrate": "node backend/db/migrate.js",
     "expand:ludwigsvorstadt": "node backend/db/expandLudwigsvorstadt.js",
     "reassign:venues": "node backend/db/reassignVenues.js",
+    "verify:coordinates": "node backend/db/verifyCoordinates.js",
+    "assign:nearest": "node backend/db/assignNearest.js",
     "geocode": "node backend/db/geocode.js",
     "test": "node --test backend/*.test.js && cd frontend && npm test"
   },

@@ -405,6 +405,7 @@ body{font-family:'Source Sans 3',sans-serif;background:var(--cream);color:var(--
 .vm-edit-btn:hover{background:var(--amber-100)}
 .vm-row-inactive{opacity:0.55}
 .vm-inactive-badge{background:#f0e0e0;color:#a03030;padding:2px 8px;border-radius:20px;font-size:10.5px;font-weight:600;white-space:nowrap}
+.vm-approx-badge{display:inline-block;margin-left:6px;background:#fff3d6;color:#8a6800;padding:1px 7px;border-radius:20px;font-size:10px;font-weight:600;white-space:nowrap;cursor:help}
 .cm-name-en{color:var(--text-muted);font-size:12px;font-weight:400}
 .vm-search-wrap{position:relative;margin-bottom:14px}
 .vm-search{width:100%;padding:9px 32px 9px 12px;border:1.5px solid var(--border-md);border-radius:8px;font-family:'Source Sans 3',sans-serif;font-size:14px;background:#fff;outline:none;transition:border-color 0.2s}

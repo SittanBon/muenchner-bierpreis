@@ -61,6 +61,14 @@ function migrate() {
   if (!venueCols.includes('active')) {
     db.exec('ALTER TABLE venues ADD COLUMN active INTEGER NOT NULL DEFAULT 1');
   }
+  // Flags a venue whose real address falls outside all 6 modelled
+  // neighbourhood polygons (e.g. Haidhausen, Au, Sendling — districts this
+  // app doesn't have boundary data for yet) and was assigned to its nearest
+  // neighbourhood by centroid distance rather than genuine polygon
+  // containment, so the admin UI can visibly flag it as approximate.
+  if (!venueCols.includes('outside_modelled_area')) {
+    db.exec('ALTER TABLE venues ADD COLUMN outside_modelled_area INTEGER NOT NULL DEFAULT 0');
+  }
   // city_id scopes a neighbourhood to one of the `cities` rows. DEFAULT 1
   // backfills every pre-existing neighbourhood to Munich in the same statement.
   const neighbourhoodCols = db.prepare('PRAGMA table_info(neighbourhoods)').all().map((c) => c.name);
@@ -136,6 +144,7 @@ function hydrateVenue(row) {
     description_de: row.description_de,
     description_en: row.description_en,
     active: row.active === 1,
+    outside_modelled_area: row.outside_modelled_area === 1,
     beers: beersForVenue.all(row.id),
   };
 }
