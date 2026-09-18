@@ -537,17 +537,23 @@ body{font-family:var(--font-body);background:var(--cream);color:var(--text-prima
    desktop, and independent of the attribution control sharing that corner. */
 .leaflet-control-zoom{position:absolute!important;bottom:160px!important;right:10px!important;top:auto!important;left:auto!important;margin:0!important}
 
-/* Venue pins — a white circle, coloured border and centred Lucide icon, one
-   colour per venue type. The divIcon's own box is always 44x44 (set in
+/* Venue pins — a solid-filled, coloured circle with a white Lucide icon, one
+   colour per venue type. (Previously a white circle with a coloured border —
+   the bar pin's amber border read as near-invisible against the map's own
+   light tan/cream tiles; a solid fill of the same colour has far more
+   contrast against any tile colour, so every type moved to this style for
+   consistency.) The divIcon's own box is always 44x44 (set in
    MunichMap.jsx) so the tap target never shrinks below the mobile-
    accessibility minimum; the visible circle inside is sized independently
    below and centred via flexbox, so it can be 36px on desktop / 42px on
-   mobile without the anchor point ever shifting. The border/icon colour
-   comes in as the --pin-color custom property (set inline per marker,
-   per-type) rather than a plain inline border-color/color, specifically so
-   the .selected rule below can still override just the border colour via
-   normal CSS cascade — an inline style beats any stylesheet rule for the
-   same property, custom-property indirection is what makes it overridable. */
+   mobile without the anchor point ever shifting. The fill colour comes in as
+   the --pin-color custom property (set inline per marker, per-type) so the
+   .selected rule below can still be plain CSS rather than needing
+   !important — an inline style otherwise beats any stylesheet rule for the
+   same property outright, custom-property indirection is what keeps it
+   overridable. The thin white border is just definition against a tile of
+   the exact same hue (e.g. the green beer_garden pin sitting on actual park
+   green) — not a colour cue itself, so it doesn't need the same treatment. */
 .venue-pin{background:none;border:none}
 .venue-pin-wrap{
   width:100%;height:100%;display:flex;align-items:center;justify-content:center;
@@ -556,20 +562,19 @@ body{font-family:var(--font-body);background:var(--cream);color:var(--text-prima
 .venue-pin-circle{
   width:36px;height:36px;border-radius:50%;
   display:flex;align-items:center;justify-content:center;
-  background:#fff;border:2.5px solid var(--pin-color);color:var(--pin-color);
+  background:var(--pin-color);color:#fff;border:2px solid #fff;
   box-shadow:0 2px 8px rgba(0,0,0,0.25);
-  cursor:pointer;transition:transform 0.15s,box-shadow 0.15s,border-width 0.15s;
+  cursor:pointer;transition:transform 0.15s,box-shadow 0.15s;
 }
 .venue-pin-circle svg{display:block}
 .venue-pin-wrap:hover .venue-pin-circle{transform:scale(1.08)}
 /* Selected pin (marker clicked — popup open, or its full detail is showing
-   in the sidebar/bottom sheet): darker/thicker border, a white ring just
-   outside it, a stronger shadow, and 1.15x scale — all per the design spec,
-   layered as one box-shadow (ring first, then the drop shadow). */
+   in the sidebar/bottom sheet): a dark ring just outside the circle, a
+   stronger shadow, and 1.2x scale — layered as one box-shadow (ring first,
+   then the drop shadow) so the circle's own white border/fill is untouched. */
 .venue-pin-wrap.selected .venue-pin-circle{
-  border-width:3.5px;border-color:#3d2200;
-  box-shadow:0 0 0 2px #fff,0 4px 12px rgba(0,0,0,0.35);
-  transform:scale(1.15);
+  box-shadow:0 0 0 3px #3d2200,0 6px 18px rgba(0,0,0,0.45);
+  transform:scale(1.2);
 }
 /* Venue name label under the pin — only shown (via the mobile media query
    below) while that venue's neighbourhood is the active one. */

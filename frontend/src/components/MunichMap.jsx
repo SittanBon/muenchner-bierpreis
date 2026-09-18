@@ -38,11 +38,12 @@ const TYPE_META = {
 };
 const DEFAULT_TYPE_META = { color: '#e8a020' };
 
-// A white circle, coloured border, and centred Lucide icon — createVenueIcon
-// returns a ready-to-use L.divIcon, no Leaflet state involved, so it's a
-// pure function of (venue, isSelected) and safe to call for every marker on
-// every rebuild. The icon itself is inline SVG (not a raster image), so it's
-// pixel-sharp at any DPI/zoom with no @2x asset needed.
+// A solid-filled, coloured circle with a centred white Lucide icon —
+// createVenueIcon returns a ready-to-use L.divIcon, no Leaflet state
+// involved, so it's a pure function of (venue, isSelected) and safe to call
+// for every marker on every rebuild. The icon itself is inline SVG (not a
+// raster image), so it's pixel-sharp at any DPI/zoom with no @2x asset
+// needed.
 function createVenueIcon(venue, isSelected, showLabel, iconSize, iconAnchor) {
   const meta = TYPE_META[venue.type] || DEFAULT_TYPE_META;
   return window.L.divIcon({
