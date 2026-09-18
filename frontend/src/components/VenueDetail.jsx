@@ -7,9 +7,8 @@ import { fetchVenue } from '../hooks/useApi';
 import ReportForm from './ReportForm';
 import FreshnessLight from './FreshnessLight';
 import ServeTypeTag from './ServeTypeTag';
+import VenueTypeIcon from './VenueTypeIcon';
 import { formatEuro } from '../utils/price';
-
-const TYPE_ICONS = { beer_garden: '🌳', beer_hall: '🏛️', bar: '🍺', restaurant: '🍽️' };
 
 // Same validated categorical order used for the Price Trends chart (dataviz
 // skill's default palette) — assigned by the beer's position in the venue's
@@ -173,7 +172,7 @@ export default function VenueDetail({ venue: initialVenue, onBack }) {
 
       {/* Hero */}
       <div className="vd-hero">
-        <div className="vd-icon-big">{TYPE_ICONS[venue.type] || '🍺'}</div>
+        <div className="vd-icon-big"><VenueTypeIcon type={venue.type} size={40} /></div>
         <div className="vd-hero-info">
           {/* h2, not h1 — this view is rendered inline under the app's own
               site-title h1 (brief Section 14 calls for one h1 per page). */}

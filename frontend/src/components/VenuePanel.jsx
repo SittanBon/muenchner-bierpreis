@@ -2,14 +2,8 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import FreshnessLight from './FreshnessLight';
 import ServeTypeTag from './ServeTypeTag';
+import VenueTypeIcon from './VenueTypeIcon';
 import { formatEuro } from '../utils/price';
-
-const TYPE_ICONS = {
-  beer_garden: '🌳',
-  beer_hall: '🏛️',
-  bar: '🍺',
-  restaurant: '🍽️'
-};
 
 function ConfidenceBadge({ reports }) {
   const { t } = useTranslation();
@@ -86,7 +80,7 @@ export default function VenuePanel({ neighbourhood, venues, onVenueClick, onClos
         {sorted.map(v => (
           <div key={v.id} className="venue-card" onClick={() => onVenueClick(v)}>
             <div className="vc-top">
-              <div className="vc-icon">{TYPE_ICONS[v.type] || '🍺'}</div>
+              <div className="vc-icon"><VenueTypeIcon type={v.type} /></div>
               <div className="vc-info">
                 <div className="vc-name">{v.name}</div>
                 <div className="vc-type">{t(`filters.types.${v.type}`)}</div>
