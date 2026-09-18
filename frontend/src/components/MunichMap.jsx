@@ -29,14 +29,19 @@ function svgIcon(type) {
   return `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${paths}</svg>`;
 }
 
-// One colour per venue type, shared by the pin border and its icon.
+// One colour per venue type, shared by the pin border and its icon. bar was
+// #e8a020 (the same light amber as the stats-bar/cluster accent) — on this
+// white-circle-bordered pin design that thin ring of light amber read as
+// near-invisible against the map's own light tan/cream tiles, so it's been
+// deepened to #d97706 (still clearly "amber", just dark enough to hold its
+// own against the map); every other type is unchanged.
 const TYPE_META = {
   beer_garden: { color: '#2d7a2d' },
   beer_hall: { color: '#7a4a06' },
-  bar: { color: '#e8a020' },
+  bar: { color: '#d97706' },
   restaurant: { color: '#5a3d1e' },
 };
-const DEFAULT_TYPE_META = { color: '#e8a020' };
+const DEFAULT_TYPE_META = { color: '#d97706' };
 
 // A solid-filled, coloured circle with a centred white Lucide icon —
 // createVenueIcon returns a ready-to-use L.divIcon, no Leaflet state
