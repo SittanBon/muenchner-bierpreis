@@ -10,6 +10,7 @@
     "seed:force": "node backend/db/seed.js --force",
     "migrate": "node backend/db/migrate.js",
     "expand:ludwigsvorstadt": "node backend/db/expandLudwigsvorstadt.js",
+    "reassign:venues": "node backend/db/reassignVenues.js",
     "geocode": "node backend/db/geocode.js",
     "test": "node --test backend/*.test.js && cd frontend && npm test"
   },

@@ -91,6 +91,15 @@ require('./backend/db/migrate').runMigration();
 // id/name, safe to call unconditionally on every boot.
 require('./backend/db/expandLudwigsvorstadt').runExpansion();
 
+// Reassigns every venue's neighbourhood_id against the REAL OpenStreetMap
+// administrative boundaries in frontend/src/data/neighbourhoodGeoJSON.js
+// (superseding the two hand-drawn polygon attempts above) — idempotent
+// (each boot just re-tests every venue; already-correct ones are a no-op),
+// safe to call unconditionally. See the file for the full reasoning,
+// including the one verified surprise (Chinesischer Turm is officially in
+// Lehel, not Schwabing) and the session report for the complete venue list.
+require('./backend/db/reassignVenues').runReassignment();
+
 const app = express();
 app.set('etag', false); // API responses are always regenerated from the live DB
 app.use(cors());

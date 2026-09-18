@@ -127,7 +127,6 @@ const NEW_VENUES = [
 
 function runExpansion() {
   let neighbourhoodsAdded = 0;
-  let reassigned = 0;
   let venuesAdded = 0;
 
   console.log('🍺 Ludwigsvorstadt-Isarvorstadt expansion: neighbourhoods...');
@@ -146,29 +145,17 @@ function runExpansion() {
     neighbourhoodsAdded += 1;
   }
 
-  console.log('🍺 Ludwigsvorstadt-Isarvorstadt expansion: reassigning venues...');
-  const getVenueStmt = db.prepare('SELECT id, name, neighbourhood_id FROM venues WHERE id = ?');
-  const updateHoodStmt = db.prepare('UPDATE venues SET neighbourhood_id = @to WHERE id = @id');
-  for (const r of REASSIGNMENTS) {
-    const venue = getVenueStmt.get(r.id);
-    if (!venue) {
-      console.log(`   ⚠️  SKIP — venue not found (id may differ locally): ${r.name} (${r.id})`);
-      continue;
-    }
-    if (venue.neighbourhood_id === r.to) {
-      console.log(`   ⏭️  SKIP — already ${r.to}: ${venue.name}`);
-      continue;
-    }
-    const from = venue.neighbourhood_id;
-    updateHoodStmt.run({ id: r.id, to: r.to });
-    logAdminAction('EDIT_VENUE', {
-      venueId: r.id,
-      venueName: venue.name,
-      details: { field: 'neighbourhood_id', old_value: from, new_value: r.to },
-    });
-    console.log(`   ✅ REASSIGNED: ${venue.name} from ${from} to ${r.to}`);
-    reassigned += 1;
-  }
+  // The REASSIGNMENTS step that used to run here is retired — see
+  // backend/db/reassignVenues.js, which supersedes it with a real
+  // point-in-polygon test against actual OpenStreetMap boundaries instead of
+  // this file's hand-verified-but-still-approximate polygon. Keeping both
+  // active was actively harmful, not just redundant: this list's targets
+  // went stale the moment the real boundaries landed, so on every boot the
+  // two scripts fought — this one silently undoing reassignVenues.js's
+  // correct answer, which then immediately re-corrected it back, forever,
+  // each pass adding a spurious pair of EDIT_VENUE entries to admin_logs.
+  // REASSIGNMENTS itself is left in this file only as a record of the
+  // session that produced it.
 
   console.log('🍺 Ludwigsvorstadt-Isarvorstadt expansion: new venues...');
   const existingNames = new Set(
@@ -191,8 +178,8 @@ function runExpansion() {
     existingNames.add(norm(v.name));
   }
 
-  console.log(`🍺 Expansion complete: ${neighbourhoodsAdded} neighbourhoods added, ${reassigned} venues reassigned, ${venuesAdded} venues added. Total venues now: ${db.prepare('SELECT COUNT(*) AS n FROM venues').get().n}.`);
-  return { neighbourhoodsAdded, reassigned, venuesAdded };
+  console.log(`🍺 Expansion complete: ${neighbourhoodsAdded} neighbourhoods added, ${venuesAdded} venues added (venue reassignment now handled by reassignVenues.js). Total venues now: ${db.prepare('SELECT COUNT(*) AS n FROM venues').get().n}.`);
+  return { neighbourhoodsAdded, venuesAdded };
 }
 
 if (require.main === module) {
