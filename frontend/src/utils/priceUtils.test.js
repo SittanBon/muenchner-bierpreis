@@ -10,6 +10,10 @@ import {
 
 describe('normalizePrice', () => {
   it('€3.50 for 330 ml -> €5.30 per 0.5 L', () => expect(normalizePrice(3.5, 330)).toBe(5.3));
+  it('a true half-cent rounds up (€2.90 @ 400 ml = 3.625 -> €3.63), matching the backend', () => {
+    expect(normalizePrice(2.9, 400)).toBe(3.63);
+    expect(normalizePrice(9.15, 1000)).toBe(4.58);
+  });
   it('€4.20 for 500 ml -> €4.20', () => expect(normalizePrice(4.2, 500)).toBe(4.2));
   it('null price -> null', () => expect(normalizePrice(null, 500)).toBeNull());
   it('zero volume -> null', () => expect(normalizePrice(4.2, 0)).toBeNull());
@@ -27,8 +31,8 @@ describe('formatPrice / formatVolume', () => {
   });
   it('labels supported volumes and refuses unknown ones', () => {
     expect(formatVolume(330, 'de')).toBe('0,33L');
-    expect(formatVolume(500, 'en')).toBe('0.5L');
-    expect(formatVolume(1000, 'en')).toBe('1L');
+    expect(formatVolume(500, 'en')).toBe('0.50L');
+    expect(formatVolume(1000, 'en')).toBe('1.00L');
     expect(formatVolume(null, 'en')).toBeNull();
     expect(formatVolume(999, 'en')).toBeNull();
   });
@@ -52,7 +56,7 @@ describe('describePrice — the display rules', () => {
   it('a 0.5 L price needs no normalized comparison', () => {
     const p = describePrice({ size_05: 4.2, serving_volume_ml: 500, normalized_500ml_price: 4.2 }, 'en');
     expect(p.actual).toBe('€4.20');
-    expect(p.volumeLabel).toBe('0.5L');
+    expect(p.volumeLabel).toBe('0.50L');
     expect(p.normalized).toBeNull();
     expect(p.isReferenceSize).toBe(true);
   });

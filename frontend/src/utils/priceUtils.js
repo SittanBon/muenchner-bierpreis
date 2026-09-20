@@ -4,17 +4,11 @@
 // carries `normalized_500ml_price`, so components use that field and only fall
 // back to computing it here for objects that lack it.
 
-export const REFERENCE_VOLUME_ML = 500;
-// Serving sizes the app understands (ml). The report form offers these; the
-// API rejects anything else.
-export const SERVING_SIZES = [
-  { size: '0.25L', ml: 250 },
-  { size: '0.33L', ml: 330 },
-  { size: '0.4L', ml: 400 },
-  { size: '0.5L', ml: 500 },
-  { size: '1L', ml: 1000 },
-];
-export const VALID_VOLUMES_ML = SERVING_SIZES.map((s) => s.ml);
+import { SERVING_SIZES, VALID_VOLUMES_ML, REFERENCE_VOLUME_ML, servingLabel } from '../constants/servingSizes.js';
+
+// The serving-size list lives in constants/servingSizes.js (the single source);
+// re-exported here so existing imports keep working.
+export { SERVING_SIZES, VALID_VOLUMES_ML, REFERENCE_VOLUME_ML };
 
 // Where a price came from (admin-only metadata). Mirrors SOURCE_TYPES in
 // backend/utils/priceUtils.js (the parity test keeps them equal).
@@ -33,7 +27,12 @@ export function normalizePrice(actualPrice, volumeMl) {
   const price = Number(actualPrice);
   const volume = Number(volumeMl);
   if (!Number.isFinite(price) || !Number.isFinite(volume) || price <= 0 || volume <= 0) return null;
-  return Math.round((price / volume * REFERENCE_VOLUME_ML) * 100) / 100;
+  // Multiply BEFORE dividing and round on a 12-significant-digit value: the other
+  // order (price / volume × 500) turns €2.90 @ 400 ml into 3.6249999… and rounds
+  // it DOWN to €3.62, while the true half-cent value €3.625 rounds up to €3.63 —
+  // which is what the SQL version of this formula gives. Cents are exact here.
+  const cents = Math.round(Number((price * REFERENCE_VOLUME_ML / volume * 100).toPrecision(12)));
+  return cents / 100;
 }
 
 // "€4,80" (de) / "€4.80" (en); null/NaN -> "—".
@@ -43,11 +42,12 @@ export function formatPrice(price, lang) {
   return lang === 'de' ? '€' + fixed.replace('.', ',') : '€' + fixed;
 }
 
-// 500 -> "0.5L" (en) / "0,5L" (de); 1000 -> "1L"; unknown -> null.
+// 500 -> "0.50L" (en) / "0,50L" (de); 1000 -> "1.00L"; unknown -> null.
+// The label comes from constants/servingSizes.js, so a size reads the same in
+// every dropdown and on every card.
 export function formatVolume(ml, lang) {
   if (!isValidVolume(ml)) return null;
-  const s = `${ml / 1000}L`;
-  return lang === 'de' ? s.replace('.', ',') : s;
+  return servingLabel(ml, lang);
 }
 
 // Everything a view needs to show one beer's price under the P0 display rules:

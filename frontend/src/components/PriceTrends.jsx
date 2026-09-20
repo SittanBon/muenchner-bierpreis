@@ -5,6 +5,7 @@ import {
 } from 'recharts';
 import { fetchTrends } from '../hooks/useApi';
 import { formatEuro } from '../utils/price';
+import { TREND_BRANDS } from '../constants/brands';
 
 // ── By Area (existing) ───────────────────────────────────────────────────────
 // Fixed categorical order — the original 4 were validated for CVD-safety via
@@ -36,12 +37,9 @@ const NEIGHBOURHOOD_ORDER = ['altstadt', 'maxvorstadt', 'schwabing_west', 'schwa
 // Fixed order + colours, exactly as specified — not a dynamically-computed
 // "most common right now" ranking, same reasoning as NEIGHBOURHOOD_COLORS: a
 // brand's colour must never shift just because a new submission changed its
-// rank. Must match backend/db/database.js's TREND_BRANDS list exactly (that's
-// what buckets everything else into 'others' server-side).
-const BRAND_ORDER = [
-  'Augustiner', 'Paulaner', 'Hofbräu München', 'Hacker-Pschorr', 'Löwenbräu',
-  'Spaten', 'Tegernseer', 'Weihenstephaner', 'Giesinger Bräu', 'Ayinger', 'others',
-];
+// rank. The list itself is TREND_BRANDS in constants/brands.js (kept equal to the
+// backend's bucketing by a test).
+const BRAND_ORDER = [...TREND_BRANDS, 'others'];
 const BRAND_COLORS = {
   'Augustiner': '#e8a020',
   'Paulaner': '#1a6eb5',
@@ -157,7 +155,7 @@ export default function PriceTrends({ neighbourhoods, onClose }) {
 
   const de = i18n.language === 'de';
   const labelFor = (id) => {
-    if (id === 'city') return de ? 'München Ø' : 'Munich avg';
+    if (id === 'city') return t('trends.cityAvg');
     if (id === 'others') return t('trends.others');
     if (viewMode === 'brand') return id; // brand names are already display-ready, no translation
     return nameById[id] || id;

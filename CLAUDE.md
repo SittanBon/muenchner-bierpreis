@@ -83,6 +83,44 @@ A price's age comes ONLY from two columns on `beers`:
 - The DB migration takes a `VACUUM INTO` backup (`<db>.pre-phase1-<ts>.bak`,
   gitignored) once, before adding the columns — restore it to roll back.
 
+## Shared constants & consistency rules (READ BEFORE ADDING A FORM OR LABEL)
+Each of these has ONE source; components import it and never re-type it. Tests
+fail if a copy drifts.
+- **Serving sizes** — `frontend/src/constants/servingSizes.js` (`SERVING_SIZES`:
+  ml/label/size/name_de/name_en: 250 0.25L Kleines · 330 0.33L Flasche · 400
+  0.40L Kleines Helles · 500 0.50L Halbe · 1000 1.00L Maß). Every size dropdown
+  is `<ServingSizeSelect>` ("0.50L — Halbe (500ml)"; DE shows a decimal comma).
+  `size` is the API wire value ('0.4L', not '0.40L') so stored rows stay valid.
+  Backend mirror: `SIZE_TO_ML` in `backend/utils/priceUtils.js` (parity-tested).
+  `serving_volume_ml` outside [250,330,400,500,1000] is a 400 on EVERY route that
+  takes one (PATCH beer, POST venues, POST venues/:id/beers). Create/add forms have
+  a size selector; omitted = 500 (older clients). "Missing a bar?" sends `size`
+  for the first beer and per extra beer; approval uses it (default 0.5L).
+- **Serving-size text in translations** is generated (`${REF_DE}` etc. in
+  `translations.js`) — never type "0,5L"/"1L" into a string
+  (`translations.test.js` fails on it). DE/EN key parity is tested there too.
+- **Brands** — `constants/brands.js` (`BRANDS`, `BRAND_GROUPS`, `TREND_BRANDS`);
+  every brand input is `<BrandCombobox>`. `TREND_BRANDS` must equal the backend's.
+- **Venue types** — `constants/venueTypes.js` ⇄ `backend/utils/venueTypes.js`;
+  labels are `t('filters.types.<type>')` only. Invalid type = 400 on create,
+  edit and "Missing a bar?".
+- **Neighbourhood names** — the DB (`neighbourhoods.name_de/name_en` via
+  GET /api/neighbourhoods) is the only source; use `neighbourhoodName(n, lang)`
+  (`utils/neighbourhoods.js`). No component keeps its own list.
+- **Freshness** — only `FreshnessLight` → `getFreshness` (`utils/freshness.js`).
+- **Price display** — one function: `formatPrice` in `utils/priceUtils.js`
+  (`formatEuro` in `utils/price.js` is just an alias); `parsePrice` for input.
+- **Normalised 0.5 L price** — `normalizePrice` (JS, multiplies BEFORE dividing
+  and rounds a true half-cent UP: €2.90 @ 400 ml = €3.63). The SQL copies
+  (`BEER_PRICE_500_SQL`, `SUBMISSION_PRICE_500_SQL`) are tested against it
+  (`normalizationParity.test.js`); SQLite's ROUND may differ by 1 cent at an exact
+  half-cent, but it only rounds AVG()s, never a displayed price.
+- **UI text** — everything user-facing goes through `t()`; no inline
+  `de ? '…' : '…'` ternaries. (Language-neutral: "Admin", "Lat"/"Lng", URLs.)
+- **Admin buttons are ≥44px tall** — one rule in `index.css`
+  (`.admin-page button { min-height: 44px }`), so new admin buttons comply
+  automatically. Form fields (inputs/selects) are not covered by it.
+
 ## Admin data-quality tooling (P0 Phase 2)
 - **Data Quality tab** (admin): automatic flags for HUMAN REVIEW ONLY —
   nothing is auto-fixed or deleted. Rules live in `backend/dataQuality.js`

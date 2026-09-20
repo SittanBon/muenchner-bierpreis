@@ -16,11 +16,13 @@ const be = require('./utils/priceUtils');
 
 let fePrice;
 let feFresh;
+let feSizes;
 
 before(async () => {
   const dir = path.join(__dirname, '..', 'frontend', 'src', 'utils');
   fePrice = await import(pathToFileURL(path.join(dir, 'priceUtils.js')).href);
   feFresh = await import(pathToFileURL(path.join(dir, 'freshness.js')).href);
+  feSizes = await import(pathToFileURL(path.join(dir, '..', 'constants', 'servingSizes.js')).href);
 });
 
 const NOW = new Date('2026-09-20T12:00:00Z');
@@ -65,6 +67,35 @@ describe('normalisation + formatting parity', () => {
       be.SIZE_TO_ML,
     );
     assert.equal(fePrice.REFERENCE_VOLUME_ML, be.REFERENCE_VOLUME_ML);
+  });
+});
+
+describe('serving-size constant (frontend/src/constants/servingSizes.js)', () => {
+  test('is exactly the five supported sizes, in ascending order', () => {
+    assert.deepEqual(feSizes.SERVING_SIZES.map((s) => s.ml), [250, 330, 400, 500, 1000]);
+    assert.deepEqual(feSizes.SERVING_SIZES.map((s) => s.label), ['0.25L', '0.33L', '0.40L', '0.50L', '1.00L']);
+    assert.deepEqual(feSizes.SERVING_SIZES.map((s) => s.name_de), ['Kleines', 'Flasche', 'Kleines Helles', 'Halbe', 'Maß']);
+    assert.deepEqual(feSizes.SERVING_SIZES.map((s) => s.name_en), ['Small', 'Bottle', 'Small Helles', 'Half litre', 'Full litre']);
+  });
+  test('matches the backend: same volumes, same wire values, same labels', () => {
+    assert.deepEqual(feSizes.VALID_VOLUMES_ML, [...be.VALID_VOLUMES_ML].sort((a, b) => a - b));
+    for (const s of feSizes.SERVING_SIZES) {
+      assert.equal(be.volumeFromSize(s.size), s.ml, `wire value ${s.size}`);
+      assert.equal(be.formatVolume(s.ml, 'en'), s.label, `backend label for ${s.ml}`);
+      assert.equal(feSizes.servingLabel(s.ml, 'en'), s.label);
+      assert.equal(feSizes.servingLabel(s.ml, 'de'), s.label.replace('.', ','));
+      assert.equal(feSizes.wireSizeFromMl(s.ml), s.size);
+    }
+  });
+  test('the dropdown text is "label — name (Nml)" in both languages', () => {
+    assert.equal(feSizes.servingOptionText(250, 'en'), '0.25L — Small (250ml)');
+    assert.equal(feSizes.servingOptionText(400, 'de'), '0,40L — Kleines Helles (400ml)');
+    assert.equal(feSizes.servingOptionText(500, 'en'), '0.50L — Half litre (500ml)');
+    assert.equal(feSizes.servingOptionText(1000, 'de'), '1,00L — Maß (1000ml)');
+    assert.equal(feSizes.servingOptionText(123, 'en'), '');
+  });
+  test('unknown volumes have no size', () => {
+    for (const bad of [null, undefined, 0, 123, NaN, 'x']) assert.equal(feSizes.servingSizeByMl(bad), null, String(bad));
   });
 });
 

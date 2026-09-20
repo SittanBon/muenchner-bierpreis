@@ -177,6 +177,13 @@ function isEmpty() {
 
 // ─── Read helpers ────────────────────────────────────────────────────────────
 
+// The per-0.5 L comparison price of a `beers` row, as SQL — for ORDER BY and
+// AVG() where the JS normalizePrice() can't run. Same formula (price / volume
+// × 500); backend/normalizationParity.test.js proves it agrees with
+// normalizePrice for every supported size. Only meaningful for rows with
+// size_05 > 0 AND serving_volume_ml > 0 (callers guard that).
+const BEER_PRICE_500_SQL = `size_05 * ${REFERENCE_VOLUME_ML}.0 / serving_volume_ml`;
+
 // Cheapest active beer first — every consumer that reads beers[0] as "the
 // headline price" (stats, map shading, sidebar cards, venue detail) gets the
 // cheapest brand for free, with no special-casing needed at the call site.
@@ -190,7 +197,7 @@ const beersForVenue = db.prepare(
           serving_volume_ml, price_observed_at, verified_at
      FROM beers WHERE venue_id = ? AND active = 1
     ORDER BY CASE WHEN serving_volume_ml > 0 AND size_05 > 0 THEN 0 ELSE 1 END,
-             size_05 * ${REFERENCE_VOLUME_ML}.0 / serving_volume_ml ASC,
+             ${BEER_PRICE_500_SQL} ASC,
              id ASC`
 );
 
@@ -202,7 +209,7 @@ const beersForVenueAdmin = db.prepare(
           serving_volume_ml, price_observed_at, verified_at, source_type, notes
      FROM beers WHERE venue_id = ? AND active = 1
     ORDER BY CASE WHEN serving_volume_ml > 0 AND size_05 > 0 THEN 0 ELSE 1 END,
-             size_05 * ${REFERENCE_VOLUME_ML}.0 / serving_volume_ml ASC,
+             ${BEER_PRICE_500_SQL} ASC,
              id ASC`
 );
 
@@ -639,7 +646,7 @@ const trendsByBrand = db.prepare(`
 // at all yet — same live beers table the map/stats bar already reads from.
 const currentByBrandStmt = db.prepare(`
   SELECT ${brandBucketSql('brand')} AS brand,
-         ROUND(AVG(size_05 * ${REFERENCE_VOLUME_ML}.0 / serving_volume_ml), 2) AS avg_price
+         ROUND(AVG(${BEER_PRICE_500_SQL}), 2) AS avg_price
     FROM beers
    WHERE active = 1 AND size_05 > 0 AND serving_volume_ml > 0
    GROUP BY brand
@@ -1333,6 +1340,8 @@ module.exports = {
   getDataQuality,
   getAdminSubmissions,
   SEEDED_ESTIMATE_NOTE,
+  BEER_PRICE_500_SQL,
+  SUBMISSION_PRICE_500_SQL,
   getPublicPriceHistory,
   hydrateBeer,
   deleteBeer,

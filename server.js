@@ -56,6 +56,7 @@ const {
 } = require('./backend/notifications');
 const { FLAG_CODES, THRESHOLDS, summarizeFlags, groupFlagsByVenue } = require('./backend/dataQuality');
 const { filterVenues } = require('./backend/filterVenues');
+const { isValidVenueType } = require('./backend/utils/venueTypes');
 const {
   isValidSize,
   isValidVolume,
@@ -385,11 +386,14 @@ function parseExtraBeers(raw) {
   return arr.map((b) => {
     const price = parseFloat(b.size_05);
     if (!b.brand || Number.isNaN(price) || price < 1 || price > 30) {
-      throw new Error('Each additional beer needs a brand and a valid 0.5L price');
+      throw new Error('Each additional beer needs a brand and a valid price');
     }
     const mass = b.size_mass != null && b.size_mass !== '' ? parseFloat(b.size_mass) : null;
+    const size = b.size === undefined || b.size === '' ? '0.5L' : b.size;
+    if (!isValidSize(size)) throw new Error('Invalid size for an additional beer');
     return {
       brand: String(b.brand),
+      size,
       size_05: price,
       size_mass: mass != null && !Number.isNaN(mass) ? mass : null,
       serve_type: normalizeServeType(b.serve_type),
@@ -401,12 +405,16 @@ app.post('/api/submissions/new-venue', upload.single('photo'), (req, res) => {
   const {
     name, type, neighbourhood_id, address, lat, lng,
     beer_brand, size_05, size_mass, serve_type, extra_beers,
-    visit_date, submitter_name, note,
+    visit_date, submitter_name, note, size,
   } = req.body || {};
 
   if (!name || !type || !neighbourhood_id || !beer_brand || !size_05) {
     if (req.file) fs.unlink(req.file.path, () => {});
     return res.status(400).json({ error: 'name, type, neighbourhood_id, beer_brand and size_05 are required' });
+  }
+  if (!isValidVenueType(type)) {
+    if (req.file) fs.unlink(req.file.path, () => {});
+    return res.status(400).json({ error: 'Invalid type' });
   }
   const validHoods = getNeighbourhoods().map((n) => n.id);
   if (!validHoods.includes(neighbourhood_id)) {
@@ -417,6 +425,13 @@ app.post('/api/submissions/new-venue', upload.single('photo'), (req, res) => {
   if (Number.isNaN(numPrice) || numPrice < 1 || numPrice > 30) {
     if (req.file) fs.unlink(req.file.path, () => {});
     return res.status(400).json({ error: 'Invalid price' });
+  }
+  // The first beer's serving size. Omitted = the 0.5 L the price field has
+  // always meant; anything else must be a supported size.
+  const newVenueSize = size === undefined || size === '' ? '0.5L' : size;
+  if (!isValidSize(newVenueSize)) {
+    if (req.file) fs.unlink(req.file.path, () => {});
+    return res.status(400).json({ error: 'Invalid size' });
   }
   let newVenueVisitDate = todayISO();
   if (visit_date !== undefined && visit_date !== null && visit_date !== '') {
@@ -442,7 +457,7 @@ app.post('/api/submissions/new-venue', upload.single('photo'), (req, res) => {
     venue_name: name,
     is_new_venue: 1,
     beer_brand,
-    size: '0.5L',
+    size: newVenueSize,
     price: numPrice,
     serve_type: normalizeServeType(serve_type),
     extra_beers: parsedExtraBeers.length ? JSON.stringify(parsedExtraBeers) : null,
@@ -494,6 +509,17 @@ function attachFlags(venue) {
     ...venue,
     flags: flags.filter((f) => f.venue_id === venue.id).map((f) => ({ flag: f.flag, beer_id: f.beer_id, brand: f.brand })),
   };
+}
+
+// serving_volume_ml for a NEW price (admin create-venue / add-beer). Omitted
+// keeps the long-standing meaning of those price fields — the 0.5 L price — so
+// older clients and scripts still work; anything that IS supplied must be one of
+// the supported sizes [250, 330, 400, 500, 1000] or the request is rejected.
+const wireSizeFor = (ml) => ['0.25L', '0.33L', '0.4L', '0.5L', '1L'].find((sz) => volumeFromSize(sz) === ml) || null;
+function parseNewServingVolume(raw) {
+  if (raw === undefined) return { ok: true, value: 500 };
+  const value = typeof raw === 'number' ? raw : (typeof raw === 'string' && raw.trim() !== '' ? Number(raw) : NaN);
+  return isValidVolume(value) ? { ok: true, value } : { ok: false };
 }
 
 // Server-side sanity bound for an admin-entered price (the public submission
@@ -567,14 +593,15 @@ app.patch('/api/admin/submissions/:id', authMiddleware, (req, res) => {
         // submitter's visit — that visit date is the observation date.
         [{
           brand: sub.beer_brand, size_05: sub.price, size_mass: sub.size_mass, serve_type: sub.serve_type,
-          serving_volume_ml: 500, price_observed_at: sub.visit_date, ...communitySource,
+          serving_volume_ml: volumeFromSize(sub.size) ?? 500, price_observed_at: sub.visit_date, ...communitySource,
         }],
       );
       if (sub.extra_beers) {
         let extraBeers = [];
         try { extraBeers = JSON.parse(sub.extra_beers); } catch { /* ignore malformed */ }
         for (const b of extraBeers) {
-          addBeerToVenue(createdVenueId, { ...b, serving_volume_ml: 500, price_observed_at: sub.visit_date, ...communitySource });
+          // Older pending proposals have no per-beer size: those were 0.5 L prices.
+          addBeerToVenue(createdVenueId, { ...b, serving_volume_ml: volumeFromSize(b.size) ?? 500, price_observed_at: sub.visit_date, ...communitySource });
         }
       }
       S.setSubmissionVenueId.run(createdVenueId, sub.id);
@@ -670,6 +697,7 @@ app.post('/api/admin/venues', authMiddleware, (req, res) => {
   if (!name || !type || !neighbourhood_id) {
     return res.status(400).json({ error: 'name, type and neighbourhood_id are required' });
   }
+  if (!isValidVenueType(type)) return res.status(400).json({ error: 'Invalid type' });
   if (!Array.isArray(beers) || beers.length === 0) {
     return res.status(400).json({ error: 'At least one beer is required' });
   }
@@ -679,6 +707,9 @@ app.post('/api/admin/venues', authMiddleware, (req, res) => {
     }
     if (b.size_mass && !isSanePrice(parseFloat(b.size_mass))) {
       return res.status(400).json({ error: 'Invalid 1L price' });
+    }
+    if (!parseNewServingVolume(b.serving_volume_ml).ok) {
+      return res.status(400).json({ error: 'Invalid serving_volume_ml' });
     }
   }
   const validHoods = getNeighbourhoods().map((n) => n.id);
@@ -694,6 +725,7 @@ app.post('/api/admin/venues', authMiddleware, (req, res) => {
         size_05: parseFloat(b.size_05),
         size_mass: b.size_mass ? parseFloat(b.size_mass) : null,
         serve_type: b.serve_type,
+        serving_volume_ml: parseNewServingVolume(b.serving_volume_ml).value,
         // An admin entering a price is recording it as current right now,
         // from the admin; that creation is the price's first history entry.
         price_observed_at: todayISO(),
@@ -739,8 +771,7 @@ app.patch('/api/admin/venues/:id', authMiddleware, (req, res) => {
   if (!name || !String(name).trim()) {
     return res.status(400).json({ error: 'name is required' });
   }
-  const VALID_TYPES = ['beer_garden', 'beer_hall', 'bar', 'restaurant'];
-  if (!VALID_TYPES.includes(type)) {
+  if (!isValidVenueType(type)) {
     return res.status(400).json({ error: 'Invalid type' });
   }
   const validHoods = getNeighbourhoods().map((n) => n.id);
@@ -819,10 +850,12 @@ app.post('/api/admin/venues/:id/beers', authMiddleware, (req, res) => {
   const venue = getVenueAdmin(req.params.id);
   if (!venue) return res.status(404).json({ error: 'Venue not found' });
 
-  const { brand, size_05, size_mass, serve_type } = req.body || {};
+  const { brand, size_05, size_mass, serve_type, serving_volume_ml } = req.body || {};
   if (!brand || size_05 == null || !isSanePrice(parseFloat(size_05))) {
     return res.status(400).json({ error: 'brand and a valid size_05 are required' });
   }
+  const volume = parseNewServingVolume(serving_volume_ml);
+  if (!volume.ok) return res.status(400).json({ error: 'Invalid serving_volume_ml' });
   if (size_mass && !isSanePrice(parseFloat(size_mass))) {
     return res.status(400).json({ error: 'Invalid size_mass' });
   }
@@ -835,6 +868,7 @@ app.post('/api/admin/venues/:id/beers', authMiddleware, (req, res) => {
     size_05: parseFloat(size_05),
     size_mass: size_mass ? parseFloat(size_mass) : null,
     serve_type,
+    serving_volume_ml: volume.value,
     price_observed_at: todayISO(),
     source_type: 'ADMIN',
     record_history_by: req.user?.username || 'admin',
@@ -842,7 +876,7 @@ app.post('/api/admin/venues/:id/beers', authMiddleware, (req, res) => {
   logAdminAction('ADD_BEER', {
     venueId: venue.id,
     venueName: venue.name,
-    details: { brand, price: parseFloat(size_05), size: '0.5L', serve_type: normalizeServeType(serve_type) },
+    details: { brand, price: parseFloat(size_05), size: wireSizeFor(volume.value), serving_volume_ml: volume.value, serve_type: normalizeServeType(serve_type) },
   });
   res.status(201).json(attachFlags(getVenueAdmin(venue.id)));
 });

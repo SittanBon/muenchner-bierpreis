@@ -5,42 +5,37 @@ import { useToast } from '../hooks/useToast';
 import MiniMapPreview from './MiniMapPreview';
 import BrandCombobox from './BrandCombobox';
 import { parsePrice, formatEuro, pricePlaceholder } from '../utils/price';
-
-const TYPES = ['beer_garden', 'beer_hall', 'bar', 'restaurant'];
-const NEIGHBOURHOODS = [
-  { id: 'altstadt', de: 'Altstadt-Lehel', en: 'Old Town & Lehel' },
-  { id: 'maxvorstadt', de: 'Maxvorstadt', en: 'Maxvorstadt' },
-  { id: 'schwabing_west', de: 'Schwabing-West', en: 'Schwabing West' },
-  { id: 'schwabing_freimann', de: 'Schwabing-Freimann', en: 'Schwabing & Freimann' },
-  { id: 'isarvorstadt', de: 'Isarvorstadt', en: 'Isarvorstadt' },
-  { id: 'schwanthalerhoehe', de: 'Schwanthalerhöhe', en: 'Schwanthalerhöhe' },
-];
+import { todayISO } from '../utils/freshness';
+import { DEFAULT_SERVING_ML, servingSizeByMl, servingLabel, wireSizeFromMl } from '../constants/servingSizes';
+import ServingSizeSelect from './ServingSizeSelect';
+import { VENUE_TYPES } from '../constants/venueTypes';
+import { neighbourhoodName } from '../utils/neighbourhoods';
 
 const MAX_BEERS = 5;
-function emptyBeer() { return { brand: '', serve_type: 'unknown', size_05: '', size_mass: '' }; }
+function emptyBeer() { return { brand: '', serve_type: 'unknown', size_05: '', size_mass: '', size_ml: DEFAULT_SERVING_ML }; }
 
 const DESCRIPTION_MAX_LENGTH = 300;
 
 function emptyForm() {
   return {
-    name: '', type: 'restaurant', address: '', neighbourhood_id: 'altstadt',
+    name: '', type: 'restaurant', address: '', neighbourhood_id: '',
     lat: '', lng: '', beers: [emptyBeer()],
     submitter_name: '', anonymous: false, about: '',
-    visit_date: new Date().toISOString().split('T')[0],
+    visit_date: todayISO(), // the Munich calendar date, like every other date in the app
     photo: null,
   };
 }
 
-export default function MissingBarModal({ allVenues, onClose, onCreated }) {
+export default function MissingBarModal({ allVenues, neighbourhoods = [], onClose, onCreated }) {
   const { t, i18n } = useTranslation();
   const showToast = useToast();
-  const de = i18n.language === 'de';
   const [step, setStep] = useState(1);
   const [query, setQuery] = useState('');
   const [searching, setSearching] = useState(false);
   const [searchError, setSearchError] = useState('');
   const [results, setResults] = useState(null);
-  const [form, setForm] = useState(emptyForm());
+  // Starts on the first neighbourhood the API lists (not a hardcoded id).
+  const [form, setForm] = useState(() => ({ ...emptyForm(), neighbourhood_id: neighbourhoods[0]?.id || '' }));
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState('');
   const [success, setSuccess] = useState(false);
@@ -130,14 +125,16 @@ export default function MissingBarModal({ allVenues, onClose, onCreated }) {
     const beer1 = form.beers[0];
     fd.append('beer_brand', beer1.brand.trim());
     fd.append('size_05', parsePrice(beer1.size_05));
+    fd.append('size', wireSizeFromMl(beer1.size_ml));
     fd.append('serve_type', beer1.serve_type);
-    const mass = parsePrice(beer1.size_mass);
+    const mass = beer1.size_ml === 1000 ? null : parsePrice(beer1.size_mass);
     if (mass != null) fd.append('size_mass', mass);
 
     const extraBeers = cleanExtraBeers().map((b) => ({
       brand: b.brand.trim(),
       size_05: parsePrice(b.size_05),
-      size_mass: parsePrice(b.size_mass),
+      size: wireSizeFromMl(b.size_ml),
+      size_mass: b.size_ml === 1000 ? null : parsePrice(b.size_mass),
       serve_type: b.serve_type,
     }));
     if (extraBeers.length) fd.append('extra_beers', JSON.stringify(extraBeers));
@@ -161,11 +158,11 @@ export default function MissingBarModal({ allVenues, onClose, onCreated }) {
     setSubmitting(false);
   };
 
+  const massSize = servingSizeByMl(1000);
+  const massName = i18n.language === 'de' ? massSize.name_de : massSize.name_en;
   const allBeersForSummary = [form.beers[0], ...cleanExtraBeers()];
   const typeLabel = t(`filters.types.${form.type}`);
-  const hoodLabel = de
-    ? NEIGHBOURHOODS.find((n) => n.id === form.neighbourhood_id)?.de
-    : NEIGHBOURHOODS.find((n) => n.id === form.neighbourhood_id)?.en;
+  const hoodLabel = neighbourhoodName(neighbourhoods.find((n) => n.id === form.neighbourhood_id), i18n.language);
 
   return (
     <div className="modal-overlay" onClick={onClose}>
@@ -247,7 +244,7 @@ export default function MissingBarModal({ allVenues, onClose, onCreated }) {
                   <div className="sf-field">
                     <label>{t('filters.type')}</label>
                     <select value={form.type} onChange={(e) => set('type', e.target.value)}>
-                      {TYPES.map((ty) => <option key={ty} value={ty}>{t(`filters.types.${ty}`)}</option>)}
+                      {VENUE_TYPES.map((ty) => <option key={ty} value={ty}>{t(`filters.types.${ty}`)}</option>)}
                     </select>
                   </div>
                   <div className="sf-field">
@@ -257,7 +254,7 @@ export default function MissingBarModal({ allVenues, onClose, onCreated }) {
                   <div className="sf-field">
                     <label>{t('filters.neighbourhood')}</label>
                     <select value={form.neighbourhood_id} onChange={(e) => set('neighbourhood_id', e.target.value)}>
-                      {NEIGHBOURHOODS.map((n) => <option key={n.id} value={n.id}>{de ? n.de : n.en}</option>)}
+                      {neighbourhoods.map((n) => <option key={n.id} value={n.id}>{neighbourhoodName(n, i18n.language)}</option>)}
                     </select>
                   </div>
                 </div>
@@ -286,14 +283,20 @@ export default function MissingBarModal({ allVenues, onClose, onCreated }) {
                     </div>
                     <div className="sf-row">
                       <div className="sf-field half">
-                        <label>{t('venue.price05')}</label>
+                        <label>{t('submission.price')}</label>
                         <input value={b.size_05} onChange={(e) => setBeerField(i, 'size_05', e.target.value)} inputMode="decimal" placeholder={pricePlaceholder(i18n.language)} />
                       </div>
                       <div className="sf-field half">
-                        <label>{t('missingBar.priceMassOptional')}</label>
-                        <input value={b.size_mass} onChange={(e) => setBeerField(i, 'size_mass', e.target.value)} inputMode="decimal" placeholder={pricePlaceholder(i18n.language)} />
+                        <label>{t('submission.size')}</label>
+                        <ServingSizeSelect value={b.size_ml} onChange={(v) => setBeerField(i, 'size_ml', Number(v))} />
                       </div>
                     </div>
+                    {b.size_ml !== 1000 && (
+                      <div className="sf-field">
+                        <label>{t('missingBar.priceMassOptional', { name: massName, size: servingLabel(1000, i18n.language) })}</label>
+                        <input value={b.size_mass} onChange={(e) => setBeerField(i, 'size_mass', e.target.value)} inputMode="decimal" placeholder={pricePlaceholder(i18n.language)} />
+                      </div>
+                    )}
                     {i > 0 && (
                       <button type="button" className="mb-remove-beer" onClick={() => removeBeerRow(i)}>
                         ✕ {t('missingBar.removeBeer')}
@@ -361,10 +364,10 @@ export default function MissingBarModal({ allVenues, onClose, onCreated }) {
                   {form.address && <div className="mb-summary-row">📍 {form.address}</div>}
                   {allBeersForSummary.map((b, i) => {
                     const p05 = parsePrice(b.size_05);
-                    const pMass = parsePrice(b.size_mass);
+                    const pMass = b.size_ml === 1000 ? null : parsePrice(b.size_mass);
                     return (
                       <div key={i} className="mb-summary-row">
-                        🍺 {b.brand} — {formatEuro(p05, i18n.language)}{pMass != null ? ` / ${formatEuro(pMass, i18n.language)} (Maß)` : ''}
+                        🍺 {b.brand} — {formatEuro(p05, i18n.language)} ({servingLabel(b.size_ml, i18n.language)}){pMass != null ? ` / ${formatEuro(pMass, i18n.language)} (${massName})` : ''}
                         {' · '}{b.serve_type === 'unknown' ? t('serveType.unknownFull') : t(`serveType.${b.serve_type}`)}
                       </div>
                     );

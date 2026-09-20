@@ -36,10 +36,12 @@ function isValidVolume(ml) {
   return Number.isInteger(ml) && VALID_VOLUMES_ML.includes(ml);
 }
 
-// 500 -> "0.5L" (en) / "0,5L" (de); 1000 -> "1L"; unknown -> null.
+// 500 -> "0.50L" (en) / "0,50L" (de); 1000 -> "1.00L"; unknown -> null.
+// Same labels as SERVING_SIZES in frontend/src/constants/servingSizes.js
+// (the parity test compares them).
 function formatVolume(ml, lang) {
   if (!isValidVolume(ml)) return null;
-  const s = `${ml / 1000}L`;
+  const s = `${(ml / 1000).toFixed(2)}L`;
   return lang === 'de' ? s.replace('.', ',') : s;
 }
 
@@ -65,7 +67,12 @@ function normalizePrice(actualPrice, volumeMl) {
   const price = Number(actualPrice);
   const volume = Number(volumeMl);
   if (!Number.isFinite(price) || !Number.isFinite(volume) || price <= 0 || volume <= 0) return null;
-  return Math.round((price / volume * REFERENCE_VOLUME_ML) * 100) / 100;
+  // Multiply BEFORE dividing and round on a 12-significant-digit value: the other
+  // order (price / volume × 500) turns €2.90 @ 400 ml into 3.6249999… and rounds
+  // it DOWN to €3.62, while the true half-cent value €3.625 rounds up to €3.63 —
+  // which is what the SQL version of this formula gives. Cents are exact here.
+  const cents = Math.round(Number((price * REFERENCE_VOLUME_ML / volume * 100).toPrecision(12)));
+  return cents / 100;
 }
 
 // "€4,80" (de) / "€4.80" (en). null/NaN -> "—" so callers need no fallback.

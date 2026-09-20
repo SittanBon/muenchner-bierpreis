@@ -139,8 +139,8 @@ export default function ActivityLog({ token, onSelectVenue }) {
           type="text" placeholder={t('admin.logs.filterVenue')}
           value={filters.venue} onChange={(e) => setFilter('venue', e.target.value)}
         />
-        <input type="date" value={filters.from} onChange={(e) => setFilter('from', e.target.value)} aria-label="from" />
-        <input type="date" value={filters.to} onChange={(e) => setFilter('to', e.target.value)} aria-label="to" />
+        <input type="date" value={filters.from} onChange={(e) => setFilter('from', e.target.value)} aria-label={t('admin.logs.dateFrom')} />
+        <input type="date" value={filters.to} onChange={(e) => setFilter('to', e.target.value)} aria-label={t('admin.logs.dateTo')} />
         <button className="log-clear-btn" onClick={clearFilters} disabled={!filtersActive}>
           {t('admin.logs.clearFilters')}
         </button>

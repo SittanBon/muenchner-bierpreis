@@ -2,7 +2,8 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { submitReport } from '../hooks/useApi';
 import { parsePrice } from '../utils/price';
-import { SERVING_SIZES, formatVolume } from '../utils/priceUtils';
+import { DEFAULT_SERVING_ML, wireSizeFromMl } from '../constants/servingSizes';
+import ServingSizeSelect from './ServingSizeSelect';
 import { useToast } from '../hooks/useToast';
 import BrandCombobox from './BrandCombobox';
 
@@ -28,14 +29,14 @@ const TOPICS = [
 // incorrect info") with one funnel, all landing in the same admin queue
 // labelled by `report_type`.
 export default function ReportForm({ venueId, venueName, onSuccess, onCancel }) {
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
   const showToast = useToast();
   const [topic, setTopic] = useState(null);
   // Only meaningful while topic === 'other_info' — null shows the sub-menu
   // ("something else is wrong" vs "suggest a description") before either form.
   const [otherSubtopic, setOtherSubtopic] = useState(null);
   const [form, setForm] = useState({
-    beer_brand: '', size: '0.5L', price: '', serve_type: 'unknown',
+    beer_brand: '', size_ml: DEFAULT_SERVING_ML, price: '', serve_type: 'unknown',
     visit_date: new Date().toISOString().split('T')[0],
     submitter_name: '', anonymous: false, note: '',
   });
@@ -76,7 +77,7 @@ export default function ReportForm({ venueId, venueName, onSuccess, onCancel }) 
       setError(t('report.errBrandPrice'));
       return;
     }
-    submit({ beer_brand: resolvedBrand, size: form.size, price, serve_type: form.serve_type, visit_date: form.visit_date });
+    submit({ beer_brand: resolvedBrand, size: wireSizeFromMl(form.size_ml), price, serve_type: form.serve_type, visit_date: form.visit_date });
   };
 
   const submitClosed = () => submit({});
@@ -141,13 +142,7 @@ export default function ReportForm({ venueId, venueName, onSuccess, onCancel }) 
           <div className="sf-row">
             <div className="sf-field half">
               <label>{t('submission.size')}</label>
-              <select value={form.size} onChange={(e) => set('size', e.target.value)}>
-                {SERVING_SIZES.map(({ size, ml }) => (
-                  <option key={size} value={size}>
-                    {formatVolume(ml, i18n.language)}{ml === 500 ? ' (Halbe)' : ml === 1000 ? ' (Maß)' : ''}
-                  </option>
-                ))}
-              </select>
+              <ServingSizeSelect value={form.size_ml} onChange={(v) => set('size_ml', Number(v))} />
             </div>
             <div className="sf-field half">
               <label>{t('submission.price')}</label>

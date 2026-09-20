@@ -5,17 +5,54 @@ import {
   adminDeleteVenue, adminAddBeer, adminDeleteBeer,
 } from '../hooks/useApi';
 import { parsePrice, formatEuro, pricePlaceholder } from '../utils/price';
+import { formatVolume } from '../utils/priceUtils';
 import { useToast } from '../hooks/useToast';
 import BrandCombobox from './BrandCombobox';
 import BeerPriceEditor from './BeerPriceEditor';
 import { venueMatchesQuery } from '../utils/adminSearch';
 import { flagSeverity } from '../utils/dataQualityFlags';
+import { DEFAULT_SERVING_ML, servingLabel } from '../constants/servingSizes';
+import ServingSizeSelect from './ServingSizeSelect';
+import FreshnessLight from './FreshnessLight';
+import { VENUE_TYPES } from '../constants/venueTypes';
+import { neighbourhoodName } from '../utils/neighbourhoods';
 
-const TYPES = ['beer_garden', 'beer_hall', 'bar', 'restaurant'];
 const SERVE_TYPES = ['tap', 'bottle', 'can', 'unknown'];
 const SERVE_EMOJI = { tap: '🍺', bottle: '🍾', can: '🥫', unknown: '❓' };
 
-function emptyBeer() { return { brand: '', size_05: '', size_mass: '', serve_type: 'unknown' }; }
+function emptyBeer() { return { brand: '', size_05: '', size_mass: '', serve_type: 'unknown', serving_volume_ml: String(DEFAULT_SERVING_ML) }; }
+
+// Price + serving size (+ the optional 1 L "Maß" price) for one beer row — shared
+// by the add-venue form and the add-beer form so both offer the same sizes.
+// A price is only meaningful with its size, so the size is chosen here, not
+// assumed; the separate Maß price is hidden when the headline size is already 1 L.
+function BeerPriceInputs({ value, onField }) {
+  const { t, i18n } = useTranslation();
+  return (
+    <>
+      <div className="vm-price-field">
+        <span className="vm-price-field-label">{t('admin.venues.priceLabel')}</span>
+        <input
+          className="vm-price-input" placeholder={pricePlaceholder(i18n.language)} inputMode="decimal"
+          value={value.size_05} onChange={(e) => onField('size_05', e.target.value)}
+        />
+      </div>
+      <ServingSizeSelect
+        className="vm-serve-select" value={value.serving_volume_ml} aria-label={t('admin.price.size')}
+        onChange={(v) => onField('serving_volume_ml', v)}
+      />
+      {Number(value.serving_volume_ml) !== 1000 && (
+        <div className="vm-price-field">
+          <span className="vm-price-field-label">{servingLabel(1000, i18n.language)}</span>
+          <input
+            className="vm-price-input" placeholder={pricePlaceholder(i18n.language)} inputMode="decimal"
+            value={value.size_mass} onChange={(e) => onField('size_mass', e.target.value)}
+          />
+        </div>
+      )}
+    </>
+  );
+}
 
 function ServeTypeSelect({ value, onChange, id }) {
   const { t } = useTranslation();
@@ -69,7 +106,11 @@ function AddVenueForm({ token, neighbourhoods, onCreated, onCancel }) {
     // Prices may be typed with a comma (German) or dot (English) decimal.
     const cleanBeers = beers
       .filter((b) => b.brand && b.size_05)
-      .map((b) => ({ brand: b.brand, size_05: parsePrice(b.size_05), size_mass: parsePrice(b.size_mass), serve_type: b.serve_type }));
+      .map((b) => ({
+        brand: b.brand, size_05: parsePrice(b.size_05), serve_type: b.serve_type,
+        serving_volume_ml: Number(b.serving_volume_ml),
+        size_mass: Number(b.serving_volume_ml) === 1000 ? null : parsePrice(b.size_mass),
+      }));
     if (cleanBeers.length === 0 || cleanBeers.some((b) => b.size_05 == null)) {
       setError(t('admin.venues.errBeer'));
       return;
@@ -101,13 +142,13 @@ function AddVenueForm({ token, neighbourhoods, onCreated, onCancel }) {
         <div className="sf-field">
           <label>{t('filters.type')}</label>
           <select value={form.type} onChange={(e) => set('type', e.target.value)}>
-            {TYPES.map((ty) => <option key={ty} value={ty}>{t(`filters.types.${ty}`)}</option>)}
+            {VENUE_TYPES.map((ty) => <option key={ty} value={ty}>{t(`filters.types.${ty}`)}</option>)}
           </select>
         </div>
         <div className="sf-field">
           <label>{t('filters.neighbourhood')}</label>
           <select value={form.neighbourhood_id} onChange={(e) => set('neighbourhood_id', e.target.value)}>
-            {neighbourhoods.map((n) => <option key={n.id} value={n.id}>{n.name_de}</option>)}
+            {neighbourhoods.map((n) => <option key={n.id} value={n.id}>{neighbourhoodName(n, i18n.language)}</option>)}
           </select>
         </div>
         <div className="sf-field">
@@ -136,20 +177,7 @@ function AddVenueForm({ token, neighbourhoods, onCreated, onCancel }) {
             id={`add-venue-beer-${i}`}
             exclude={beers.filter((_, idx) => idx !== i).map((x) => x.brand).filter(Boolean)}
           />
-          <div className="vm-price-field">
-            <span className="vm-price-field-label">0,5L</span>
-            <input
-              className="vm-price-input" placeholder={pricePlaceholder(i18n.language)} inputMode="decimal"
-              value={b.size_05} onChange={(e) => setBeer(i, 'size_05', e.target.value)}
-            />
-          </div>
-          <div className="vm-price-field">
-            <span className="vm-price-field-label">1L</span>
-            <input
-              className="vm-price-input" placeholder={pricePlaceholder(i18n.language)} inputMode="decimal"
-              value={b.size_mass} onChange={(e) => setBeer(i, 'size_mass', e.target.value)}
-            />
-          </div>
+          <BeerPriceInputs value={b} onField={(f, v) => setBeer(i, f, v)} />
           <ServeTypeSelect value={b.serve_type} onChange={(v) => setBeer(i, 'serve_type', v)} id={`add-venue-serve-${i}`} />
           {beers.length > 1 && (
             <button type="button" className="vm-remove-beer" onClick={() => removeBeerRow(i)}>✕</button>
@@ -175,7 +203,7 @@ function AddVenueForm({ token, neighbourhoods, onCreated, onCancel }) {
 // price/brand editor below doesn't cover. Its own Save/Discard so editing a
 // typo doesn't accidentally touch anything else.
 function VenueDetailsForm({ token, venue, neighbourhoods, onUpdated }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const showToast = useToast();
   const [details, setDetails] = useState(() => detailsFromVenue(venue));
   const [saving, setSaving] = useState(false);
@@ -231,13 +259,13 @@ function VenueDetailsForm({ token, venue, neighbourhoods, onUpdated }) {
         <div className="sf-field">
           <label>{t('filters.type')}</label>
           <select value={details.type} onChange={(e) => set('type', e.target.value)}>
-            {TYPES.map((ty) => <option key={ty} value={ty}>{t(`filters.types.${ty}`)}</option>)}
+            {VENUE_TYPES.map((ty) => <option key={ty} value={ty}>{t(`filters.types.${ty}`)}</option>)}
           </select>
         </div>
         <div className="sf-field">
           <label>{t('filters.neighbourhood')}</label>
           <select value={details.neighbourhood_id} onChange={(e) => set('neighbourhood_id', e.target.value)}>
-            {neighbourhoods.map((n) => <option key={n.id} value={n.id}>{n.name_de}</option>)}
+            {neighbourhoods.map((n) => <option key={n.id} value={n.id}>{neighbourhoodName(n, i18n.language)}</option>)}
           </select>
         </div>
         <div className="sf-field">
@@ -299,7 +327,7 @@ function VenueDetailsForm({ token, venue, neighbourhoods, onUpdated }) {
 }
 
 function EditVenueForm({ token, venue, neighbourhoods, onUpdated, onDeleted, onCancel }) {
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
   const showToast = useToast();
   const [deletingId, setDeletingId] = useState(null);
   const [error, setError] = useState('');
@@ -354,7 +382,8 @@ function EditVenueForm({ token, venue, neighbourhoods, onUpdated, onDeleted, onC
       const updated = await adminAddBeer(token, venue.id, {
         brand: newBeer.brand,
         size_05,
-        size_mass: parsePrice(newBeer.size_mass),
+        serving_volume_ml: Number(newBeer.serving_volume_ml),
+        size_mass: Number(newBeer.serving_volume_ml) === 1000 ? null : parsePrice(newBeer.size_mass),
         serve_type: newBeer.serve_type,
       });
       onUpdated(updated);
@@ -398,20 +427,7 @@ function EditVenueForm({ token, venue, neighbourhoods, onUpdated, onDeleted, onC
           id={`edit-venue-new-beer-${venue.id}`}
           exclude={existingBrands}
         />
-        <div className="vm-price-field">
-          <span className="vm-price-field-label">0,5L</span>
-          <input
-            className="vm-price-input" placeholder={pricePlaceholder(i18n.language)} inputMode="decimal"
-            value={newBeer.size_05} onChange={(e) => setNewBeer((b) => ({ ...b, size_05: e.target.value }))}
-          />
-        </div>
-        <div className="vm-price-field">
-          <span className="vm-price-field-label">1L</span>
-          <input
-            className="vm-price-input" placeholder={pricePlaceholder(i18n.language)} inputMode="decimal"
-            value={newBeer.size_mass} onChange={(e) => setNewBeer((b) => ({ ...b, size_mass: e.target.value }))}
-          />
-        </div>
+        <BeerPriceInputs value={newBeer} onField={(f, v) => setNewBeer((b) => ({ ...b, [f]: v }))} />
         <ServeTypeSelect
           value={newBeer.serve_type}
           onChange={(v) => setNewBeer((b) => ({ ...b, serve_type: v }))}
@@ -520,7 +536,7 @@ export default function VenueManager({ token, initialQuery = '', initialEditVenu
                   <tr className={v.active === false ? 'vm-row-inactive' : ''}>
                     <td>{v.name}</td>
                     <td>
-                      {v.neighbourhood_name_de}
+                      {i18n.language === 'de' ? v.neighbourhood_name_de : v.neighbourhood_name_en}
                       {v.outside_modelled_area && (
                         <span className="vm-approx-badge" title={t('admin.venues.outsideModelledAreaHint')}>
                           {t('admin.venues.outsideModelledArea')}
@@ -532,7 +548,16 @@ export default function VenueManager({ token, initialQuery = '', initialEditVenu
                         {v.beers.map((b) => <span key={b.id} className="vm-tag">{b.brand}</span>)}
                       </div>
                     </td>
-                    <td>{formatEuro(v.beers[0]?.size_05, i18n.language)}</td>
+                    <td>
+                      {/* The same price/size/freshness the public card shows, from the same helpers */}
+                      {v.beers[0] ? (
+                        <span className="vm-price-cell">
+                          {formatEuro(v.beers[0].size_05, i18n.language)}
+                          <small className="vm-price-size">{formatVolume(v.beers[0].serving_volume_ml, i18n.language) || t('price.sizeUnknown')}</small>
+                          <FreshnessLight beer={v.beers[0]} compact />
+                        </span>
+                      ) : '—'}
+                    </td>
                     <td>
                       {v.active === false && <span className="vm-inactive-badge">{t('admin.venues.inactive')}</span>}
                       {/* Open data-quality flags — text badges (never colour alone); click one to filter the list by it */}

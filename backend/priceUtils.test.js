@@ -20,6 +20,12 @@ const daysAgo = (n) => new Date(Date.UTC(2026, 8, 20 - n)).toISOString().slice(0
 describe('normalizePrice — per-0.5 L comparison price', () => {
   test('€3.50 for 330 ml -> €5.30', () => assert.equal(normalizePrice(3.5, 330), 5.3));
   test('€4.20 for 500 ml -> €4.20 (already 0.5 L)', () => assert.equal(normalizePrice(4.2, 500), 4.2));
+  test('a true half-cent rounds UP, not down through floating-point noise (€2.90 @ 400 ml = 3.625 -> €3.63)', () => {
+    assert.equal(normalizePrice(2.9, 400), 3.63);   // price / volume × 500 used to give 3.6249999… -> 3.62
+    assert.equal(normalizePrice(9.15, 1000), 4.58);
+    assert.equal(normalizePrice(1.15, 1000), 0.58);
+    assert.equal(normalizePrice(3.3, 330), 5);      // and exact values are unaffected
+  });
   test('null price -> null', () => assert.equal(normalizePrice(null, 500), null));
   test('undefined price -> null', () => assert.equal(normalizePrice(undefined, 500), null));
   test('zero volume -> null', () => assert.equal(normalizePrice(4.2, 0), null));
@@ -55,11 +61,11 @@ describe('formatPrice / formatVolume', () => {
     assert.equal(formatPrice(NaN, 'en'), '—');
   });
   test('volumes', () => {
-    assert.equal(formatVolume(500, 'en'), '0.5L');
-    assert.equal(formatVolume(500, 'de'), '0,5L');
+    assert.equal(formatVolume(500, 'en'), '0.50L');
+    assert.equal(formatVolume(500, 'de'), '0,50L');
     assert.equal(formatVolume(330, 'de'), '0,33L');
     assert.equal(formatVolume(250, 'en'), '0.25L');
-    assert.equal(formatVolume(1000, 'de'), '1L');
+    assert.equal(formatVolume(1000, 'de'), '1,00L');
   });
   test('an unsupported / unknown volume has no label', () => {
     assert.equal(formatVolume(null, 'en'), null);

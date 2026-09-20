@@ -8,6 +8,7 @@ import DataQualityPanel from './DataQualityPanel';
 import SubmissionPriceInfo from './SubmissionPriceInfo';
 import MiniMapPreview from './MiniMapPreview';
 import { formatEuro } from '../utils/price';
+import { servingSizeByWire, servingLabel } from '../constants/servingSizes';
 import { useToast } from '../hooks/useToast';
 
 const REPORT_TYPE_META = {
@@ -115,7 +116,7 @@ export default function AdminPage({ onBack }) {
   if (!token) {
     return (
       <div className="admin-login-page">
-        <button className="back-btn" onClick={onBack}>← Zurück / Back</button>
+        <button className="back-btn" onClick={onBack}>{t('admin.back')}</button>
         <div className="login-card">
           <div className="login-logo">🍺</div>
           <h2>{t('admin.login')}</h2>
@@ -138,7 +139,7 @@ export default function AdminPage({ onBack }) {
   return (
     <div className="admin-page">
       <div className="admin-header">
-        <button className="back-btn" onClick={onBack}>← Zurück</button>
+        <button className="back-btn" onClick={onBack}>{t('admin.back')}</button>
         <h2>🍺 {t('admin.dashboard')}</h2>
         <button className="logout-btn" onClick={handleLogout}>{t('admin.logout')}</button>
       </div>
@@ -209,8 +210,8 @@ export default function AdminPage({ onBack }) {
             <div key={sub.id} className={`submission-card ${outlier ? 'outlier' : ''}`}>
               <div className="sub-top">
                 <span className="report-type-badge">{meta.icon} {meta.label}</span>
-                <strong>{sub.venue_name || 'Neues Lokal'}</strong>
-                {outlier && <span className="outlier-badge">⚠️ Ausreißer</span>}
+                <strong>{sub.venue_name || t('admin.newVenueFallback')}</strong>
+                {outlier && <span className="outlier-badge">{t('admin.outlierBadge')}</span>}
               </div>
               {isPriceReport ? (
                 <>
@@ -220,9 +221,9 @@ export default function AdminPage({ onBack }) {
               ) : (
               <div className="sub-details">
                 {sub.beer_brand && <span>🍻 {sub.beer_brand}</span>}
-                {sub.size && <span>📏 {sub.size}</span>}
+                {sub.size && <span>📏 {servingLabel(servingSizeByWire(sub.size)?.ml, i18n.language) || sub.size}</span>}
                 {sub.price != null && <span>💶 {formatEuro(sub.price, i18n.language)}</span>}
-                {sub.report_type === 'new_venue' && sub.size_mass != null && <span>💶 {formatEuro(sub.size_mass, i18n.language)} (Maß)</span>}
+                {sub.report_type === 'new_venue' && sub.size_mass != null && <span>💶 {formatEuro(sub.size_mass, i18n.language)} ({servingSizeByWire('1L')[i18n.language === 'de' ? 'name_de' : 'name_en']})</span>}
                 {sub.report_type === 'new_venue' && sub.address && <span>📍 {sub.address}</span>}
                 {sub.visit_date && <span>📅 {sub.visit_date}</span>}
                 <span>👤 {sub.submitter_name}</span>

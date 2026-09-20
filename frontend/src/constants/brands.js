@@ -68,3 +68,12 @@ export const OTHER_BRAND = 'Other / Andere';
 // Flat, de-duplicated, group order preserved — for the simple cases (native
 // <select> options, substring search) that don't need the grouping.
 export const BRANDS = [...new Set(BRAND_GROUPS.flatMap((g) => g.brands))];
+
+// The fixed top-10 the Price Trends "By Brand" chart draws (every other brand is
+// bucketed into 'others' server-side). Must equal TREND_BRANDS in
+// backend/db/database.js — backend/adminApi.test.js compares it with what
+// GET /api/stats/trends returns as `brandOrder`.
+export const TREND_BRANDS = [
+  'Augustiner', 'Paulaner', 'Hofbräu München', 'Hacker-Pschorr', 'Löwenbräu',
+  'Spaten', 'Tegernseer', 'Weihenstephaner', 'Giesinger Bräu', 'Ayinger',
+];

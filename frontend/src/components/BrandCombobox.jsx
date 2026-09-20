@@ -115,7 +115,7 @@ export default function BrandCombobox({ value, onChange, placeholder, id, exclud
           <button
             type="button"
             className="brand-combobox-clear"
-            aria-label="Clear"
+            aria-label={t('brandPicker.clear')}
             onMouseDown={(e) => e.preventDefault()} // keep focus, don't blur before onClick fires
             onClick={() => { onChange(''); setOpen(true); }}
           >

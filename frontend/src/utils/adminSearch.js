@@ -1,4 +1,5 @@
 import { formatVolume } from './priceUtils';
+import { servingSizeByMl } from '../constants/servingSizes';
 import { flagSearchTerms } from './dataQualityFlags';
 
 // Admin venue search (P0 Phase 2, Task 5). One query box finds a venue by
@@ -18,9 +19,15 @@ export function normalizeText(s) {
 // Every way an admin might type one serving size.
 function sizeTerms(ml) {
   if (ml == null) return ['unknown size', 'size unknown', 'groesse unbekannt', 'größe unbekannt'];
-  const terms = [String(ml), `${ml}ml`, `${ml} ml`, formatVolume(ml, 'en'), formatVolume(ml, 'de')].filter(Boolean);
-  if (ml === 500) terms.push('halbe', 'half litre');
-  if (ml === 1000) terms.push('maß', 'mass', 'maas', 'litre');
+  const terms = [
+    String(ml), `${ml}ml`, `${ml} ml`,
+    formatVolume(ml, 'en'), formatVolume(ml, 'de'),           // "0.50L" / "0,50L"
+    `${ml / 1000}L`, `${ml / 1000}L`.replace('.', ','),       // the short forms people type: "0.5L" / "0,5L" / "1L"
+  ].filter(Boolean);
+  // The size's names come from the shared constant ("Halbe", "Half litre", "Maß"…).
+  const size = servingSizeByMl(ml);
+  if (size) terms.push(size.name_de, size.name_en);
+  if (ml === 1000) terms.push('mass', 'maas'); // ß typed without a German keyboard
   return terms;
 }
 

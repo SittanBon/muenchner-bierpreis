@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { BRAND_GROUPS } from '../constants/brands';
+import { VENUE_TYPES } from '../constants/venueTypes';
+import { neighbourhoodName } from '../utils/neighbourhoods';
 
-const TYPES = ['beer_garden', 'beer_hall', 'bar', 'restaurant'];
 const SERVE_TYPES = [
   { id: 'tap', icon: '🍺' },
   { id: 'bottle', icon: '🍾' },
@@ -15,16 +16,7 @@ const SERVE_TYPES = [
 const FILTERABLE_GROUPS = BRAND_GROUPS
   .map((g) => ({ ...g, brands: g.brands.filter((b) => b !== 'Other / Andere' && b !== 'Craft Beer (lokal)') }))
   .filter((g) => g.brands.length > 0);
-const NEIGHBOURHOODS = [
-  { id: 'altstadt', de: 'Altstadt-Lehel', en: 'Old Town & Lehel' },
-  { id: 'maxvorstadt', de: 'Maxvorstadt', en: 'Maxvorstadt' },
-  { id: 'schwabing_west', de: 'Schwabing-West', en: 'Schwabing West' },
-  { id: 'schwabing_freimann', de: 'Schwabing-Freimann', en: 'Schwabing & Freimann' },
-  { id: 'isarvorstadt', de: 'Isarvorstadt', en: 'Isarvorstadt' },
-  { id: 'schwanthalerhoehe', de: 'Schwanthalerhöhe', en: 'Schwanthalerhöhe' }
-];
-
-export default function SearchBar({ onSearch, onSearchNow, onFocus, onFilterChange, filters, onNeighbourhoodSelect, resultCount }) {
+export default function SearchBar({ onSearch, onSearchNow, onFocus, onFilterChange, filters, onNeighbourhoodSelect, resultCount, neighbourhoods = [] }) {
   const { t, i18n } = useTranslation();
   const [query, setQuery] = useState('');
   const [showFilters, setShowFilters] = useState(false);
@@ -107,7 +99,7 @@ export default function SearchBar({ onSearch, onSearchNow, onFocus, onFilterChan
           )}
           {filters.neighbourhood && (
             <span className="chip">
-              {NEIGHBOURHOODS.find(n => n.id === filters.neighbourhood)?.[i18n.language === 'de' ? 'de' : 'en']}
+              {neighbourhoodName(neighbourhoods.find(n => n.id === filters.neighbourhood), i18n.language)}
               <button onClick={() => { setFilter('neighbourhood', '__all__'); onNeighbourhoodSelect(''); }}>✕</button>
             </span>
           )}
@@ -129,7 +121,7 @@ export default function SearchBar({ onSearch, onSearchNow, onFocus, onFilterChan
               <label className="filter-label">{t('filters.type')}</label>
               <select value={filters.type || '__all__'} onChange={e => setFilter('type', e.target.value)}>
                 <option value="__all__">{t('filters.all')}</option>
-                {TYPES.map(t2 => <option key={t2} value={t2}>{t(`filters.types.${t2}`)}</option>)}
+                {VENUE_TYPES.map(t2 => <option key={t2} value={t2}>{t(`filters.types.${t2}`)}</option>)}
               </select>
             </div>
 
@@ -164,10 +156,8 @@ export default function SearchBar({ onSearch, onSearchNow, onFocus, onFilterChan
                   onNeighbourhoodSelect(e.target.value === '__all__' ? '' : e.target.value);
                 }}>
                 <option value="__all__">{t('filters.all')}</option>
-                {NEIGHBOURHOODS.map(n => (
-                  <option key={n.id} value={n.id}>
-                    {i18n.language === 'de' ? n.de : n.en}
-                  </option>
+                {neighbourhoods.map(n => (
+                  <option key={n.id} value={n.id}>{neighbourhoodName(n, i18n.language)}</option>
                 ))}
               </select>
             </div>
@@ -176,11 +166,11 @@ export default function SearchBar({ onSearch, onSearchNow, onFocus, onFilterChan
             <div className="filter-group">
               <label className="filter-label">{t('filters.priceRange')}</label>
               <div className="price-range-inputs">
-                <input type="number" placeholder="min €" step="0.10" min="3" max="9"
+                <input type="number" placeholder={t('filters.priceMin')} step="0.10" min="3" max="9"
                   value={filters.min_price || ''}
                   onChange={e => setFilter('min_price', e.target.value)} />
                 <span>–</span>
-                <input type="number" placeholder="max €" step="0.10" min="3" max="9"
+                <input type="number" placeholder={t('filters.priceMax')} step="0.10" min="3" max="9"
                   value={filters.max_price || ''}
                   onChange={e => setFilter('max_price', e.target.value)} />
               </div>

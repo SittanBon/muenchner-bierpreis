@@ -315,7 +315,7 @@ function AppContent({ navigate }) {
           <button
             className="hamburger-btn"
             onClick={() => setMobileMenuOpen((o) => !o)}
-            aria-label={mobileMenuOpen ? 'Close menu' : 'Open menu'}
+            aria-label={mobileMenuOpen ? t('app.closeMenu') : t('app.openMenu')}
             aria-expanded={mobileMenuOpen}
           >
             ☰
@@ -352,7 +352,7 @@ function AppContent({ navigate }) {
             onClick={handleSheetTap}
             onTouchStart={handleSheetTouchStart}
             onTouchEnd={handleSheetTouchEnd}
-            aria-label={sheetLevel === 'collapsed' ? 'Expand list' : 'Collapse list'}
+            aria-label={sheetLevel === 'collapsed' ? t('app.expandList') : t('app.collapseList')}
           >
             <span className="sheet-grip" />
             <span className="sheet-handle-text">
@@ -360,11 +360,12 @@ function AppContent({ navigate }) {
                 ? selectedVenue.name
                 : activeNInfo
                   ? (i18n.language === 'de' ? activeNInfo.name_de : activeNInfo.name_en)
-                  : (i18n.language === 'de' ? 'Lokale & Filter' : 'Venues & filters')}
+                  : t('app.venuesAndFilters')}
             </span>
           </button>
 
           <SearchBar
+            neighbourhoods={neighbourhoods}
             onSearch={handleSearch}
             onSearchNow={handleSearchNow}
             onFocus={() => setSheetLevel('half')}
@@ -411,13 +412,11 @@ function AppContent({ navigate }) {
                 <div className="hint-content">
                   <div className="hint-icon">👆</div>
                   <div className="hint-text">
-                    {i18n.language === 'de'
-                      ? 'Klicke auf ein Viertel auf der Karte, um die Bierlokale zu sehen.'
-                      : 'Click on a neighbourhood on the map to see its beer venues.'}
+                    {t('app.mapHint')}
                   </div>
                   <div className="all-venues-section">
                     <div className="av-title">
-                      {i18n.language === 'de' ? 'Alle Lokale' : 'All venues'}
+                      {t('app.allVenues')}
                       {` (${filteredVenues.length})`}
                       {searchQuery && ` — "${searchQuery}"`}
                     </div>
@@ -489,6 +488,7 @@ function AppContent({ navigate }) {
       {showMissingBar && (
         <MissingBarModal
           allVenues={allVenues}
+          neighbourhoods={neighbourhoods}
           onClose={() => setShowMissingBar(false)}
           onCreated={loadSnapshot}
         />

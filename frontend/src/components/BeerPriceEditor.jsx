@@ -2,10 +2,11 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { adminUpdateBeerPrice, adminVerifyBeer } from '../hooks/useApi';
 import { parsePrice, pricePlaceholder } from '../utils/price';
-import { SERVING_SIZES, SOURCE_TYPES, NOTES_MAX_LENGTH, normalizePrice, formatPrice } from '../utils/priceUtils';
+import { SOURCE_TYPES, NOTES_MAX_LENGTH, normalizePrice, formatPrice } from '../utils/priceUtils';
 import { todayISO } from '../utils/freshness';
 import { useToast } from '../hooks/useToast';
 import FreshnessLight from './FreshnessLight';
+import ServingSizeSelect from './ServingSizeSelect';
 import PriceHistoryTable from './PriceHistoryTable';
 
 const SERVE_TYPES = ['tap', 'bottle', 'can', 'unknown'];
@@ -120,10 +121,7 @@ export default function BeerPriceEditor({
 
         <div className="pe-field">
           <label htmlFor={`${id}-size`}>{t('admin.price.size')}</label>
-          <select id={`${id}-size`} className="vm-serve-select" value={volume} onChange={(e) => setVolume(e.target.value)}>
-            <option value="">{t('admin.price.sizeUnknown')}</option>
-            {SERVING_SIZES.map(({ ml }) => <option key={ml} value={ml}>{t(`admin.price.size${ml}`)}</option>)}
-          </select>
+          <ServingSizeSelect id={`${id}-size`} className="vm-serve-select" value={volume} onChange={setVolume} allowUnknown />
         </div>
 
         <div className="pe-field">

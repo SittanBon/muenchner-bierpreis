@@ -1,3 +1,17 @@
+import { servingLabel, servingSizeByMl } from '../constants/servingSizes.js';
+
+// Serving-size text in the strings below is generated from
+// constants/servingSizes.js, never typed by hand, so a comparison unit reads the
+// same ("0,50L") here as in every dropdown and price card.
+const REF_DE = servingLabel(500, 'de');   // the per-0.5 L comparison unit
+const REF_EN = servingLabel(500, 'en');
+const EX_DE = servingLabel(330, 'de');    // an example size for a placeholder
+const EX_EN = servingLabel(330, 'en');
+const MASS_DE = servingLabel(1000, 'de');
+const MASS_EN = servingLabel(1000, 'en');
+const MASS_NAME_DE = servingSizeByMl(1000).name_de;
+const MASS_NAME_EN = servingSizeByMl(1000).name_en;
+
 export const de = {
   translation: {
     nav: {
@@ -35,7 +49,9 @@ export const de = {
     },
     filters: {
       type: "Art des Lokals",
-      priceRange: "Preisbereich (0,5L)",
+      priceRange: `Preisbereich (${REF_DE})`,
+      priceMin: "ab €",
+      priceMax: "bis €",
       brand: "Biermarke",
       serveType: "Zapfart",
       neighbourhood: "Stadtteil",
@@ -49,25 +65,18 @@ export const de = {
     },
     map: {
       hover: "Hover über ein Viertel",
-      avgPrice: "Ø Preis (0,5L)",
+      avgPrice: `Ø Preis (${REF_DE})`,
       venues: "Lokale",
       noData: "Noch keine Daten",
       viewDetails: "Details ansehen",
       legend: {
-        title: "Preis pro 0,5L",
+        title: `Preis pro ${REF_DE}`,
         cheap: "Günstig",
         expensive: "Teuer"
       }
     },
     venue: {
-      type: {
-        beer_garden: "Biergarten",
-        beer_hall: "Wirtshaus",
-        bar: "Bar",
-        restaurant: "Restaurant"
-      },
-      price05: "0,5L Helles",
-      priceMass: "Maß (1L)",
+      priceMass: `${MASS_NAME_DE} (${MASS_DE})`,
       brand: "Biermarke",
       reports: "Meldungen",
       address: "Adresse",
@@ -108,7 +117,7 @@ export const de = {
     price: {
       forSize: "{{size}} Helles",
       sizeUnknown: "Größe unbekannt",
-      approxPer05: "ca. {{price}} / 0,5L"
+      approxPer05: `ca. {{price}} / ${REF_DE}`
     },
     stats: {
       cityAvg: "Ø München",
@@ -136,7 +145,17 @@ export const de = {
       allBrands: "Alle Marken",
       otherBrandPlaceholder: "Markenname eingeben"
     },
+    app: {
+      openMenu: "Menü öffnen",
+      closeMenu: "Menü schließen",
+      expandList: "Liste aufklappen",
+      collapseList: "Liste einklappen",
+      venuesAndFilters: "Lokale & Filter",
+      mapHint: "Klicke auf ein Viertel auf der Karte, um die Bierlokale zu sehen.",
+      allVenues: "Alle Lokale",
+    },
     brandPicker: {
+      clear: "Leeren",
       placeholder: "Marke suchen oder eingeben...",
       noResults: "Keine Treffer für \"{{query}}\" — als neue Marke übernehmen"
     },
@@ -171,7 +190,7 @@ export const de = {
       mightExist: "Dieses Lokal könnte schon auf der Karte sein!",
       didYouMean: "Meintest du: {{name}}?",
       addManually: "Nicht gefunden? Manuell hinzufügen",
-      priceMassOptional: "Preis Maß (1L, optional)",
+      priceMassOptional: "Preis {{name}} ({{size}}, optional)",
       aboutLabel: "Erzähl uns von diesem Ort (optional)",
       aboutPlaceholder: "z.B. Gemütliche Studentenkneipe mit günstigem Augustiner vom Fass...",
       photoOptional: "Foto (optional)",
@@ -179,8 +198,8 @@ export const de = {
       errName: "Name ist erforderlich",
       errNeighbourhood: "Stadtteil ist erforderlich",
       errBrand: "Biermarke ist erforderlich",
-      errPrice: "Preis (0,5L) ist erforderlich",
-      errExtraBeer: "Jedes zusätzliche Bier braucht eine Marke und einen gültigen Preis (0,5L) — oder entferne die leere Zeile.",
+      errPrice: `Preis (${REF_DE}) ist erforderlich`,
+      errExtraBeer: `Jedes zusätzliche Bier braucht eine Marke und einen gültigen Preis (${REF_DE}) — oder entferne die leere Zeile.`,
       removeBeer: "Entfernen",
       noCoords: "Keine Koordinaten gesetzt — unser Team prüft die Adresse.",
       success: "Danke! Wir prüfen deine Meldung innerhalb von 48 Stunden."
@@ -191,6 +210,9 @@ export const de = {
       password: "Passwort",
       signin: "Anmelden",
       dashboard: "Dashboard",
+      back: "← Zurück",
+      newVenueFallback: "Neues Lokal",
+      outlierBadge: "⚠️ Ausreißer",
       pending: "Ausstehend",
       approved: "Genehmigt",
       rejected: "Abgelehnt",
@@ -218,10 +240,11 @@ export const de = {
         addAnotherBeer: "Weiteres Bier hinzufügen",
         errName: "Name und Stadtteil sind erforderlich",
         errBeer: "Mindestens eine Marke mit Preis ist erforderlich",
+        priceLabel: "Preis",
         errPrice: "Ungültiger Preis",
         verify: "✓ Preis bestätigen",
         verifyHint: "Bestätigt, dass der Preis unverändert stimmt — ändert weder den Preis noch das Änderungsdatum.",
-        searchPlaceholder: "Name, Adresse, Marke, Stadtteil, Hinweis (z. B. „veraltet“) oder Größe (0,33L)...",
+        searchPlaceholder: `Name, Adresse, Marke, Stadtteil, Hinweis (z. B. „veraltet“) oder Größe (${EX_DE})...`,
         deleteBeer: "Löschen",
         confirmDelete: "{{brand}} wirklich löschen?",
         deleteVenue: "Lokal löschen",
@@ -305,17 +328,17 @@ export const de = {
           INVALID_PRICE: "Ungültiger Preis",
           VENUE_WITHOUT_ACTIVE_PRICE: "Kein aktiver Preis",
           DUPLICATE_VENUE: "Doppeltes Lokal",
-          EXTREME_NORMALIZED_PRICE: "Extremer Preis / 0,5L"
+          EXTREME_NORMALIZED_PRICE: `Extremer Preis / ${REF_DE}`
         },
         desc: {
-          MISSING_SERVING_SIZE: "Serviergröße unbekannt — kein fairer 0,5L-Vergleich möglich.",
+          MISSING_SERVING_SIZE: `Serviergröße unbekannt — kein fairer ${REF_DE}-Vergleich möglich.`,
           MISSING_PRICE: "Kein verwendbarer Preis.",
           MISSING_OBSERVATION_DATE: "Weder beobachtet noch bestätigt — Aktualität unbekannt.",
           STALE_PRICE: "Zuletzt vor mehr als 90 Tagen beobachtet oder bestätigt.",
           INVALID_PRICE: "Außerhalb von €0,50–€20,00.",
           VENUE_WITHOUT_ACTIVE_PRICE: "Dieses Lokal hat kein Bier mit verwendbarem Preis.",
           DUPLICATE_VENUE: "Gleicher Name und Stadtteil wie: {{names}}.",
-          EXTREME_NORMALIZED_PRICE: "Ergibt {{price}} pro 0,5L (über €15,00)."
+          EXTREME_NORMALIZED_PRICE: `Ergibt {{price}} pro ${REF_DE} (über €15,00).`
         }
       },
       price: {
@@ -323,12 +346,7 @@ export const de = {
         price: "Tatsächlicher Preis (€)",
         size: "Serviergröße",
         sizeUnknown: "— unbekannt —",
-        size250: "250 ml",
-        size330: "330 ml",
-        size400: "400 ml",
-        size500: "500 ml (0,5L)",
-        size1000: "1000 ml (Maß)",
-        normalized: "≈ Vergleichspreis pro 0,5L",
+        normalized: `≈ Vergleichspreis pro ${REF_DE}`,
         normalizedUnknown: "— (Serviergröße unbekannt: kein Vergleich)",
         normalizedHint: "Nur ein Vergleichswert, berechnet — nicht, was der Gast zahlt.",
         observed: "Preis beobachtet am",
@@ -349,7 +367,7 @@ export const de = {
         date: "Datum",
         price: "Preis",
         size: "Größe",
-        normalized: "≈ 0,5L",
+        normalized: `≈ ${REF_DE}`,
         source: "Quelle",
         by: "Von",
         status: "Status",
@@ -376,7 +394,7 @@ export const de = {
         noCurrent: "Kein aktueller Preis für dieses Bier (neues Bier)",
         invalidSize: "⚠ Unbekannte Serviergröße — beim Freigeben wird der Preis NICHT übernommen.",
         approveHint: "Freigeben speichert dies als Beobachtung am Besuchsdatum — der Preis gilt damit nicht als bestätigt.",
-        per05: "≈ {{price}} / 0,5L"
+        per05: `≈ {{price}} / ${REF_DE}`
       },
       logs: {
         tab: "Aktivitätsprotokoll",
@@ -384,6 +402,8 @@ export const de = {
         allActions: "Alle Aktionen",
         filterVenue: "Lokal suchen",
         clearFilters: "Filter zurücksetzen",
+        dateFrom: "Von",
+        dateTo: "Bis",
         exportCsv: "📥 CSV exportieren",
         columnTime: "Zeitpunkt",
         columnAction: "Aktion",
@@ -432,12 +452,13 @@ export const de = {
       button: "Preistrends",
       pillLabel: "Trends",
       title: "Preistrends",
-      subtitle: "Ø Preis für 0,5L Helles pro Viertel, über Zeit",
+      subtitle: `Ø Preis für ${REF_DE} Helles pro Viertel, über Zeit`,
       error: "Trends konnten nicht geladen werden.",
       noData: "Noch keine Trenddaten vorhanden.",
       byArea: "Nach Viertel",
       byBrand: "Nach Marke",
       others: "Andere",
+      cityAvg: "München Ø",
       noHistoryTooltip: "Basiert auf dem aktuellen Durchschnitt — noch keine historischen Daten",
       dataPoints: "{{count}} Meldungen"
     },
@@ -538,7 +559,9 @@ export const en = {
     },
     filters: {
       type: "Venue type",
-      priceRange: "Price range (0.5L)",
+      priceRange: `Price range (${REF_EN})`,
+      priceMin: "min €",
+      priceMax: "max €",
       brand: "Beer brand",
       serveType: "Serve Type",
       neighbourhood: "Neighbourhood",
@@ -552,25 +575,18 @@ export const en = {
     },
     map: {
       hover: "Hover over a neighbourhood",
-      avgPrice: "Avg price (0.5L)",
+      avgPrice: `Avg price (${REF_EN})`,
       venues: "venues",
       noData: "No data yet",
       viewDetails: "View details",
       legend: {
-        title: "Price per 0.5L",
+        title: `Price per ${REF_EN}`,
         cheap: "Cheap",
         expensive: "Expensive"
       }
     },
     venue: {
-      type: {
-        beer_garden: "Beer Garden",
-        beer_hall: "Beer Hall",
-        bar: "Bar",
-        restaurant: "Restaurant"
-      },
-      price05: "0.5L Helles",
-      priceMass: "Maß (1L)",
+      priceMass: `${MASS_NAME_EN} (${MASS_EN})`,
       brand: "Beer brand",
       reports: "reports",
       address: "Address",
@@ -606,7 +622,7 @@ export const en = {
     price: {
       forSize: "{{size}} Helles",
       sizeUnknown: "Size unknown",
-      approxPer05: "approx. {{price}} / 0.5L"
+      approxPer05: `approx. {{price}} / ${REF_EN}`
     },
     stats: {
       cityAvg: "Munich avg",
@@ -634,7 +650,17 @@ export const en = {
       allBrands: "All brands",
       otherBrandPlaceholder: "Enter brand name"
     },
+    app: {
+      openMenu: "Open menu",
+      closeMenu: "Close menu",
+      expandList: "Expand list",
+      collapseList: "Collapse list",
+      venuesAndFilters: "Venues & filters",
+      mapHint: "Click on a neighbourhood on the map to see its beer venues.",
+      allVenues: "All venues",
+    },
     brandPicker: {
+      clear: "Clear",
       placeholder: "Search or type a brand...",
       noResults: "No results for \"{{query}}\" — use as a new brand"
     },
@@ -669,7 +695,7 @@ export const en = {
       mightExist: "This venue might already be on the map!",
       didYouMean: "Did you mean: {{name}}?",
       addManually: "Not finding it? Add manually",
-      priceMassOptional: "Price Maß (1L, optional)",
+      priceMassOptional: "Price {{name}} ({{size}}, optional)",
       aboutLabel: "Tell us about this place (optional)",
       aboutPlaceholder: "e.g. Cosy student bar with cheap Augustiner on tap...",
       photoOptional: "Photo (optional)",
@@ -677,8 +703,8 @@ export const en = {
       errName: "Name is required",
       errNeighbourhood: "Neighbourhood is required",
       errBrand: "Beer brand is required",
-      errPrice: "Price (0.5L) is required",
-      errExtraBeer: "Each additional beer needs a brand and a valid 0.5L price — or remove the empty row.",
+      errPrice: `Price (${REF_EN}) is required`,
+      errExtraBeer: `Each additional beer needs a brand and a valid ${REF_EN} price — or remove the empty row.`,
       removeBeer: "Remove",
       noCoords: "No coordinates set — our team will verify the address.",
       success: "Thanks! We'll review your submission within 48 hours."
@@ -689,6 +715,9 @@ export const en = {
       password: "Password",
       signin: "Sign in",
       dashboard: "Dashboard",
+      back: "← Back",
+      newVenueFallback: "New venue",
+      outlierBadge: "⚠️ Outlier",
       pending: "Pending",
       approved: "Approved",
       rejected: "Rejected",
@@ -716,10 +745,11 @@ export const en = {
         addAnotherBeer: "Add another beer",
         errName: "Name and neighbourhood are required",
         errBeer: "At least one brand with a price is required",
+        priceLabel: "Price",
         errPrice: "Invalid price",
         verify: "✓ Verify price",
         verifyHint: "Confirms the price is still correct — changes neither the price nor the modified date.",
-        searchPlaceholder: "Name, address, brand, neighbourhood, flag (e.g. “stale”) or size (0.33L)...",
+        searchPlaceholder: `Name, address, brand, neighbourhood, flag (e.g. “stale”) or size (${EX_EN})...`,
         deleteBeer: "Delete",
         confirmDelete: "Really delete {{brand}}?",
         deleteVenue: "Delete venue",
@@ -803,17 +833,17 @@ export const en = {
           INVALID_PRICE: "Invalid price",
           VENUE_WITHOUT_ACTIVE_PRICE: "No active price",
           DUPLICATE_VENUE: "Duplicate venue",
-          EXTREME_NORMALIZED_PRICE: "Extreme price / 0.5L"
+          EXTREME_NORMALIZED_PRICE: `Extreme price / ${REF_EN}`
         },
         desc: {
-          MISSING_SERVING_SIZE: "Serving size unknown — no fair 0.5L comparison possible.",
+          MISSING_SERVING_SIZE: `Serving size unknown — no fair ${REF_EN} comparison possible.`,
           MISSING_PRICE: "No usable price.",
           MISSING_OBSERVATION_DATE: "Never observed or verified — freshness unknown.",
           STALE_PRICE: "Last observed or verified more than 90 days ago.",
           INVALID_PRICE: "Outside €0.50–€20.00.",
           VENUE_WITHOUT_ACTIVE_PRICE: "This venue has no beer with a usable price.",
           DUPLICATE_VENUE: "Same name and neighbourhood as: {{names}}.",
-          EXTREME_NORMALIZED_PRICE: "Comes to {{price}} per 0.5L (above €15.00)."
+          EXTREME_NORMALIZED_PRICE: `Comes to {{price}} per ${REF_EN} (above €15.00).`
         }
       },
       price: {
@@ -821,12 +851,7 @@ export const en = {
         price: "Actual price (€)",
         size: "Serving size",
         sizeUnknown: "— unknown —",
-        size250: "250 ml",
-        size330: "330 ml",
-        size400: "400 ml",
-        size500: "500 ml (0.5L)",
-        size1000: "1000 ml (Maß)",
-        normalized: "≈ Comparison price per 0.5L",
+        normalized: `≈ Comparison price per ${REF_EN}`,
         normalizedUnknown: "— (serving size unknown: no comparison)",
         normalizedHint: "A calculated comparison figure only — not what the guest pays.",
         observed: "Price observed on",
@@ -847,7 +872,7 @@ export const en = {
         date: "Date",
         price: "Price",
         size: "Size",
-        normalized: "≈ 0.5L",
+        normalized: `≈ ${REF_EN}`,
         source: "Source",
         by: "By",
         status: "Status",
@@ -874,7 +899,7 @@ export const en = {
         noCurrent: "No current price for this beer (new beer)",
         invalidSize: "⚠ Unrecognised serving size — approving will NOT apply the price.",
         approveHint: "Approving records this as an observation on the visit date — it does not mark the price verified.",
-        per05: "≈ {{price}} / 0.5L"
+        per05: `≈ {{price}} / ${REF_EN}`
       },
       logs: {
         tab: "Activity Log",
@@ -882,6 +907,8 @@ export const en = {
         allActions: "All actions",
         filterVenue: "Search venue",
         clearFilters: "Clear filters",
+        dateFrom: "From",
+        dateTo: "To",
         exportCsv: "📥 Export CSV",
         columnTime: "Timestamp",
         columnAction: "Action",
@@ -930,12 +957,13 @@ export const en = {
       button: "Price Trends",
       pillLabel: "Trends",
       title: "Price Trends",
-      subtitle: "Avg. price for 0.5L Helles per neighbourhood, over time",
+      subtitle: `Avg. price for ${REF_EN} Helles per neighbourhood, over time`,
       error: "Couldn't load trend data.",
       noData: "No trend data yet.",
       byArea: "By Area",
       byBrand: "By Brand",
       others: "Others",
+      cityAvg: "Munich avg",
       noHistoryTooltip: "Based on current average — no historical data yet",
       dataPoints: "{{count}} reports"
     },

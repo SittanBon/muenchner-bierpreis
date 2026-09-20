@@ -1054,3 +1054,26 @@ body{font-family:var(--font-body);background:var(--cream);color:var(--text-prima
   .dq-actions{width:100%}
   .vm-beer-actions .vm-delete-beer{margin-left:0}
 }
+
+.vm-price-cell{display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
+.vm-price-size{font-size:11px;color:var(--text-muted)}
+
+/* -- Admin touch targets: EVERY admin button and toggle is at least 44px tall.
+   One rule for the whole dashboard (tabs, Verify/Dismiss/Edit, approve/reject,
+   save/delete, chips, pagination, flag badges…) instead of per-class tweaks, so a
+   newly added admin button can't fall short. Icon-only buttons are also 44px wide. */
+.admin-page button,
+.admin-login-page button { min-height: 44px; }
+.admin-page .vm-remove-beer,
+.admin-page .brand-combobox-clear { min-width: 44px; }
+/* Flag badges in the venue list are buttons (click = filter by that flag). Keep the
+   compact pill LOOK but give it a full 44px hit area: the button itself is
+   transparent and 44px tall; the pill is painted by ::before at its usual size. */
+.admin-page button.dq-badge { position: relative; z-index: 0; display: inline-flex; align-items: center; justify-content: center;
+  background: transparent; border-color: transparent; padding: 0 9px; }
+.admin-page button.dq-badge::before { content: ''; position: absolute; z-index: -1; left: 0; right: 0; top: 50%; height: 20px;
+  transform: translateY(-50%); border-radius: 20px; background: var(--dq-pill-bg); border: 1px solid var(--dq-pill-bd); }
+.admin-page button.dq-badge-high { --dq-pill-bg: #fbe4de; --dq-pill-bd: #f0c2b7; }
+.admin-page button.dq-badge-medium { --dq-pill-bg: #fff3d6; --dq-pill-bd: #f0dca0; }
+.admin-page button.dq-badge-low { --dq-pill-bg: #eeeae2; --dq-pill-bd: #dcd4c4; }
+.admin-page .vm-active-toggle { min-height: 44px; }

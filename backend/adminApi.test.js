@@ -366,3 +366,135 @@ describe('admin search inputs are present on the venue payload (Task 5)', () => 
     for (const b of v.beers) assert.ok('brand' in b && 'serving_volume_ml' in b);
   });
 });
+
+// ─── Serving size on every price-creating route ─────────────────────────────
+// serving_volume_ml must be one of [250, 330, 400, 500, 1000]; anything else is
+// a 400. Omitted keeps the historic meaning of those forms' price field (0.5 L).
+describe('serving size is validated wherever a price is created', () => {
+  let hood;
+  let uniq = 0;
+  before(async () => { hood = (await get('/api/venues', { auth: '' })).body[0].neighbourhood_id; });
+  const newVenueBody = (beer) => ({ name: `Size Test Bar ${++uniq}`, type: 'bar', neighbourhood_id: hood, beers: [{ brand: 'Augustiner', size_05: 4.2, serve_type: 'tap', ...beer }] });
+  const BAD = [0, 123, 300, -500, 500.5, 2000, 'abc', '', null, '0.5L', {}, []];
+
+  test('PATCH price: every unsupported value is a 400 (and every supported one is accepted)', async () => {
+    const v = (await get('/api/admin/venues')).body.find((x) => x.beers.length);
+    const b = v.beers[0];
+    for (const bad of BAD.filter((x) => x !== null)) {
+      assert.equal((await patch(`/api/admin/venues/${v.id}/beers/${b.id}`, { size_05: b.size_05, serving_volume_ml: bad })).status, 400, `PATCH ${JSON.stringify(bad)}`);
+    }
+    for (const ok of [250, 330, 400, 500, 1000, '330']) {
+      assert.equal((await patch(`/api/admin/venues/${v.id}/beers/${b.id}`, { size_05: b.size_05, serving_volume_ml: ok })).status, 200, `PATCH ${JSON.stringify(ok)}`);
+    }
+  });
+
+  test('POST /api/admin/venues: the chosen size is stored, normalised and put in the history; bad sizes create nothing', async () => {
+    const before = (await get('/api/admin/venues')).body.length;
+    for (const bad of BAD) {
+      assert.equal((await post('/api/admin/venues', newVenueBody({ serving_volume_ml: bad }))).status, 400, `create ${JSON.stringify(bad)}`);
+    }
+    assert.equal((await get('/api/admin/venues')).body.length, before, 'a rejected request must not create a venue');
+
+    const res = await post('/api/admin/venues', newVenueBody({ serving_volume_ml: 330, size_05: 3.3 }));
+    assert.equal(res.status, 201, JSON.stringify(res.body));
+    const beer = res.body.beers[0];
+    assert.equal(beer.serving_volume_ml, 330);
+    assert.equal(beer.normalized_500ml_price, 5);   // 3.30 / 330 × 500
+    const hist = (await get(`/api/admin/venues/${res.body.id}/beers/${beer.id}/history`)).body.entries;
+    assert.equal(hist.length, 1);
+    assert.equal(hist[0].serving_volume_ml, 330);
+  });
+
+  test('POST /api/admin/venues: an omitted size keeps meaning 0.5 L (older clients)', async () => {
+    const res = await post('/api/admin/venues', newVenueBody({}));
+    assert.equal(res.status, 201);
+    assert.equal(res.body.beers[0].serving_volume_ml, 500);
+  });
+
+  test('POST /api/admin/venues/:id/beers: size validated, stored and logged', async () => {
+    const v = (await post('/api/admin/venues', newVenueBody({}))).body;
+    for (const bad of BAD) {
+      assert.equal((await post(`/api/admin/venues/${v.id}/beers`, { brand: 'Paulaner', size_05: 4.5, serving_volume_ml: bad })).status, 400, `add beer ${JSON.stringify(bad)}`);
+    }
+    assert.equal((await adminVenue(v.id)).beers.length, 1, 'a rejected request adds nothing');
+    const ok = await post(`/api/admin/venues/${v.id}/beers`, { brand: 'Paulaner', size_05: 4.5, serving_volume_ml: 400 });
+    assert.equal(ok.status, 201);
+    const added = ok.body.beers.find((b) => b.brand === 'Paulaner');
+    assert.equal(added.serving_volume_ml, 400);
+    assert.equal(added.normalized_500ml_price, 5.63);
+    const logs = (await get('/api/admin/logs?action_type=ADD_BEER')).body;
+    const entry = (logs.logs || logs.rows || logs.items || logs).find((l) => l.venue_id === v.id && l.details.brand === 'Paulaner');
+    assert.equal(entry.details.serving_volume_ml, 400);
+    assert.equal(entry.details.size, '0.4L');
+  });
+
+  describe('POST /api/submissions/new-venue ("Missing a bar?")', () => {
+    const proposal = (over) => ({
+      name: `Missing Bar ${++uniq}`, type: 'bar', neighbourhood_id: hood, beer_brand: 'Augustiner', size_05: 4.5, serve_type: 'tap', ...over,
+    });
+
+    test('rejects an unsupported size — for the first beer and for extra beers', async () => {
+      for (const bad of ['0.3L', '2L', '0.50L', '500', 'abc']) {
+        assert.equal((await post('/api/submissions/new-venue', proposal({ size: bad }), { auth: '' })).status, 400, `size ${bad}`);
+        const extra = JSON.stringify([{ brand: 'Paulaner', size_05: 5, size: bad }]);
+        assert.equal((await post('/api/submissions/new-venue', proposal({ extra_beers: extra }), { auth: '' })).status, 400, `extra size ${bad}`);
+      }
+    });
+
+    test('approving creates each beer at ITS chosen size (first beer and extras)', async () => {
+      const extra = JSON.stringify([{ brand: 'Paulaner', size_05: 5, size: '1L' }, { brand: 'Hacker-Pschorr', size_05: 4, size: '0.25L' }]);
+      const body = proposal({ size: '0.33L', size_05: 3.3, extra_beers: extra });
+      const sent = await post('/api/submissions/new-venue', body, { auth: '' });
+      assert.equal(sent.status, 201, JSON.stringify(sent.body));
+      const approved = await patch(`/api/admin/submissions/${sent.body.id}`, { status: 'approved' });
+      assert.equal(approved.status, 200, JSON.stringify(approved.body));
+      const venue = (await get('/api/admin/venues')).body.find((v) => v.name === body.name);
+      const size = (brand) => venue.beers.find((b) => b.brand === brand).serving_volume_ml;
+      assert.deepEqual([size('Augustiner'), size('Paulaner'), size('Hacker-Pschorr')], [330, 1000, 250]);
+    });
+
+    test('an omitted size is still the 0.5 L the form has always meant', async () => {
+      const body = proposal({ extra_beers: JSON.stringify([{ brand: 'Paulaner', size_05: 5 }]) });
+      const sent = await post('/api/submissions/new-venue', body, { auth: '' });
+      assert.equal(sent.status, 201);
+      await patch(`/api/admin/submissions/${sent.body.id}`, { status: 'approved' });
+      const venue = (await get('/api/admin/venues')).body.find((v) => v.name === body.name);
+      assert.deepEqual(venue.beers.map((b) => b.serving_volume_ml), [500, 500]);
+    });
+  });
+});
+
+// ─── Shared frontend constants stay equal to what the backend serves ────────
+describe('frontend constants agree with the backend', () => {
+  test('the Price Trends brand list is the backend’s TREND_BRANDS, and every one is a known brand', async () => {
+    const { pathToFileURL } = require('url');
+    const brands = await import(pathToFileURL(path.join(ROOT, 'frontend', 'src', 'constants', 'brands.js')).href);
+    const api = (await get('/api/stats/trends', { auth: '' })).body;
+    assert.deepEqual(api.brandOrder, [...brands.TREND_BRANDS, 'others']);
+    for (const b of brands.TREND_BRANDS) assert.ok(brands.BRANDS.includes(b), `${b} is in the brand list`);
+  });
+});
+
+describe('venue types', () => {
+  test('the frontend and backend lists are identical', async () => {
+    const { pathToFileURL } = require('url');
+    const fe = await import(pathToFileURL(path.join(ROOT, 'frontend', 'src', 'constants', 'venueTypes.js')).href);
+    assert.deepEqual(fe.VENUE_TYPES, require('./utils/venueTypes').VENUE_TYPES);
+  });
+
+  test('an unknown type is a 400 on create-venue, on a "Missing a bar?" proposal and on edit — and creates nothing', async () => {
+    const hood = (await get('/api/venues', { auth: '' })).body[0].neighbourhood_id;
+    const venuesBefore = (await get('/api/admin/venues')).body.length;
+    const pendingBefore = (await get('/api/admin/submissions?status=pending')).body.length;
+    for (const bad of ['pub', 'Bar', '', 'beer garden', 42]) {
+      const c = await post('/api/admin/venues', { name: 'Bad Type', type: bad, neighbourhood_id: hood, beers: [{ brand: 'Augustiner', size_05: 4.2 }] });
+      assert.equal(c.status, 400, `create type ${JSON.stringify(bad)}`);
+      const m = await post('/api/submissions/new-venue', { name: 'Bad Type', type: bad, neighbourhood_id: hood, beer_brand: 'Augustiner', size_05: 4.2 }, { auth: '' });
+      assert.equal(m.status, 400, `proposal type ${JSON.stringify(bad)}`);
+    }
+    const v = (await get('/api/admin/venues')).body[0];
+    assert.equal((await patch(`/api/admin/venues/${v.id}`, { name: v.name, type: 'pub' })).status, 400, 'edit');
+    assert.equal((await get('/api/admin/venues')).body.length, venuesBefore);
+    assert.equal((await get('/api/admin/submissions?status=pending')).body.length, pendingBefore);
+  });
+});
