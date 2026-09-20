@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { adminFetchDataQuality, adminDismissFlag, adminVerifyBeer } from '../hooks/useApi';
+import { adminFetchDataQuality, adminDismissFlag, adminVerifyBeer, adminBulkVerify } from '../hooks/useApi';
 import { useToast } from '../hooks/useToast';
 import { formatPrice, formatVolume } from '../utils/priceUtils';
 import { FLAG_ORDER, flagSeverity } from '../utils/dataQualityFlags';
@@ -21,6 +21,8 @@ export default function DataQualityPanel({ token, onEditVenue }) {
   const [filter, setFilter] = useState(null);      // a flag code, or null = all
   const [visible, setVisible] = useState(PAGE);
   const [busy, setBusy] = useState(null);           // the flag row currently acting
+  const [bulkBusy, setBulkBusy] = useState(false);
+  const [bulkResult, setBulkResult] = useState(null); // { count } from the last bulk verify
 
   const load = useCallback(() => adminFetchDataQuality(token).then((d) => { setData(d); setFailed(false); })
     .catch(() => setFailed(true)), [token]);
@@ -52,6 +54,22 @@ export default function DataQualityPanel({ token, onEditVenue }) {
     setBusy(null);
   };
 
+  // "Bulk Verify All Prices": asks first (the dialog states how many prices and
+  // what it does NOT do), then marks every unverified price verified today.
+  const bulkVerify = async () => {
+    if (!window.confirm(t('admin.quality.bulk.confirm', { count: data.unverified_count }))) return;
+    setBulkBusy(true);
+    try {
+      const { count } = await adminBulkVerify(token);
+      setBulkResult({ count });
+      showToast('success', t('admin.quality.bulk.result', { count }));
+      await load();
+    } catch (err) {
+      showToast('error', err.message);
+    }
+    setBulkBusy(false);
+  };
+
   if (failed && !data) return <div className="dq-panel"><div className="dq-error">{t('admin.quality.loadError')}</div></div>;
   if (!data) return <div className="dq-panel"><div className="loading">{t('loading')}</div></div>;
 
@@ -79,6 +97,21 @@ export default function DataQualityPanel({ token, onEditVenue }) {
           {t('admin.quality.summarySub', { flags: summary.total_flags, dismissed: summary.dismissed_active })}
         </div>
         <div className="dq-review-only">{t('admin.quality.reviewOnly')}</div>
+      </div>
+
+      <div className="dq-bulk">
+        <div className="dq-bulk-text">
+          <strong>{t('admin.quality.bulk.title')}</strong>
+          <span>
+            {data.unverified_count > 0
+              ? t('admin.quality.bulk.desc', { count: data.unverified_count })
+              : t('admin.quality.bulk.none')}
+          </span>
+          {bulkResult && <span className="dq-bulk-result" role="status">✓ {t('admin.quality.bulk.result', { count: bulkResult.count })}</span>}
+        </div>
+        <button type="button" className="dq-btn dq-btn-verify dq-bulk-btn" disabled={bulkBusy || !data.unverified_count} onClick={bulkVerify}>
+          {bulkBusy ? t('admin.quality.bulk.working') : t('admin.quality.bulk.button')}
+        </button>
       </div>
 
       <div className="dq-chips" role="group" aria-label={t('admin.quality.title')}>

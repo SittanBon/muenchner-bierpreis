@@ -114,6 +114,30 @@ A price's age comes ONLY from two columns on `beers`:
   The public Price Trends chart still reads submissions only (unchanged).
 - **Telegram**: one-click verify sends `✓ Price verified: <venue> €<price> —
   <admin>` (`notifyPriceVerified`); audit log actions VERIFY_PRICE, DISMISS_FLAG.
+- **Bulk Verify All Prices** (Data Quality tab, "before Phase 3"): one click
+  (behind a `window.confirm` that states the count and what it does NOT do)
+  stamps `verified_at = today` (Europe/Berlin) on every priced (`size_05 > 0`),
+  active beer on an active venue that has no `verified_at`
+  (`bulkVerifyPrices` in `backend/db/database.js`, one transaction).
+  `POST /api/admin/bulk-verify` needs `{ "confirm": true }` (400 otherwise).
+  ONLY `verified_at` changes — never price, `updated`, `price_observed_at` or
+  history; already-verified beers keep their earlier date. Audit action
+  `BULK_VERIFY` {count, verified_at}; Telegram `✓ Bulk verify: N prices verified —
+  <admin>` (`notifyBulkVerified`); nothing is logged/sent when the count is 0.
+  The tab's `unverified_count` previews the same scope. CAVEAT: this vouches
+  for prices nobody individually observed — it makes them FRESH for 30 days on
+  the public site, so use it deliberately (it is the one place "verified" does
+  not mean "someone looked at this price").
+- **Seeded-submission cleanup** (`backend/db/removeSeededSubmissions.js`, runs on
+  every boot, idempotent): deletes submissions whose `note` contains
+  `seeded price-trend history` (the fabricated Price Trends data; `submissions`
+  has NO `source_type` column, `SEED_ESTIMATE` was never a stored value). Writes
+  `<db>.pre-remove-seeded-submissions-<ts>.bak` first (nothing is deleted if that
+  fails) and one `DELETE_SEEDED_SUBMISSIONS` audit entry (performed_by `system`).
+  Submission ids are now `s` + (highest existing s-number + 1), NOT a row count —
+  the count-based id would have collided with existing ids after this delete.
+- **Telegram**: one-click verify sends `✓ Price verified: <venue> €<price> —
+  <admin>` (`notifyPriceVerified`); audit log actions VERIFY_PRICE, DISMISS_FLAG.
   NOTE: the project `.env` configures a REAL bot. Tests and scratch servers must
   blank `TELEGRAM_BOT_TOKEN`/`TELEGRAM_CHAT_ID` (backend/adminApi.test.js does).
 - **Submission queue**: GET /api/admin/submissions is enriched (submitted price +
@@ -215,11 +239,12 @@ Railway auto-deploys from main branch.
 - ⬜ 3 public core UI · 4 map (price-first markers) · 5 venue experience ·
   6 discovery (chips/list/bottom nav) · 7 contribution ("Preis falsch?") ·
   8 desktop · 9 QA
-- Known remaining data-trust debt (NOT fixed in Phase 1, needs a decision):
-  production still holds the fabricated `Community / "seeded price-trend
-  history"` submissions (Price Trends chart is built on them) and
-  seed-invented `reports` counts (the "N reports" badge). Every existing
-  price shows "Datum unbekannt" until verified or re-reported.
+- Known remaining data-trust debt: seed-invented `reports` counts (the "N reports"
+  badge) are still in the data. Every price shows "Datum unbekannt" until
+  verified, re-reported or bulk-verified. The fabricated Price Trends
+  submissions are removed on the next boot of each environment (see
+  "Seeded-submission cleanup"); the Price Trends chart then shows only real
+  approved reports, so it stays sparse until people submit prices.
 
 ## Still To Do ❌
 - Venue descriptions DE+EN for all venues

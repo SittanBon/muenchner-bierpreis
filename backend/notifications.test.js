@@ -47,7 +47,7 @@ after(() => {
 // set) — notifications.js reads process.env.TELEGRAM_BOT_TOKEN once, at
 // module load, to decide whether `bot` exists at all.
 delete require.cache[require.resolve('./notifications')];
-const { notifyApproved, notifyPriceVerified } = require('./notifications');
+const { notifyApproved, notifyPriceVerified, notifyBulkVerified } = require('./notifications');
 
 describe('notifyApproved', () => {
   test('sends a Telegram message for a price-bearing approval (price_change/new_beer/new_venue)', async () => {
@@ -96,5 +96,25 @@ describe('notifyPriceVerified (admin one-click verify)', () => {
     calls.length = 0;
     await notifyPriceVerified({ venueName: 'X', price: null, admin: 'admin' });
     assert.doesNotMatch(textOf(), /NaN|null|undefined/);
+  });
+});
+
+describe('notifyBulkVerified (admin bulk verify)', () => {
+  const textOf = () => JSON.parse(calls[0].body).text;
+
+  test('sends "✓ Bulk verify: [count] prices verified — [admin]"', async () => {
+    calls.length = 0;
+    await notifyBulkVerified({ count: 201, admin: 'sittan' });
+    assert.equal(calls.length, 1);
+    assert.equal(textOf(), '✓ Bulk verify: 201 prices verified — sittan');
+  });
+
+  test('escapes the admin name and falls back to "admin"', async () => {
+    calls.length = 0;
+    await notifyBulkVerified({ count: 3, admin: 'a<b' });
+    assert.equal(textOf(), '✓ Bulk verify: 3 prices verified — a&lt;b');
+    calls.length = 0;
+    await notifyBulkVerified({ count: 3 });
+    assert.equal(textOf(), '✓ Bulk verify: 3 prices verified — admin');
   });
 });

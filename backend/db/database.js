@@ -516,8 +516,14 @@ const insertSubmission = db.prepare(`
      @serve_type, @extra_beers)
 `);
 
+// Highest numeric suffix among the app-issued `s###` ids — NOT a row count.
+// A count-based id (the original) collides with an existing id as soon as any
+// submission has ever been deleted (e.g. the seeded-estimate cleanup): with
+// s037…s041 present and 5 rows left, the sixth new submission would try s011…
+// and the 32nd would hit s037 and fail on the primary key. Seeded `h####` ids
+// are ignored on purpose (different prefix, can never collide).
 const nextSubmissionSeq = db.prepare(
-  `SELECT COUNT(*) AS n FROM submissions`
+  `SELECT COALESCE(MAX(CAST(SUBSTR(id, 2) AS INTEGER)), 0) AS n FROM submissions WHERE id GLOB 's[0-9]*'`
 );
 
 const submissionsByStatus = db.prepare(
@@ -962,6 +968,44 @@ function verifyBeerPrice(venue_id, beer_id) {
   return { brand: existing.brand, price: existing.size_05, verified_at, previous_verified_at: existing.verified_at };
 }
 
+// Marks every not-yet-verified price as verified today, in ONE transaction.
+// Deliberately the same narrow write as verifyBeerPrice — only `verified_at`;
+// no price, `updated`, `price_observed_at` or history entry changes — applied
+// to rows where verified_at IS NULL. Scope is limited to beers that actually
+// carry a price (size_05 > 0, the same rule the single Verify uses) on venues
+// that are live: confirming an empty price or a hidden venue's price would be
+// a verification of nothing. Returns { count, verified_at }.
+const BULK_VERIFY_SCOPE_SQL = `verified_at IS NULL AND size_05 > 0 AND active = 1
+      AND venue_id IN (SELECT id FROM venues WHERE active = 1)`;
+const bulkVerifyStmt = db.prepare(`UPDATE beers SET verified_at = @verified_at WHERE ${BULK_VERIFY_SCOPE_SQL}`);
+const countUnverifiedStmt = db.prepare(`SELECT COUNT(*) AS n FROM beers WHERE ${BULK_VERIFY_SCOPE_SQL}`);
+// How many prices a bulk verify would mark right now (same scope as the write).
+function countUnverifiedPrices() {
+  return countUnverifiedStmt.get().n;
+}
+const bulkVerifyPrices = db.transaction(() => {
+  const verified_at = todayISO();
+  const { changes } = bulkVerifyStmt.run({ verified_at });
+  return { count: changes, verified_at };
+});
+
+// Deletes the fabricated "seeded price-trend history" submissions that
+// early seed.js versions wrote (see SEEDED_ESTIMATE_NOTE). They were invented
+// estimates — never a customer report — and feed the public Price Trends chart.
+// Matches on the note (the only marker: `submissions` has no source_type
+// column). Idempotent; writes a consistent backup first when it will delete
+// something. Returns { deleted, ids, backup }.
+function removeSeededSubmissions() {
+  const rows = db.prepare(`SELECT id FROM submissions WHERE note LIKE ?`).all(`%${SEEDED_ESTIMATE_NOTE}%`);
+  if (rows.length === 0) return { deleted: 0, ids: [], backup: null };
+  const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+  const backup = `${DB_PATH}.pre-remove-seeded-submissions-${stamp}.bak`;
+  db.prepare('VACUUM INTO ?').run(backup); // throws on failure -> nothing is deleted
+  const del = db.prepare('DELETE FROM submissions WHERE id = ?');
+  db.transaction(() => { for (const { id } of rows) del.run(id); })();
+  return { deleted: rows.length, ids: rows.map((r) => r.id), backup };
+}
+
 // Applies an approved price_change / new_beer submission to the beers table.
 // Returns { applied: false, reason } — writing NOTHING, not even `reports` or
 // `updated` — when the submission's size isn't a recognised one or its price
@@ -1279,6 +1323,9 @@ module.exports = {
   addBeerToVenue,
   updateBeerPrice,
   verifyBeerPrice,
+  bulkVerifyPrices,
+  countUnverifiedPrices,
+  removeSeededSubmissions,
   applyApprovedPrice,
   recordPriceHistory,
   getBeerHistory,

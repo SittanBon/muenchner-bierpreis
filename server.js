@@ -28,6 +28,8 @@ const {
   addBeerToVenue,
   updateBeerPrice,
   verifyBeerPrice,
+  bulkVerifyPrices,
+  countUnverifiedPrices,
   applyApprovedPrice,
   getPublicPriceHistory,
   getBeerHistory,
@@ -49,6 +51,7 @@ const {
   notifyDescriptionSuggestion,
   notifyApproved,
   notifyPriceVerified,
+  notifyBulkVerified,
   notifyStartup,
 } = require('./backend/notifications');
 const { FLAG_CODES, THRESHOLDS, summarizeFlags, groupFlagsByVenue } = require('./backend/dataQuality');
@@ -127,6 +130,13 @@ require('./backend/db/restructureNeighbourhoods').run();
 // including the one verified surprise (Chinesischer Turm is officially in
 // Lehel, not Schwabing) and the session report for the complete venue list.
 require('./backend/db/reassignVenues').runReassignment();
+
+// One-time removal of the fabricated "seeded price-trend history" submissions
+// that early seeds wrote into the database (they fed the public Price Trends
+// chart with invented prices). Idempotent — a no-op once none are left — and it
+// takes its own backup first when it has something to delete. See
+// removeSeededSubmissions in backend/db/database.js.
+require('./backend/db/removeSeededSubmissions').run();
 
 const app = express();
 app.set('etag', false); // API responses are always regenerated from the live DB
@@ -960,8 +970,29 @@ app.get('/api/admin/data-quality', authMiddleware, (req, res) => {
     generated_at: new Date().toISOString(),
     thresholds: THRESHOLDS,
     summary: { ...summarizeFlags(flags), dismissed_active: dismissed_count },
+    // What "Bulk Verify All Prices" would mark right now — shown in its confirmation.
+    unverified_count: countUnverifiedPrices(),
     venues: grouped,
   });
+});
+
+// "Bulk Verify All Prices": stamps verified_at = today on EVERY priced, live
+// beer that has none. This is a deliberate, blunt admin decision — it says
+// "I vouch for all of these as of today", not "each was individually observed" —
+// so it needs an explicit { confirm: true } (the UI asks first) and leaves a
+// BULK_VERIFY audit entry plus a Telegram notice. It touches only verified_at:
+// no price, `updated`, observation date or price history changes. When there is
+// nothing to verify it does nothing and records nothing.
+app.post('/api/admin/bulk-verify', authMiddleware, (req, res) => {
+  if (req.body?.confirm !== true) return res.status(400).json({ error: 'Bulk verify must be confirmed ({ "confirm": true })' });
+  const admin = req.user?.username || 'admin';
+  const { count, verified_at } = bulkVerifyPrices();
+  if (count > 0) {
+    logAdminAction('BULK_VERIFY', { performedBy: admin, details: { count, verified_at } });
+    // Fire-and-forget; sendTelegramMessage swallows its own errors.
+    notifyBulkVerified({ count, admin });
+  }
+  res.json({ count, verified_at });
 });
 
 // "Dismiss": hide ONE flag for 7 days. It fixes nothing and deletes nothing —

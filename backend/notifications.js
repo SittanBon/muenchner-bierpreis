@@ -152,6 +152,11 @@ function notifyPriceVerified({ venueName, price, admin }) {
   return sendTelegramMessage(`✓ Price verified: ${esc(venueName)} ${amount} — ${esc(admin || 'admin')}`);
 }
 
+// An admin marked every not-yet-verified price as verified in one click.
+function notifyBulkVerified({ count, admin }) {
+  return sendTelegramMessage(`✓ Bulk verify: ${Number(count)} prices verified — ${esc(admin || 'admin')}`);
+}
+
 function notifyStartup() {
   return sendTelegramMessage(
     `🍺 <b>Bierpreis server started</b>\n` +
@@ -169,5 +174,6 @@ module.exports = {
   notifyDescriptionSuggestion,
   notifyApproved,
   notifyPriceVerified,
+  notifyBulkVerified,
   notifyStartup,
 };

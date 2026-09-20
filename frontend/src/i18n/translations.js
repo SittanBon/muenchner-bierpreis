@@ -285,6 +285,18 @@ export const de = {
         verifyHint: "Bestätigt, dass der Preis stimmt (setzt nur „bestätigt am“).",
         dismissedToast: "Hinweis für 7 Tage ausgeblendet.",
         verifiedToast: "Preis bestätigt für {{venue}}",
+        bulk: {
+          title: "Alle Preise bestätigen",
+          desc_one: "{{count}} Preis wurde noch nie bestätigt.",
+          desc_other: "{{count}} Preise wurden noch nie bestätigt.",
+          none: "Alle Preise sind bestätigt.",
+          button: "Alle Preise bestätigen",
+          working: "Wird bestätigt …",
+          confirm_one: "{{count}} Preis als heute bestätigt markieren?\n\nDamit bürgst du für jeden bisher unbestätigten Preis, ohne sie einzeln zu prüfen. Preise, Beobachtungsdaten und Verlauf bleiben unverändert. Das lässt sich nicht gesammelt rückgängig machen.",
+          confirm_other: "{{count}} Preise als heute bestätigt markieren?\n\nDamit bürgst du für jeden bisher unbestätigten Preis, ohne sie einzeln zu prüfen. Preise, Beobachtungsdaten und Verlauf bleiben unverändert. Das lässt sich nicht gesammelt rückgängig machen.",
+          result_one: "{{count}} Preis bestätigt",
+          result_other: "{{count}} Preise bestätigt",
+        },
         flags: {
           MISSING_SERVING_SIZE: "Größe fehlt",
           MISSING_PRICE: "Preis fehlt",
@@ -384,6 +396,10 @@ export const de = {
         noLogs: "Keine Einträge gefunden",
         noReason: "Kein Grund angegeben",
         permanentlyClosed: "Dauerhaft geschlossen",
+        bulkVerifyDetail_one: "{{count}} Preis bestätigt (am {{date}})",
+        bulkVerifyDetail_other: "{{count}} Preise bestätigt (am {{date}})",
+        seededDeletedDetail_one: "{{count}} erfundene Seed-Meldung gelöscht",
+        seededDeletedDetail_other: "{{count}} erfundene Seed-Meldungen gelöscht",
         active: "Aktiv",
         actions: {
           APPROVE: "Genehmigt",
@@ -396,6 +412,8 @@ export const de = {
           EDIT_BEER: "Bierpreis bearbeitet",
           VERIFY_PRICE: "Preis bestätigt",
           DISMISS_FLAG: "Hinweis ausgeblendet",
+          BULK_VERIFY: "Alle Preise bestätigt",
+          DELETE_SEEDED_SUBMISSIONS: "Erfundene Seed-Meldungen gelöscht",
           TOGGLE_ACTIVE: "Sichtbarkeit geändert",
           MARK_CLOSED: "Als geschlossen markiert"
         }
@@ -765,6 +783,18 @@ export const en = {
         verifyHint: "Confirms the price is still correct (only sets “verified at”).",
         dismissedToast: "Flag hidden for 7 days.",
         verifiedToast: "Price verified for {{venue}}",
+        bulk: {
+          title: "Bulk Verify All Prices",
+          desc_one: "{{count}} price has never been verified.",
+          desc_other: "{{count}} prices have never been verified.",
+          none: "Every price is verified.",
+          button: "Bulk Verify All Prices",
+          working: "Verifying …",
+          confirm_one: "Mark {{count}} price as verified today?\n\nThis vouches for every price that has never been verified, without checking each one individually. Prices, observation dates and history stay unchanged. It can't be undone in bulk.",
+          confirm_other: "Mark {{count}} prices as verified today?\n\nThis vouches for every price that has never been verified, without checking each one individually. Prices, observation dates and history stay unchanged. It can't be undone in bulk.",
+          result_one: "{{count}} price verified",
+          result_other: "{{count}} prices verified",
+        },
         flags: {
           MISSING_SERVING_SIZE: "Serving size missing",
           MISSING_PRICE: "Price missing",
@@ -864,6 +894,10 @@ export const en = {
         noLogs: "No entries found",
         noReason: "No reason given",
         permanentlyClosed: "Permanently closed",
+        bulkVerifyDetail_one: "{{count}} price verified (on {{date}})",
+        bulkVerifyDetail_other: "{{count}} prices verified (on {{date}})",
+        seededDeletedDetail_one: "{{count}} fabricated seed submission deleted",
+        seededDeletedDetail_other: "{{count}} fabricated seed submissions deleted",
         active: "Active",
         actions: {
           APPROVE: "Approved",
@@ -876,6 +910,8 @@ export const en = {
           EDIT_BEER: "Beer price edited",
           VERIFY_PRICE: "Price verified",
           DISMISS_FLAG: "Flag dismissed",
+          BULK_VERIFY: "Bulk verify",
+          DELETE_SEEDED_SUBMISSIONS: "Seeded estimates deleted",
           TOGGLE_ACTIVE: "Visibility toggled",
           MARK_CLOSED: "Marked closed"
         }

@@ -89,6 +89,7 @@ describe('authentication — every admin route refuses an unauthenticated caller
     ['GET', '/api/admin/submissions'],
     ['PATCH', '/api/admin/submissions/s001', { status: 'approved' }],
     ['GET', '/api/admin/data-quality'],
+    ['POST', '/api/admin/bulk-verify', { confirm: true }],
     ['POST', '/api/admin/data-quality/dismiss', { flag: 'STALE_PRICE', venue_id: 'x' }],
     ['GET', '/api/admin/venues/x/beers/1/history'],
     ['POST', '/api/admin/venues/x/beers/1/verify', {}],

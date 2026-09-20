@@ -5,11 +5,11 @@ import { formatEuro } from '../utils/price';
 
 const ACTION_TYPES = [
   'APPROVE', 'REJECT', 'EDIT_VENUE', 'ADD_VENUE', 'DELETE_VENUE',
-  'ADD_BEER', 'DELETE_BEER', 'EDIT_BEER', 'VERIFY_PRICE', 'DISMISS_FLAG', 'TOGGLE_ACTIVE', 'MARK_CLOSED',
+  'ADD_BEER', 'DELETE_BEER', 'EDIT_BEER', 'VERIFY_PRICE', 'BULK_VERIFY', 'DELETE_SEEDED_SUBMISSIONS', 'DISMISS_FLAG', 'TOGGLE_ACTIVE', 'MARK_CLOSED',
 ];
 const BADGE_COLOR = {
-  APPROVE: 'green', ADD_VENUE: 'green', ADD_BEER: 'green', VERIFY_PRICE: 'green',
-  REJECT: 'red', DELETE_VENUE: 'red', DELETE_BEER: 'red',
+  APPROVE: 'green', ADD_VENUE: 'green', ADD_BEER: 'green', VERIFY_PRICE: 'green', BULK_VERIFY: 'green',
+  REJECT: 'red', DELETE_VENUE: 'red', DELETE_BEER: 'red', DELETE_SEEDED_SUBMISSIONS: 'red',
   EDIT_VENUE: 'amber', TOGGLE_ACTIVE: 'amber', MARK_CLOSED: 'amber', EDIT_BEER: 'amber', DISMISS_FLAG: 'amber',
 };
 const EMPTY_FILTERS = { action_type: '', venue: '', from: '', to: '' };
@@ -66,6 +66,10 @@ function formatDetails(log, lang, t) {
       return `${d.flag}${d.brand ? ` — ${d.brand}` : ''}`;
     case 'VERIFY_PRICE':
       return `${d.brand ? d.brand + ' — ' : ''}${eur(d.price)}`;
+    case 'BULK_VERIFY':
+      return t('admin.logs.bulkVerifyDetail', { count: d.count, date: d.verified_at });
+    case 'DELETE_SEEDED_SUBMISSIONS':
+      return t('admin.logs.seededDeletedDetail', { count: d.deleted });
     case 'TOGGLE_ACTIVE':
       return `${t('admin.logs.active')}: ${d.old_state ? '✓' : '✕'} → ${d.new_state ? '✓' : '✕'}`;
     case 'MARK_CLOSED':

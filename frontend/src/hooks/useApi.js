@@ -149,6 +149,17 @@ export async function adminVerifyBeer(token, venueId, beerId) {
   });
 }
 
+// "Bulk Verify All Prices": stamps verified_at = today on every priced, live beer
+// that has none. Only verified_at changes. The server insists on confirm:true —
+// the UI asks the admin first. Resolves { count, verified_at }.
+export async function adminBulkVerify(token) {
+  return authedFetch(`${BASE}/admin/bulk-verify`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ confirm: true }),
+  });
+}
+
 // Full price history of one beer (admin only): real observations/changes plus
 // pending/rejected reports, each labelled observation vs seeded estimate.
 export async function adminFetchBeerHistory(token, venueId, beerId) {
