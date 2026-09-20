@@ -149,6 +149,31 @@ export async function adminVerifyBeer(token, venueId, beerId) {
   });
 }
 
+// Full price history of one beer (admin only): real observations/changes plus
+// pending/rejected reports, each labelled observation vs seeded estimate.
+export async function adminFetchBeerHistory(token, venueId, beerId) {
+  return authedFetch(`${BASE}/admin/venues/${venueId}/beers/${beerId}/history`, {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+}
+
+// "Data Quality" tab: summary + every open flag grouped by venue. Flags are
+// for human review only — nothing here fixes or deletes data.
+export async function adminFetchDataQuality(token) {
+  return authedFetch(`${BASE}/admin/data-quality`, {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+}
+
+// Hide one flag for 7 days (it reappears by itself if the problem is still there).
+export async function adminDismissFlag(token, { flag, venue_id, beer_id }) {
+  return authedFetch(`${BASE}/admin/data-quality/dismiss`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ flag, venue_id, beer_id })
+  });
+}
+
 export async function adminDeleteBeer(token, venueId, beerId) {
   return authedFetch(`${BASE}/admin/venues/${venueId}/beers/${beerId}`, {
     method: 'DELETE',

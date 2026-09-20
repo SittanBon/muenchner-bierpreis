@@ -83,6 +83,49 @@ A price's age comes ONLY from two columns on `beers`:
 - The DB migration takes a `VACUUM INTO` backup (`<db>.pre-phase1-<ts>.bak`,
   gitignored) once, before adding the columns — restore it to roll back.
 
+## Admin data-quality tooling (P0 Phase 2)
+- **Data Quality tab** (admin): automatic flags for HUMAN REVIEW ONLY —
+  nothing is auto-fixed or deleted. Rules live in `backend/dataQuality.js`
+  (pure, tested): MISSING_SERVING_SIZE, MISSING_PRICE, MISSING_OBSERVATION_DATE,
+  STALE_PRICE, INVALID_PRICE (<€0.50 or >€20), VENUE_WITHOUT_ACTIVE_PRICE,
+  DUPLICATE_VENUE (same name + neighbourhood), EXTREME_NORMALIZED_PRICE (>€15
+  per 0.5 L). Only ACTIVE venues are checked. Per flag: Edit (opens the venue
+  editor), ✓ Verify (only offered where confirming the price resolves it),
+  Dismiss (hides that one flag for 7 days via `flag_dismissals`; reappears by
+  itself). Endpoints: GET /api/admin/data-quality, POST
+  /api/admin/data-quality/dismiss. Every admin venue response also carries its
+  `flags` (attachFlags in server.js) — that is what the badges/flag-search use.
+- **Price editor** (`BeerPriceEditor.jsx`, per beer in the venue editor):
+  actual price, serving size, live read-only per-0.5 L price, "price observed
+  on" date, source (ADMIN/COMMUNITY/VENUE/MENU_PHOTO/OTHER), internal notes.
+  `source_type` and `notes` are ADMIN-ONLY columns on `beers` — deliberately
+  absent from `beersForVenue`, so they can never reach a public response.
+  Saving NEVER sets `verified_at` (a changed price clears it); the separate
+  "✓ Verify price" button does (and is disabled while there are unsaved edits).
+  The client only sends `price_observed_at` / `source_type` if the admin touched
+  them, so an untouched field can't pin an old date onto a new price.
+- **Price history** = table `price_history` (one row per REAL price change or
+  observation: an admin create/change, or an applied submission approval).
+  Verify, a no-op save, notes/source-only saves and rejections write NOTHING.
+  No backfill — legacy prices have no rows. The admin history viewer
+  (`GET .../beers/:beerId/history`) merges those rows with pending/rejected
+  submissions and pre-Phase-2 approved ones, and labels the fabricated
+  `seeded price-trend history` submissions as "Seeded estimate" (no attribution).
+  The public Price Trends chart still reads submissions only (unchanged).
+- **Telegram**: one-click verify sends `✓ Price verified: <venue> €<price> —
+  <admin>` (`notifyPriceVerified`); audit log actions VERIFY_PRICE, DISMISS_FLAG.
+  NOTE: the project `.env` configures a REAL bot. Tests and scratch servers must
+  blank `TELEGRAM_BOT_TOKEN`/`TELEGRAM_CHAT_ID` (backend/adminApi.test.js does).
+- **Submission queue**: GET /api/admin/submissions is enriched (submitted price +
+  size, per-0.5 L price, the venue's CURRENT price + freshness, difference %, a
+  live >25% outlier flag, source COMMUNITY). Approve = observation on the visit
+  date, NOT verified, one history entry, source COMMUNITY. Reject touches no
+  price data. The queue is re-fetched whenever its tab is reopened so the
+  "current price" is never a stale snapshot.
+- **Admin search** (`frontend/src/utils/adminSearch.js`): name, address,
+  neighbourhood, brand, serving size ("0.33L"/"0,33l"/"330ml"/"Maß"), and flag
+  words ("stale", "duplicate", "unverified"…), every word must match.
+
 ## Tier 1 Stadtteile
 Altstadt-Lehel, Maxvorstadt, Schwabing-West, Schwabing-Freimann,
 Ludwigsvorstadt-Isarvorstadt, Schwanthalerhöhe
@@ -166,9 +209,12 @@ Railway auto-deploys from main branch.
   price_observed_at added, serving_volume_ml added, freshness thresholds
   corrected to 30/90 days, fake seed data removed (seed.js no longer
   staggers dates or generates trend-history submissions)
-- ⬜ Phase 2 admin foundation · 3 public core UI · 4 map (price-first
-  markers) · 5 venue experience · 6 discovery (chips/list/bottom nav) ·
-  7 contribution ("Preis falsch?") · 8 desktop · 9 QA
+- ✅ Phase 2 — admin foundation (see "Admin data-quality tooling" above): data
+  quality dashboard, price editor, one-click verify + Telegram, price history
+  viewer, admin search, enriched submission queue
+- ⬜ 3 public core UI · 4 map (price-first markers) · 5 venue experience ·
+  6 discovery (chips/list/bottom nav) · 7 contribution ("Preis falsch?") ·
+  8 desktop · 9 QA
 - Known remaining data-trust debt (NOT fixed in Phase 1, needs a decision):
   production still holds the fabricated `Community / "seeded price-trend
   history"` submissions (Price Trends chart is built on them) and

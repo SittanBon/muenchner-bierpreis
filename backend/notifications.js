@@ -145,6 +145,13 @@ function notifyApproved({ venueName, price, reportType }) {
   );
 }
 
+// An admin confirmed a price is still correct (verified_at set; the price itself
+// is unchanged). `price` is the confirmed actual menu price.
+function notifyPriceVerified({ venueName, price, admin }) {
+  const amount = price != null && !Number.isNaN(Number(price)) ? `€${Number(price).toFixed(2)}` : '—';
+  return sendTelegramMessage(`✓ Price verified: ${esc(venueName)} ${amount} — ${esc(admin || 'admin')}`);
+}
+
 function notifyStartup() {
   return sendTelegramMessage(
     `🍺 <b>Bierpreis server started</b>\n` +
@@ -161,5 +168,6 @@ module.exports = {
   notifyIncorrectInfo,
   notifyDescriptionSuggestion,
   notifyApproved,
+  notifyPriceVerified,
   notifyStartup,
 };

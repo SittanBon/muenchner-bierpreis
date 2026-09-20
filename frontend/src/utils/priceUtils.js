@@ -16,6 +16,11 @@ export const SERVING_SIZES = [
 ];
 export const VALID_VOLUMES_ML = SERVING_SIZES.map((s) => s.ml);
 
+// Where a price came from (admin-only metadata). Mirrors SOURCE_TYPES in
+// backend/utils/priceUtils.js (the parity test keeps them equal).
+export const SOURCE_TYPES = ['ADMIN', 'COMMUNITY', 'VENUE', 'MENU_PHOTO', 'OTHER'];
+export const NOTES_MAX_LENGTH = 500;
+
 export function isValidVolume(ml) {
   return Number.isInteger(ml) && VALID_VOLUMES_ML.includes(ml);
 }

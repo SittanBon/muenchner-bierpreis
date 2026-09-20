@@ -192,7 +192,6 @@ body{font-family:var(--font-body);background:var(--cream);color:var(--text-prima
 .av-price-wrap{display:flex;flex-direction:column;align-items:flex-end;line-height:1.15}
 .vpc-size{font-family:var(--font-body);font-weight:400;font-size:11px;color:var(--text-secondary)}
 .vpc-approx{font-family:var(--font-body);font-size:10.5px;color:var(--text-muted);margin-top:1px}
-.vm-beer-meta{display:flex;align-items:center;flex-wrap:wrap;gap:8px 12px;margin:-2px 0 8px;padding-left:2px;font-size:11.5px;color:var(--text-secondary)}
 .vm-verify{padding:3px 10px;background:none;border:1.5px solid var(--amber-400);border-radius:6px;color:var(--amber-800);font-size:11.5px;font-weight:500;cursor:pointer;font-family:var(--font-body)}
 .vm-verify:hover:not(:disabled){background:var(--amber-100)}
 .vm-verify:disabled{opacity:0.5;cursor:default}
@@ -945,4 +944,108 @@ body{font-family:var(--font-body);background:var(--cream);color:var(--text-prima
   .legal-header{padding:0 14px}
   .legal-header-brand{display:none}
   .legal-content{padding:24px 16px 40px}
+}
+
+/* ===== Admin Phase 2: data quality, price editor, price history, submission review ===== */
+
+/* -- Data-quality flag badges. Always carry a text label; colour is only a cue. */
+.dq-badge{display:inline-block;padding:2px 9px;border-radius:20px;font-size:11px;font-weight:600;white-space:nowrap;border:1px solid transparent;font-family:var(--font-body);line-height:1.4}
+.dq-badge-high{background:#fbe4de;color:#a5361f;border-color:#f0c2b7}
+.dq-badge-medium{background:#fff3d6;color:#8a6800;border-color:#f0dca0}
+.dq-badge-low{background:#eeeae2;color:#5a4d3a;border-color:#dcd4c4}
+.dq-badge-sm{font-size:10px;padding:1px 7px;cursor:pointer}
+.vm-flags{display:flex;flex-wrap:wrap;gap:4px;margin-top:4px;align-items:center}
+.dq-more-n{font-size:10.5px;color:var(--text-muted)}
+
+/* -- Data Quality tab */
+.dq-panel{padding:4px 0 24px}
+.dq-summary{background:var(--amber-50);border:1.5px solid var(--amber-400);border-radius:var(--radius-lg);padding:14px 16px;margin-bottom:14px}
+.dq-summary-main{font-family:var(--font-heading);font-weight:700;font-size:22px;color:var(--amber-900);line-height:1.2}
+.dq-summary-clean{color:#2f7d2f}
+.dq-summary-sub{font-size:12.5px;color:var(--text-secondary);margin-top:3px}
+.dq-review-only{font-size:11.5px;color:var(--text-muted);margin-top:8px;font-style:italic}
+.dq-chips{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px}
+.dq-chip{display:inline-flex;align-items:center;gap:6px;min-height:34px;padding:5px 12px;border-radius:20px;border:1.5px solid var(--border-md);background:#fff;font-size:12px;font-weight:500;color:var(--text-secondary);cursor:pointer;font-family:var(--font-body)}
+.dq-chip:disabled{opacity:.45;cursor:default}
+.dq-chip.active{background:var(--amber-900);border-color:var(--amber-900);color:var(--amber-100)}
+.dq-chip-n{font-weight:700;font-size:11px;background:rgba(0,0,0,.07);border-radius:10px;padding:0 6px}
+.dq-chip.active .dq-chip-n{background:rgba(255,255,255,.2)}
+.dq-list{display:flex;flex-direction:column;gap:10px}
+.dq-venue{background:var(--surface);border:1.5px solid var(--border);border-radius:var(--radius);overflow:hidden}
+.dq-venue-head{display:flex;align-items:center;gap:10px;padding:9px 12px;background:var(--amber-50);border-bottom:1px solid var(--border)}
+.dq-venue-head strong{font-family:var(--font-heading);font-weight:600;font-size:14px;color:var(--text-primary)}
+.dq-hood{font-size:12px;color:var(--text-muted);flex:1}
+.dq-flag-row{display:flex;align-items:flex-start;gap:10px;padding:9px 12px;border-top:1px solid var(--border);flex-wrap:wrap}
+.dq-flag-row:first-of-type{border-top:none}
+.dq-flag-info{flex:1;min-width:180px}
+.dq-beer{font-size:13px;color:var(--text-primary);display:flex;flex-wrap:wrap;gap:0 4px;align-items:center}
+.dq-fresh{margin-left:6px}
+.dq-desc{font-size:12px;color:var(--text-muted);margin-top:1px}
+.dq-actions{display:flex;gap:6px;flex-wrap:wrap}
+.dq-btn{min-height:32px;padding:4px 11px;border-radius:7px;border:1.5px solid var(--border-md);background:#fff;font-size:12px;font-weight:500;color:var(--text-secondary);cursor:pointer;font-family:var(--font-body)}
+.dq-btn:hover:not(:disabled){background:var(--amber-50)}
+.dq-btn:disabled{opacity:.5;cursor:default}
+.dq-btn-edit{border-color:var(--amber-400);color:var(--amber-800)}
+.dq-btn-verify{border-color:#2d7a2d;color:#2d7a2d}
+.dq-more{align-self:center;margin-top:4px;padding:8px 18px;border-radius:20px;border:1.5px solid var(--amber-400);background:var(--amber-50);color:var(--amber-800);font-weight:600;font-size:12.5px;cursor:pointer;font-family:var(--font-body)}
+.dq-error{padding:20px;color:#a5361f;text-align:center}
+
+/* -- Price editor (one card per beer in the venue editor) */
+.vm-beer-card{border:1.5px solid var(--border-md);background:#fff;border-radius:var(--radius);padding:12px;margin-bottom:10px}
+.vm-beer-head{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:10px}
+.vm-beer-head .vm-beer-brand{font-size:14px;font-weight:600;color:var(--text-primary)}
+.vm-beer-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px 12px}
+.pe-field{display:flex;flex-direction:column;gap:3px;min-width:0}
+.pe-field label{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.3px;color:var(--text-muted)}
+.pe-field .vm-price-input,.pe-field .vm-serve-select{width:100%;max-width:none;flex:none}
+.pe-normalized{min-height:36px;display:flex;align-items:center;padding:0 10px;border:1.5px dashed var(--border-md);border-radius:7px;background:var(--amber-50);color:var(--text-secondary);font-size:13px;font-weight:600}
+.pe-notes{margin-top:10px}
+.pe-notes textarea{width:100%;padding:8px;border:1.5px solid var(--border-md);border-radius:7px;font-family:var(--font-body);font-size:13px;resize:vertical}
+.pe-hint{text-transform:none;letter-spacing:0;font-weight:400}
+.vm-beer-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px;align-items:center}
+.vm-beer-actions .vm-save-beer{padding:8px 16px}
+.vm-beer-actions .vm-save-beer:disabled{opacity:.45;cursor:default}
+.vm-beer-actions .vm-verify{padding:7px 14px;font-size:12.5px}
+.vm-beer-actions .vm-delete-beer{margin-left:auto}
+.vm-history-btn{padding:7px 12px;border:1.5px solid var(--border-md);border-radius:7px;background:#fff;color:var(--text-secondary);font-size:12.5px;cursor:pointer;font-family:var(--font-body)}
+.vm-history-btn[aria-expanded="true"]{background:var(--amber-50);border-color:var(--amber-400)}
+
+/* -- Price history table */
+.ph-wrap{margin-top:12px;border-top:1px dashed var(--border-md);padding-top:10px}
+.ph-scroll{overflow-x:auto}
+.ph-table{width:100%;border-collapse:collapse;font-size:12px;min-width:640px}
+.ph-table th{text-align:left;font-size:10.5px;text-transform:uppercase;letter-spacing:.3px;color:var(--text-muted);padding:5px 8px;border-bottom:1.5px solid var(--border-md);white-space:nowrap}
+.ph-table td{padding:6px 8px;border-bottom:1px solid var(--border);vertical-align:top}
+.ph-price{font-family:var(--font-heading);font-weight:700;font-size:13px;color:var(--amber-800)}
+.ph-muted{color:var(--text-muted)}
+.ph-seeded td{color:var(--text-muted);background:repeating-linear-gradient(135deg,transparent 0 6px,rgba(0,0,0,.035) 6px 12px)}
+.ph-seeded .ph-price{color:var(--text-muted);font-weight:500}
+.ph-current td{background:var(--amber-50)}
+.ph-badge{display:inline-block;margin-left:6px;padding:1px 7px;border-radius:20px;font-size:10px;font-weight:600;white-space:nowrap}
+.ph-badge-current{background:var(--amber-900);color:var(--amber-100)}
+.ph-badge-seeded{margin-left:0;background:#eeeae2;color:#5a4d3a;border:1px dashed #b8ad97}
+.ph-flag{color:var(--text-muted);margin-left:2px;cursor:help}
+.ph-status{display:inline-block;padding:1px 8px;border-radius:20px;font-size:10.5px;font-weight:600}
+.ph-status-approved{background:#e6f4e6;color:#2d7a2d}
+.ph-status-pending{background:#fff3d6;color:#8a6800}
+.ph-status-rejected{background:#fbe4de;color:#a5361f}
+.ph-notapplied{display:block;margin-top:2px;font-size:10px;color:#a5361f;font-weight:600}
+.ph-note{font-size:11.5px;color:var(--text-muted);margin-top:8px}
+.ph-error{color:#a5361f}
+
+/* -- Submission review: price comparison block */
+.spi{background:var(--amber-50);border:1px solid var(--border);border-radius:8px;padding:9px 11px;margin:8px 0;font-size:13px;display:flex;flex-direction:column;gap:5px}
+.spi-row{display:flex;gap:10px;align-items:baseline;flex-wrap:wrap}
+.spi-label{min-width:82px;font-size:10.5px;font-weight:600;text-transform:uppercase;letter-spacing:.3px;color:var(--text-muted)}
+.spi-muted{color:var(--text-muted)}
+.spi-fresh{margin-left:8px}
+.spi-outlier{margin-left:8px}
+.spi-meta{gap:6px 16px;font-size:12px;color:var(--text-secondary);padding-top:4px;border-top:1px dashed var(--border-md)}
+.spi-warn{color:#a5361f;font-weight:600;font-size:12px}
+.spi-hint{color:var(--text-muted);font-size:11.5px;font-style:italic}
+
+@media (max-width:768px){
+  .dq-summary-main{font-size:19px}
+  .dq-actions{width:100%}
+  .vm-beer-actions .vm-delete-beer{margin-left:0}
 }

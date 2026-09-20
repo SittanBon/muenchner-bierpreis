@@ -53,6 +53,11 @@ describe('normalisation + formatting parity', () => {
     }
   });
 
+  test('both sides know the same price source types and notes limit', () => {
+    assert.deepEqual(fePrice.SOURCE_TYPES, be.SOURCE_TYPES);
+    assert.equal(fePrice.NOTES_MAX_LENGTH, be.NOTES_MAX_LENGTH);
+  });
+
   test('both sides support the same serving sizes', () => {
     assert.deepEqual([...fePrice.VALID_VOLUMES_ML].sort((a, b) => a - b), [...be.VALID_VOLUMES_ML].sort((a, b) => a - b));
     assert.deepEqual(

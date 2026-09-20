@@ -4,6 +4,8 @@ import { adminLogin, adminFetchSubmissions, adminUpdateSubmission, adminFetchSta
 import VenueManager from './VenueManager';
 import CityManager from './CityManager';
 import ActivityLog from './ActivityLog';
+import DataQualityPanel from './DataQualityPanel';
+import SubmissionPriceInfo from './SubmissionPriceInfo';
 import MiniMapPreview from './MiniMapPreview';
 import { formatEuro } from '../utils/price';
 import { useToast } from '../hooks/useToast';
@@ -27,9 +29,10 @@ export default function AdminPage({ onBack }) {
   const [stats, setStats] = useState(null);
   const [filter, setFilter] = useState('pending');
   const [loading, setLoading] = useState(false);
-  const [section, setSection] = useState('submissions'); // 'submissions' | 'venues' | 'cities' | 'logs'
-  const [venuesQuery, setVenuesQuery] = useState(''); // seeded by "jump to venue" from the Activity Log
-  const openVenueInManager = (name) => { setVenuesQuery(name || ''); setSection('venues'); };
+  const [section, setSection] = useState('submissions'); // 'submissions' | 'venues' | 'quality' | 'cities' | 'logs'
+  const [venuesQuery, setVenuesQuery] = useState(''); // seeded by "jump to venue" from the Activity Log / Data Quality
+  const [venuesEditId, setVenuesEditId] = useState(null); // Data Quality's "Edit" also opens that venue's editor
+  const openVenueInManager = (name, id = null) => { setVenuesQuery(name || ''); setVenuesEditId(id); setSection('venues'); };
 
   const handleLogin = async () => {
     const res = await adminLogin(creds.username, creds.password);
@@ -47,8 +50,12 @@ export default function AdminPage({ onBack }) {
     localStorage.removeItem('bp_admin_token');
   };
 
+  // Re-fetched every time the Submissions tab is (re)opened, not just once: each
+  // card shows the venue's CURRENT price for comparison, and an admin who has
+  // since verified or edited a price on another tab must not review against a
+  // stale snapshot of it.
   useEffect(() => {
-    if (!token) return;
+    if (!token || section !== 'submissions') return;
     setLoading(true);
     Promise.all([
       adminFetchSubmissions(token, filter),
@@ -58,7 +65,7 @@ export default function AdminPage({ onBack }) {
       setStats(st);
       setLoading(false);
     }).catch(() => { setToken(''); setLoading(false); });
-  }, [token, filter]);
+  }, [token, filter, section]);
 
   const handleAction = async (id, status, reject_reason) => {
     // Captured before the row disappears from `submissions` below — the toast
@@ -154,6 +161,9 @@ export default function AdminPage({ onBack }) {
         <button className={`admin-section-tab ${section === 'venues' ? 'active' : ''}`} onClick={() => setSection('venues')}>
           🍺 {t('admin.venues.tab')}
         </button>
+        <button className={`admin-section-tab ${section === 'quality' ? 'active' : ''}`} onClick={() => setSection('quality')}>
+          🩺 {t('admin.quality.tab')}
+        </button>
         <button className={`admin-section-tab ${section === 'cities' ? 'active' : ''}`} onClick={() => setSection('cities')}>
           🌍 {t('admin.cities.tab')}
         </button>
@@ -163,7 +173,9 @@ export default function AdminPage({ onBack }) {
       </div>
 
       {section === 'venues' ? (
-        <VenueManager token={token} initialQuery={venuesQuery} />
+        <VenueManager token={token} initialQuery={venuesQuery} initialEditVenueId={venuesEditId} />
+      ) : section === 'quality' ? (
+        <DataQualityPanel token={token} onEditVenue={(g) => openVenueInManager(g.name, g.venue_id)} />
       ) : section === 'cities' ? (
         <CityManager token={token} />
       ) : section === 'logs' ? (
@@ -188,13 +200,24 @@ export default function AdminPage({ onBack }) {
             <div className="submissions-list">
           {submissions.map(sub => {
             const meta = REPORT_TYPE_META[sub.report_type] || REPORT_TYPE_META.price_change;
+            // price_change / new_beer get the full comparison (size, per-0.5 L
+            // price, current price, difference, source); their outlier flag is
+            // recomputed live against the CURRENT price by the server.
+            const isPriceReport = sub.report_type === 'price_change' || sub.report_type === 'new_beer';
+            const outlier = isPriceReport ? sub.outlier : sub.is_outlier;
             return (
-            <div key={sub.id} className={`submission-card ${sub.is_outlier ? 'outlier' : ''}`}>
+            <div key={sub.id} className={`submission-card ${outlier ? 'outlier' : ''}`}>
               <div className="sub-top">
                 <span className="report-type-badge">{meta.icon} {meta.label}</span>
                 <strong>{sub.venue_name || 'Neues Lokal'}</strong>
-                {sub.is_outlier && <span className="outlier-badge">⚠️ Ausreißer</span>}
+                {outlier && <span className="outlier-badge">⚠️ Ausreißer</span>}
               </div>
+              {isPriceReport ? (
+                <>
+                  <div className="sub-details">{sub.beer_brand && <span>🍻 {sub.beer_brand}</span>}</div>
+                  <SubmissionPriceInfo sub={sub} pending={filter === 'pending'} />
+                </>
+              ) : (
               <div className="sub-details">
                 {sub.beer_brand && <span>🍻 {sub.beer_brand}</span>}
                 {sub.size && <span>📏 {sub.size}</span>}
@@ -204,6 +227,7 @@ export default function AdminPage({ onBack }) {
                 {sub.visit_date && <span>📅 {sub.visit_date}</span>}
                 <span>👤 {sub.submitter_name}</span>
               </div>
+              )}
               {sub.note && <div className="sub-note">💬 {sub.note}</div>}
               {sub.report_type === 'new_venue' && sub.lat != null && sub.lng != null && (
                 <MiniMapPreview lat={sub.lat} lng={sub.lng} className="sub-map-preview" />

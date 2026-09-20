@@ -67,7 +67,45 @@ CREATE TABLE IF NOT EXISTS beers (
   serve_type TEXT NOT NULL DEFAULT 'unknown',  -- 'tap' | 'bottle' | 'can' | 'unknown'
   price_observed_at TEXT,     -- when size_05 was actually seen/reported (YYYY-MM-DD); NULL = unknown
   verified_at       TEXT,     -- when someone confirmed size_05 is still correct; NULL = never verified
-  serving_volume_ml INTEGER   -- serving size size_05 is quoted for: 250|330|400|500|1000; NULL = unknown
+  serving_volume_ml INTEGER,  -- serving size size_05 is quoted for: 250|330|400|500|1000; NULL = unknown
+  source_type TEXT,           -- where the CURRENT price came from: ADMIN|COMMUNITY|VENUE|MENU_PHOTO|OTHER; NULL = unknown (ADMIN-ONLY, never in the public API)
+  notes       TEXT            -- internal admin note on this price (ADMIN-ONLY, never in the public API)
+);
+
+-- One row per real price observation/change for a beer: a price an admin
+-- entered or changed, or one that came from an approved community submission.
+-- NOT written by "Verify" (confirming an unchanged price isn't a price change),
+-- by a save that changes nothing, or by a rejected submission. There is no
+-- backfill: prices that predate this table have no rows here, and their
+-- history is whatever approved submissions exist (see getBeerHistory).
+-- No foreign keys on purpose: a delisted/deleted beer's history stays readable
+-- and is matched by (venue_id, brand); deleting the VENUE removes its rows.
+CREATE TABLE IF NOT EXISTS price_history (
+  id                INTEGER PRIMARY KEY AUTOINCREMENT,
+  beer_id           INTEGER,
+  venue_id          TEXT NOT NULL,
+  brand             TEXT NOT NULL,
+  price             REAL NOT NULL,
+  serving_volume_ml INTEGER,
+  price_observed_at TEXT,      -- when this price was actually seen (NULL = unknown)
+  source_type       TEXT,
+  changed_by        TEXT,      -- admin username, or the submitter's name for a community report
+  submission_id     TEXT,      -- the submission this came from, if any
+  event             TEXT NOT NULL,  -- 'created' | 'price_changed' | 'approved_submission'
+  created_at        TEXT NOT NULL
+);
+
+-- "Dismiss" on a data-quality flag hides that one flag until dismissed_until.
+-- Nothing is fixed or deleted; when the date passes the flag reappears.
+-- beer_id 0 = a venue-level flag.
+CREATE TABLE IF NOT EXISTS flag_dismissals (
+  flag            TEXT NOT NULL,
+  venue_id        TEXT NOT NULL,
+  beer_id         INTEGER NOT NULL DEFAULT 0,
+  dismissed_until TEXT NOT NULL,
+  dismissed_by    TEXT,
+  created_at      TEXT NOT NULL,
+  PRIMARY KEY (flag, venue_id, beer_id)
 );
 
 -- report_type: price_change | new_beer | closed | other_info | new_venue.
@@ -122,3 +160,4 @@ CREATE INDEX IF NOT EXISTS idx_submissions_venue    ON submissions(venue_id);
 CREATE INDEX IF NOT EXISTS idx_submissions_status   ON submissions(status);
 CREATE INDEX IF NOT EXISTS idx_admin_logs_action    ON admin_logs(action_type);
 CREATE INDEX IF NOT EXISTS idx_admin_logs_created   ON admin_logs(created_at);
+CREATE INDEX IF NOT EXISTS idx_price_history_venue  ON price_history(venue_id, brand);

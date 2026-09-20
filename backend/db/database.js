@@ -14,7 +14,9 @@ const {
   toDateOnly,
   volumeFromSize,
   resolveObservationDates,
+  isValidSourceType,
 } = require('../utils/priceUtils');
+const { computeFlags, flagKey, THRESHOLDS } = require('../dataQuality');
 
 // Railway mounts the persistent volume at /app/data — without DATABASE_PATH
 // explicitly pointing there, a production deploy would silently fall back to
@@ -111,6 +113,18 @@ function migrate() {
       db.exec(`UPDATE beers SET serving_volume_ml = ${REFERENCE_VOLUME_ML} WHERE size_05 IS NOT NULL`);
     }
   }
+  // P0 Phase 2 — where the current price came from + an internal admin note.
+  // Both start NULL for every existing row: source tracking didn't exist, and
+  // guessing "ADMIN" or "COMMUNITY" for old prices would be inventing
+  // provenance. (price_history and flag_dismissals are new tables — schema.sql
+  // creates them; they need no migration.)
+  const beerColsP2 = db.prepare('PRAGMA table_info(beers)').all().map((c) => c.name);
+  const missingP2 = ['source_type', 'notes'].filter((c) => !beerColsP2.includes(c));
+  if (missingP2.length) {
+    backupBeforeMigration('phase2');
+    if (!beerColsP2.includes('source_type')) db.exec('ALTER TABLE beers ADD COLUMN source_type TEXT');
+    if (!beerColsP2.includes('notes')) db.exec('ALTER TABLE beers ADD COLUMN notes TEXT');
+  }
   const venueCols = db.prepare('PRAGMA table_info(venues)').all().map((c) => c.name);
   if (!venueCols.includes('active')) {
     db.exec('ALTER TABLE venues ADD COLUMN active INTEGER NOT NULL DEFAULT 1');
@@ -180,6 +194,18 @@ const beersForVenue = db.prepare(
              id ASC`
 );
 
+// The admin variant of the same query adds the two ADMIN-ONLY columns —
+// source_type and the internal notes. They are deliberately absent from
+// beersForVenue, so they can never reach a public response.
+const beersForVenueAdmin = db.prepare(
+  `SELECT id, venue_id, brand, size_05, size_mass, updated, reports, serve_type,
+          serving_volume_ml, price_observed_at, verified_at, source_type, notes
+     FROM beers WHERE venue_id = ? AND active = 1
+    ORDER BY CASE WHEN serving_volume_ml > 0 AND size_05 > 0 THEN 0 ELSE 1 END,
+             size_05 * ${REFERENCE_VOLUME_ML}.0 / serving_volume_ml ASC,
+             id ASC`
+);
+
 // Adds the server-derived fields every public/admin beer carries: the price
 // normalised to 0.5 L (null when the serving size or price is unknown) and
 // the freshness state. The API sends only what the UI needs — no admin ids,
@@ -213,7 +239,7 @@ const venueByIdStmt = db.prepare(`${venueBase} WHERE v.id = ? AND v.active = 1`)
 const allVenuesAdminStmt = db.prepare(`${venueBase} ORDER BY v.name`);
 const venueByIdAdminStmt = db.prepare(`${venueBase} WHERE v.id = ?`);
 
-function hydrateVenue(row) {
+function hydrateVenue(row, { admin = false } = {}) {
   if (!row) return null;
   return {
     id: row.id,
@@ -231,7 +257,7 @@ function hydrateVenue(row) {
     description_en: row.description_en,
     active: row.active === 1,
     outside_modelled_area: row.outside_modelled_area === 1,
-    beers: beersForVenue.all(row.id).map(hydrateBeer),
+    beers: (admin ? beersForVenueAdmin : beersForVenue).all(row.id).map(hydrateBeer),
   };
 }
 
@@ -244,11 +270,11 @@ function getVenue(id) {
 }
 
 function getVenuesAdmin() {
-  return allVenuesAdminStmt.all().map(hydrateVenue);
+  return allVenuesAdminStmt.all().map((row) => hydrateVenue(row, { admin: true }));
 }
 
 function getVenueAdmin(id) {
-  return hydrateVenue(venueByIdAdminStmt.get(id));
+  return hydrateVenue(venueByIdAdminStmt.get(id), { admin: true });
 }
 
 const neighbourhoodsStmt = db.prepare('SELECT * FROM neighbourhoods ORDER BY name_de');
@@ -695,11 +721,39 @@ function updateVenue(id, fields) {
 const insertBeerStmt = db.prepare(`
   INSERT INTO beers
     (venue_id, brand, size_05, size_mass, updated, reports, active, serve_type,
-     serving_volume_ml, price_observed_at, verified_at)
+     serving_volume_ml, price_observed_at, verified_at, source_type)
   VALUES
     (@venue_id, @brand, @size_05, @size_mass, @updated, 1, 1, @serve_type,
-     @serving_volume_ml, @price_observed_at, NULL)
+     @serving_volume_ml, @price_observed_at, NULL, @source_type)
 `);
+
+const insertPriceHistoryStmt = db.prepare(`
+  INSERT INTO price_history
+    (beer_id, venue_id, brand, price, serving_volume_ml, price_observed_at,
+     source_type, changed_by, submission_id, event, created_at)
+  VALUES
+    (@beer_id, @venue_id, @brand, @price, @serving_volume_ml, @price_observed_at,
+     @source_type, @changed_by, @submission_id, @event, @created_at)
+`);
+
+// One row per REAL price observation/change — see the price_history comment in
+// schema.sql. Callers: an admin entering/changing a price, and an approved
+// submission. Never "Verify", never a no-op save, never a rejection.
+function recordPriceHistory(entry) {
+  insertPriceHistoryStmt.run({
+    beer_id: entry.beer_id ?? null,
+    venue_id: entry.venue_id,
+    brand: entry.brand,
+    price: entry.price,
+    serving_volume_ml: entry.serving_volume_ml ?? null,
+    price_observed_at: toDateOnly(entry.price_observed_at),
+    source_type: isValidSourceType(entry.source_type) ? entry.source_type : null,
+    changed_by: entry.changed_by ?? null,
+    submission_id: entry.submission_id ?? null,
+    event: entry.event,
+    created_at: new Date().toISOString(),
+  });
+}
 
 // Bound parameters for insertBeerStmt from a caller's beer object.
 //  - serving_volume_ml defaults to 500: every creation path (admin form,
@@ -721,7 +775,34 @@ function beerInsertParams(venue_id, b) {
     serve_type: normalizeServeType(b.serve_type),
     serving_volume_ml: b.serving_volume_ml === undefined ? REFERENCE_VOLUME_ML : b.serving_volume_ml,
     price_observed_at: toDateOnly(b.price_observed_at),
+    // NULL = unknown. Only a caller that knows where the price came from sets it.
+    source_type: isValidSourceType(b.source_type) ? b.source_type : null,
   };
+}
+
+// Inserts a beer and returns its id. When the caller passes record_history_by
+// (an admin adding a price, or an approved new-venue/new-beer submission) the
+// creation is also written to price_history; the research/backfill scripts
+// don't, so their prices stay history-less rather than getting an invented
+// first entry.
+function insertBeer(venue_id, b) {
+  const params = beerInsertParams(venue_id, b);
+  const beerId = Number(insertBeerStmt.run(params).lastInsertRowid);
+  if (b.record_history_by) {
+    recordPriceHistory({
+      beer_id: beerId,
+      venue_id,
+      brand: b.brand,
+      price: b.size_05,
+      serving_volume_ml: params.serving_volume_ml,
+      price_observed_at: b.price_observed_at,
+      source_type: b.source_type,
+      changed_by: b.record_history_by,
+      submission_id: b.history_submission_id,
+      event: b.history_event || 'created',
+    });
+  }
+  return beerId;
 }
 
 const beerBelongsToVenueStmt = db.prepare('SELECT id FROM beers WHERE id = ? AND venue_id = ?');
@@ -776,59 +857,95 @@ const createVenue = db.transaction((venue, beersInput) => {
   });
 
   for (const b of beersInput) {
-    insertBeerStmt.run(beerInsertParams(id, b));
+    insertBeer(id, b);
   }
 
   return id;
 });
 
 function addBeerToVenue(venue_id, beer) {
-  insertBeerStmt.run(beerInsertParams(venue_id, beer));
+  return insertBeer(venue_id, beer);
 }
 
 // Admin price edit. Returns false if the beer doesn't exist / doesn't belong to
 // that venue.
 //
-//  * A save that changes nothing writes nothing — not even `updated`. (It used
-//    to stamp `updated = today` on every save, so clicking Save on an old
-//    price made it look freshly confirmed.)
+//  * A save that changes nothing writes nothing — not even `updated`, and no
+//    history entry. (It used to stamp `updated = today` on every save, so
+//    clicking Save on an old price made it look freshly confirmed.)
 //  * `updated` (technical) moves only when a stored value actually changed.
 //  * A changed headline price or serving size is a new observation by the
-//    admin: price_observed_at = today, and verified_at is cleared — any
-//    earlier verification was of the OLD value.
-//  * A change to size_mass or serve_type alone touches `updated` only; it says
-//    nothing about how current the headline price is, so the freshness dates
-//    stay as they were.
-//  * serve_type / serving_volume_ml are optional — an omitted value keeps
-//    what the beer already has (a plain price edit must never silently reset
-//    a known 'tap' back to 'unknown').
-function updateBeerPrice(venue_id, beer_id, { size_05, size_mass, serve_type, serving_volume_ml }) {
+//    admin: price_observed_at = the date they entered (default: today),
+//    verified_at is CLEARED (any earlier verification was of the OLD value),
+//    the source becomes 'ADMIN' unless they chose one, and ONE price_history
+//    entry is written. Saving NEVER sets verified_at — only the separate
+//    "Verify" action does.
+//  * price_observed_at given on its own (a date correction, no price change):
+//    it is stored as given, and a verification that is not newer than it is
+//    cleared so freshness (which prefers verified_at) can't contradict it. No
+//    history entry — the price didn't change.
+//  * source_type / notes / serve_type / size_mass alone touch `updated` only;
+//    they say nothing about how current the headline price is.
+//  * serve_type / serving_volume_ml / price_observed_at / source_type / notes
+//    are optional — an omitted (undefined) value keeps what the beer already has.
+function updateBeerPrice(venue_id, beer_id, fields, ctx = {}) {
+  const { size_05, size_mass, serve_type, serving_volume_ml, price_observed_at, source_type, notes } = fields;
   const existing = beerForVenueStmt.get(beer_id, venue_id);
   if (!existing) return false;
 
   const nextServe = serve_type !== undefined ? normalizeServeType(serve_type) : existing.serve_type;
   const nextVolume = serving_volume_ml !== undefined ? serving_volume_ml : existing.serving_volume_ml;
   const nextMass = size_mass ?? null;
+  const nextNotes = notes !== undefined ? (String(notes ?? '').trim() || null) : existing.notes;
+  const givenObserved = toDateOnly(price_observed_at);
 
   const headlineChanged = existing.size_05 !== size_05
     || (existing.serving_volume_ml ?? null) !== (nextVolume ?? null);
   const massChanged = (existing.size_mass ?? null) !== nextMass;
   const serveChanged = existing.serve_type !== nextServe;
-  if (!headlineChanged && !massChanged && !serveChanged) return true;
+  const notesChanged = (existing.notes ?? null) !== (nextNotes ?? null);
 
-  const today = todayISO();
+  let nextSource = source_type !== undefined ? (isValidSourceType(source_type) ? source_type : null) : existing.source_type;
+  let observed = existing.price_observed_at;
+  let verified = existing.verified_at;
+  let observedChanged = false;
+
+  if (headlineChanged) {
+    observed = givenObserved || todayISO();
+    verified = null;
+    if (source_type === undefined) nextSource = 'ADMIN'; // the admin entered this price
+  } else if (givenObserved && givenObserved !== existing.price_observed_at) {
+    observed = givenObserved;
+    observedChanged = true;
+    if (verified && verified <= observed) verified = null;
+  }
+  const sourceChanged = (existing.source_type ?? null) !== (nextSource ?? null);
+
+  if (!headlineChanged && !massChanged && !serveChanged && !notesChanged && !observedChanged && !sourceChanged) {
+    return true;
+  }
+
   db.prepare(`
     UPDATE beers
        SET size_05 = @size_05, size_mass = @size_mass, serve_type = @serve_type,
            serving_volume_ml = @serving_volume_ml, updated = @today,
-           price_observed_at = @price_observed_at, verified_at = @verified_at
+           price_observed_at = @price_observed_at, verified_at = @verified_at,
+           source_type = @source_type, notes = @notes
      WHERE id = @beer_id AND venue_id = @venue_id
   `).run({
-    beer_id, venue_id, today,
+    beer_id, venue_id, today: todayISO(),
     size_05, size_mass: nextMass, serve_type: nextServe, serving_volume_ml: nextVolume ?? null,
-    price_observed_at: headlineChanged ? today : existing.price_observed_at,
-    verified_at: headlineChanged ? null : existing.verified_at,
+    price_observed_at: observed, verified_at: verified,
+    source_type: nextSource ?? null, notes: nextNotes ?? null,
   });
+
+  if (headlineChanged) {
+    recordPriceHistory({
+      beer_id, venue_id, brand: existing.brand, price: size_05, serving_volume_ml: nextVolume ?? null,
+      price_observed_at: observed, source_type: nextSource, changed_by: ctx.changedBy || 'admin',
+      event: 'price_changed',
+    });
+  }
   return true;
 }
 
@@ -876,14 +993,22 @@ const applyApprovedPrice = db.transaction((sub) => {
   const serveType = sub.serve_type || null;
   const existing = activeBeerByBrandStmt.get(sub.venue_id, sub.beer_brand);
 
+  const submitter = sub.submitter_name || 'Anonym';
+  // Every applied approval is a real observation, so it gets ONE history entry
+  // (source COMMUNITY, attributed to the submitter, dated by the visit date).
+  const logObservation = (beerId) => recordPriceHistory({
+    beer_id: beerId, venue_id: sub.venue_id, brand: sub.beer_brand, price,
+    serving_volume_ml: volume, price_observed_at: observedAt, source_type: 'COMMUNITY',
+    changed_by: submitter, submission_id: sub.id, event: 'approved_submission',
+  });
+
   if (!existing) {
-    insertBeerStmt.run({
-      ...beerInsertParams(sub.venue_id, {
-        brand: sub.beer_brand, size_05: price, size_mass: null, serve_type: serveType,
-        serving_volume_ml: volume, price_observed_at: observedAt,
-      }),
+    const beerId = insertBeer(sub.venue_id, {
+      brand: sub.beer_brand, size_05: price, size_mass: null, serve_type: serveType,
+      serving_volume_ml: volume, price_observed_at: observedAt, source_type: 'COMMUNITY',
+      record_history_by: submitter, history_submission_id: sub.id, history_event: 'approved_submission',
     });
-    return { applied: true, created: true, target: 'headline', old: null };
+    return { applied: true, created: true, target: 'headline', old: null, beer_id: beerId };
   }
 
   const old = { size_05: existing.size_05, size_mass: existing.size_mass, serving_volume_ml: existing.serving_volume_ml };
@@ -894,7 +1019,8 @@ const applyApprovedPrice = db.transaction((sub) => {
              serve_type = COALESCE(@serve_type, serve_type)
        WHERE id = @id
     `).run({ id: existing.id, price, today, serve_type: serveType });
-    return { applied: true, created: false, target: 'mass', old };
+    logObservation(existing.id);
+    return { applied: true, created: false, target: 'mass', old, beer_id: existing.id };
   }
 
   const dates = resolveObservationDates({ existing, newPrice: price, newVolume: volume, observedAt });
@@ -905,7 +1031,7 @@ const applyApprovedPrice = db.transaction((sub) => {
     UPDATE beers
        SET size_05 = @price, serving_volume_ml = @volume, size_mass = @size_mass,
            price_observed_at = @price_observed_at, verified_at = @verified_at,
-           updated = @today, reports = reports + 1,
+           updated = @today, reports = reports + 1, source_type = 'COMMUNITY',
            serve_type = COALESCE(@serve_type, serve_type)
      WHERE id = @id
   `).run({
@@ -913,8 +1039,164 @@ const applyApprovedPrice = db.transaction((sub) => {
     price_observed_at: dates.price_observed_at, verified_at: dates.verified_at,
     today, serve_type: serveType,
   });
-  return { applied: true, created: false, target: 'headline', old };
+  logObservation(existing.id);
+  return { applied: true, created: false, target: 'headline', old, beer_id: existing.id };
 });
+
+// ─── Price history viewer (admin) ───────────────────────────────────────────
+
+// The note the seed script's fabricated trend-history submissions carry. They
+// are formula output, not observations — the history viewer labels them as
+// "seeded estimates" so nobody mistakes them for a real price.
+const SEEDED_ESTIMATE_NOTE = 'seeded price-trend history';
+
+const priceHistoryRowsStmt = db.prepare(
+  'SELECT * FROM price_history WHERE venue_id = ? AND lower(brand) = lower(?) ORDER BY id DESC'
+);
+// Submissions for the same venue+brand that price_history does NOT already
+// represent: pending and rejected ones (never applied, so never recorded), and
+// approved ones from before price_history existed. Applied approvals since
+// Phase 2 are in price_history (linked by submission_id) and excluded here so
+// nothing shows twice.
+const submissionHistoryStmt = db.prepare(`
+  SELECT * FROM submissions
+   WHERE venue_id = ? AND lower(beer_brand) = lower(?) AND price IS NOT NULL
+     AND id NOT IN (SELECT submission_id FROM price_history WHERE submission_id IS NOT NULL)
+   ORDER BY created_at DESC
+`);
+
+// Full price history of one beer for the admin editor: real observations and
+// price changes (price_history), plus the submissions described above. Returns
+// null if the beer doesn't belong to the venue. `kind` separates a real
+// observation from a seeded estimate; `is_current` marks the entry that IS the
+// beer's current price — the only one the beer's verified_at can speak for
+// (a verification isn't a price event, so it never appears as its own row).
+function getBeerHistory(venue_id, beer_id) {
+  const beer = beerForVenueStmt.get(beer_id, venue_id);
+  if (!beer) return null;
+
+  const entries = [];
+  for (const h of priceHistoryRowsStmt.all(venue_id, beer.brand)) {
+    entries.push({
+      id: `h${h.id}`, kind: 'observation', event: h.event,
+      date: h.price_observed_at || h.created_at.slice(0, 10), date_is_observed: h.price_observed_at != null,
+      price: h.price, serving_volume_ml: h.serving_volume_ml,
+      normalized_500ml_price: normalizePrice(h.price, h.serving_volume_ml),
+      source_type: h.source_type, submitted_by: h.changed_by, status: 'approved',
+      created_at: h.created_at, verified_at: null, is_current: false,
+    });
+  }
+  for (const sub of submissionHistoryStmt.all(venue_id, beer.brand)) {
+    const volume = volumeFromSize(sub.size);
+    const seeded = sub.note === SEEDED_ESTIMATE_NOTE;
+    entries.push({
+      id: `s${sub.id}`, kind: seeded ? 'seeded_estimate' : 'observation', event: 'submission',
+      date: sub.visit_date || String(sub.created_at).slice(0, 10), date_is_observed: sub.visit_date != null,
+      price: sub.price, serving_volume_ml: volume, normalized_500ml_price: normalizePrice(sub.price, volume),
+      source_type: seeded ? null : 'COMMUNITY', submitted_by: seeded ? null : sub.submitter_name,
+      status: sub.status, created_at: sub.created_at, verified_at: null, is_current: false,
+      // An approved report whose serving size wasn't a recognised one was never
+      // applied to the price (see applyApprovedPrice) — say so, rather than
+      // letting "approved" read as "this is a price we recorded".
+      not_applied: sub.status === 'approved' && volume === null,
+    });
+  }
+  entries.sort((a, b) => (b.date.localeCompare(a.date)) || String(b.created_at).localeCompare(String(a.created_at)));
+
+  const current = entries.find((e) => e.kind === 'observation' && e.status === 'approved'
+    && e.price === beer.size_05 && (e.serving_volume_ml ?? null) === (beer.serving_volume_ml ?? null));
+  if (current) {
+    current.is_current = true;
+    current.verified_at = beer.verified_at;
+  }
+  return {
+    beer: {
+      id: beer.id, brand: beer.brand, size_05: beer.size_05, serving_volume_ml: beer.serving_volume_ml,
+      price_observed_at: beer.price_observed_at, verified_at: beer.verified_at, source_type: beer.source_type,
+    },
+    entries,
+  };
+}
+
+// ─── Data-quality flags (admin) ─────────────────────────────────────────────
+
+// Flags currently hidden by "Dismiss" (a Set of flagKey()s). Expired
+// dismissals are simply ignored — and pruned here — so the flag reappears by
+// itself once its 7 days are up.
+function getActiveDismissalKeys(now = new Date()) {
+  const nowIso = now.toISOString();
+  db.prepare('DELETE FROM flag_dismissals WHERE dismissed_until <= ?').run(nowIso);
+  return new Set(
+    db.prepare('SELECT flag, venue_id, beer_id FROM flag_dismissals WHERE dismissed_until > ?')
+      .all(nowIso).map((r) => flagKey(r.flag, r.venue_id, r.beer_id)),
+  );
+}
+
+// Hides one flag for THRESHOLDS.DISMISS_DAYS days. Fixes and deletes nothing.
+// Returns the ISO time it reappears.
+function dismissFlag({ flag, venue_id, beer_id = 0, by = 'admin' }, now = new Date()) {
+  const until = new Date(now.getTime() + THRESHOLDS.DISMISS_DAYS * 86400000).toISOString();
+  db.prepare(`
+    INSERT INTO flag_dismissals (flag, venue_id, beer_id, dismissed_until, dismissed_by, created_at)
+    VALUES (@flag, @venue_id, @beer_id, @until, @by, @created_at)
+    ON CONFLICT(flag, venue_id, beer_id) DO UPDATE SET
+      dismissed_until = excluded.dismissed_until, dismissed_by = excluded.dismissed_by, created_at = excluded.created_at
+  `).run({ flag, venue_id, beer_id: beer_id || 0, until, by, created_at: now.toISOString() });
+  return until;
+}
+
+// The admin venues (with admin-only beer fields) plus every open flag over them.
+function getDataQuality(now = new Date()) {
+  const venues = getVenuesAdmin();
+  const dismissed = getActiveDismissalKeys(now);
+  return { venues, flags: computeFlags(venues, dismissed), dismissed_count: dismissed.size };
+}
+
+// ─── Submission review (admin) ──────────────────────────────────────────────
+
+const OUTLIER_THRESHOLD = 0.25; // >25% off the current price (per 0.5 L) = warning
+
+// A submission row plus everything a reviewer needs to judge it without
+// leaving the queue: the submitted price at its serving size and per 0.5 L,
+// the venue's CURRENT price for that beer, and how far apart they are. The
+// outlier flag is recomputed against the current price now, not the price at
+// submission time (which may since have changed). Community submissions all
+// come through the public form, so their source is COMMUNITY.
+function enrichSubmissionForAdmin(row) {
+  const volume = volumeFromSize(row.size);
+  const normalized = normalizePrice(row.price, volume);
+  let current = null;
+  if (row.venue_id && row.beer_brand) {
+    const beer = activeBeerByBrandStmt.get(row.venue_id, row.beer_brand);
+    if (beer) {
+      current = {
+        beer_id: beer.id, price: beer.size_05, serving_volume_ml: beer.serving_volume_ml,
+        normalized_500ml_price: normalizePrice(beer.size_05, beer.serving_volume_ml),
+        freshness_state: getFreshness(beer).state,
+        price_observed_at: beer.price_observed_at, verified_at: beer.verified_at,
+      };
+    }
+  }
+  let differencePct = null;
+  if (normalized != null && current?.normalized_500ml_price) {
+    differencePct = Math.round(((normalized - current.normalized_500ml_price) / current.normalized_500ml_price) * 1000) / 10;
+  }
+  return {
+    ...row,
+    source_type: 'COMMUNITY',
+    serving_volume_ml: volume,
+    size_valid: row.price == null ? null : volume !== null,
+    normalized_500ml_price: normalized,
+    current,
+    difference_pct: differencePct,
+    outlier: differencePct != null && Math.abs(differencePct) > OUTLIER_THRESHOLD * 100,
+  };
+}
+
+function getAdminSubmissions(status) {
+  const rows = status ? submissionsByStatus.all(status) : allSubmissions.all();
+  return rows.map(enrichSubmissionForAdmin);
+}
 
 // Raw active-flag flip, independent of the full-edit form — used when
 // approving a "closed" report auto-deactivates the venue (MARK_CLOSED).
@@ -934,6 +1216,10 @@ const detachSubmissionsStmt = db.prepare('UPDATE submissions SET venue_id = NULL
 const deleteVenueTxn = db.transaction((id) => {
   detachSubmissionsStmt.run(id);
   deleteVenueStmt.run(id);
+  // price_history / flag_dismissals carry no foreign key (so a delisted beer's
+  // history stays readable) — clean them up explicitly with the venue.
+  db.prepare('DELETE FROM price_history WHERE venue_id = ?').run(id);
+  db.prepare('DELETE FROM flag_dismissals WHERE venue_id = ?').run(id);
 });
 
 // Returns the venue as it was just before deletion (for logging/notifying),
@@ -994,6 +1280,12 @@ module.exports = {
   updateBeerPrice,
   verifyBeerPrice,
   applyApprovedPrice,
+  recordPriceHistory,
+  getBeerHistory,
+  dismissFlag,
+  getDataQuality,
+  getAdminSubmissions,
+  SEEDED_ESTIMATE_NOTE,
   getPublicPriceHistory,
   hydrateBeer,
   deleteBeer,

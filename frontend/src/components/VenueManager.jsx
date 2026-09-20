@@ -2,13 +2,14 @@ import { useState, useEffect, useCallback, useMemo, Fragment } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   fetchNeighbourhoods, adminFetchVenues, adminCreateVenue, adminUpdateVenue,
-  adminDeleteVenue, adminAddBeer, adminUpdateBeerPrice, adminDeleteBeer, adminVerifyBeer,
+  adminDeleteVenue, adminAddBeer, adminDeleteBeer,
 } from '../hooks/useApi';
 import { parsePrice, formatEuro, pricePlaceholder } from '../utils/price';
 import { useToast } from '../hooks/useToast';
 import BrandCombobox from './BrandCombobox';
-import FreshnessLight from './FreshnessLight';
-import { describePrice } from '../utils/priceUtils';
+import BeerPriceEditor from './BeerPriceEditor';
+import { venueMatchesQuery } from '../utils/adminSearch';
+import { flagSeverity } from '../utils/dataQualityFlags';
 
 const TYPES = ['beer_garden', 'beer_hall', 'bar', 'restaurant'];
 const SERVE_TYPES = ['tap', 'bottle', 'can', 'unknown'];
@@ -300,64 +301,21 @@ function VenueDetailsForm({ token, venue, neighbourhoods, onUpdated }) {
 function EditVenueForm({ token, venue, neighbourhoods, onUpdated, onDeleted, onCancel }) {
   const { t, i18n } = useTranslation();
   const showToast = useToast();
-  const [prices, setPrices] = useState(() => Object.fromEntries(venue.beers.map((b) => [b.id, String(b.size_05)])));
-  const [serveTypes, setServeTypes] = useState(() => Object.fromEntries(venue.beers.map((b) => [b.id, b.serve_type || 'unknown'])));
-  const [savingId, setSavingId] = useState(null);
-  const [verifyingId, setVerifyingId] = useState(null);
   const [deletingId, setDeletingId] = useState(null);
   const [error, setError] = useState('');
   const [newBeer, setNewBeer] = useState(emptyBeer());
   const [addingBeer, setAddingBeer] = useState(false);
   const [deletingVenue, setDeletingVenue] = useState(false);
-
-  // Prices are keyed by beer id, so a fresh venue prop (after any edit) just
-  // adds/keeps entries — no need to reset the whole map each time.
-  useEffect(() => {
-    setPrices((p) => {
-      const next = { ...p };
-      venue.beers.forEach((b) => { if (!(b.id in next)) next[b.id] = String(b.size_05); });
-      return next;
-    });
-    setServeTypes((st) => {
-      const next = { ...st };
-      venue.beers.forEach((b) => { if (!(b.id in next)) next[b.id] = b.serve_type || 'unknown'; });
-      return next;
-    });
-  }, [venue.beers]);
+  // Which beers' price-history tables are open. Held here (not in each price
+  // editor) because an editor is remounted after every save/verify.
+  const [openHistory, setOpenHistory] = useState(() => new Set());
+  const toggleHistory = (beerId) => setOpenHistory((prev) => {
+    const next = new Set(prev);
+    if (next.has(beerId)) next.delete(beerId); else next.add(beerId);
+    return next;
+  });
 
   const existingBrands = venue.beers.map((b) => b.brand);
-
-  const savePrice = async (beer) => {
-    setError('');
-    const size_05 = parsePrice(prices[beer.id]);
-    if (size_05 == null) { setError(t('admin.venues.errPrice')); return; }
-    setSavingId(beer.id);
-    try {
-      const updated = await adminUpdateBeerPrice(token, venue.id, beer.id, {
-        size_05, size_mass: beer.size_mass, serve_type: serveTypes[beer.id],
-      });
-      onUpdated(updated);
-    } catch (err) {
-      setError(err.message);
-    }
-    setSavingId(null);
-  };
-
-  // "This price is still correct": sets verified_at only. Unlike Save, this
-  // never sends a price — there is nothing to change — so it cannot alter the
-  // price, the observation date or the technical modified date.
-  const verifyPrice = async (beer) => {
-    setError('');
-    setVerifyingId(beer.id);
-    try {
-      const updated = await adminVerifyBeer(token, venue.id, beer.id);
-      onUpdated(updated);
-      showToast('success', t('admin.toast.priceVerified', { brand: beer.brand, venue: venue.name }));
-    } catch (err) {
-      setError(err.message);
-    }
-    setVerifyingId(null);
-  };
 
   const deleteBeer = async (beer) => {
     if (!window.confirm(t('admin.venues.confirmDelete', { brand: beer.brand }))) return;
@@ -415,52 +373,20 @@ function EditVenueForm({ token, venue, neighbourhoods, onUpdated, onDeleted, onC
 
       <div className="vm-beers-title">{t('admin.venues.beers')}</div>
       {venue.beers.map((b) => (
-        <Fragment key={b.id}>
-        <div className="vm-beer-row vm-edit-row">
-          <span className="vm-beer-brand">{b.brand}</span>
-          <input
-            className="vm-price-input" inputMode="decimal" placeholder={pricePlaceholder(i18n.language)}
-            value={prices[b.id] ?? ''}
-            onChange={(e) => setPrices((p) => ({ ...p, [b.id]: e.target.value }))}
-          />
-          <ServeTypeSelect
-            value={serveTypes[b.id]}
-            onChange={(v) => setServeTypes((st) => ({ ...st, [b.id]: v }))}
-            id={`edit-venue-serve-${b.id}`}
-          />
-          <button type="button" className="vm-save-beer" onClick={() => savePrice(b)} disabled={savingId === b.id}>
-            {savingId === b.id ? '...' : t('admin.venues.save')}
-          </button>
-          <button
-            type="button" className="vm-delete-beer"
-            onClick={() => deleteBeer(b)} disabled={deletingId === b.id || venue.beers.length <= 1}
-            title={venue.beers.length <= 1 ? t('admin.venues.lastBeer') : t('admin.venues.deleteBeer')}
-          >
-            {deletingId === b.id ? '...' : `🗑 ${t('admin.venues.deleteBeer')}`}
-          </button>
-        </div>
-        {/* What the price above actually is, and how current it is — from the
-            same shared freshness rules the public site uses. */}
-        <div className="vm-beer-meta">
-          {(() => {
-            const p = describePrice(b, i18n.language);
-            return (
-              <span>
-                {p.sizeUnknown ? t('price.sizeUnknown') : p.volumeLabel}
-                {p.normalized && ` · ${t('price.approxPer05', { price: p.normalized })}`}
-              </span>
-            );
-          })()}
-          <FreshnessLight beer={b} />
-          <button
-            type="button" className="vm-verify"
-            onClick={() => verifyPrice(b)} disabled={verifyingId === b.id}
-            title={t('admin.venues.verifyHint')}
-          >
-            {verifyingId === b.id ? '...' : t('admin.venues.verify')}
-          </button>
-        </div>
-        </Fragment>
+        <BeerPriceEditor
+          // Remount whenever the SAVED beer changes, so the form always starts
+          // from what is stored; unsaved edits survive everything else.
+          key={[b.id, b.size_05, b.size_mass, b.serving_volume_ml, b.serve_type, b.price_observed_at, b.verified_at, b.source_type, b.notes, b.updated].join('|')}
+          token={token}
+          venue={venue}
+          beer={b}
+          onUpdated={onUpdated}
+          onDelete={() => deleteBeer(b)}
+          deleting={deletingId === b.id}
+          canDelete={venue.beers.length > 1}
+          historyOpen={openHistory.has(b.id)}
+          onToggleHistory={() => toggleHistory(b.id)}
+        />
       ))}
 
       <div className="vm-beers-title">{t('admin.venues.addAnotherBeer')}</div>
@@ -508,13 +434,14 @@ function EditVenueForm({ token, venue, neighbourhoods, onUpdated, onDeleted, onC
   );
 }
 
-export default function VenueManager({ token, initialQuery = '' }) {
+export default function VenueManager({ token, initialQuery = '', initialEditVenueId = null }) {
   const { t, i18n } = useTranslation();
   const [venues, setVenues] = useState([]);
   const [neighbourhoods, setNeighbourhoods] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showAdd, setShowAdd] = useState(false);
-  const [editingVenueId, setEditingVenueId] = useState(null);
+  // Seeded from the Data Quality tab's "Edit" — opens that venue's editor as soon as the list loads.
+  const [editingVenueId, setEditingVenueId] = useState(initialEditVenueId);
   // Seeded from the Activity Log's "jump to this venue" link — VenueManager is
   // only ever mounted while section==='venues', so a fresh initialQuery always
   // reaches a fresh instance of this state.
@@ -538,17 +465,14 @@ export default function VenueManager({ token, initialQuery = '' }) {
     setEditingVenueId((id) => (id === venueId ? null : id));
   };
 
-  // Real-time filter by name, neighbourhood (id or either-language name) or brand.
+  // Real-time filter. One box finds a venue by name, address, neighbourhood
+  // (id or either language), beer brand, serving size ("0.33L", "330ml"…) or
+  // data-quality flag ("stale", "duplicate"…) — see utils/adminSearch.js.
   const filteredVenues = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    if (!q) return venues;
+    if (!query.trim()) return venues;
     const hoodNames = {};
-    neighbourhoods.forEach((n) => { hoodNames[n.id] = `${n.name_de} ${n.name_en}`.toLowerCase(); });
-    return venues.filter((v) =>
-      v.name.toLowerCase().includes(q) ||
-      (hoodNames[v.neighbourhood_id] || v.neighbourhood_id).includes(q) ||
-      v.beers.some((b) => b.brand.toLowerCase().includes(q))
-    );
+    neighbourhoods.forEach((n) => { hoodNames[n.id] = `${n.name_de} ${n.name_en}`; });
+    return venues.filter((v) => venueMatchesQuery(v, query, hoodNames));
   }, [venues, neighbourhoods, query]);
 
   const editingVenue = editingVenueId ? venues.find((v) => v.id === editingVenueId) : null;
@@ -611,6 +535,23 @@ export default function VenueManager({ token, initialQuery = '' }) {
                     <td>{formatEuro(v.beers[0]?.size_05, i18n.language)}</td>
                     <td>
                       {v.active === false && <span className="vm-inactive-badge">{t('admin.venues.inactive')}</span>}
+                      {/* Open data-quality flags — text badges (never colour alone); click one to filter the list by it */}
+                      {(v.flags || []).length > 0 && (
+                        <div className="vm-flags">
+                          {[...new Set(v.flags.map((f) => f.flag))].slice(0, 3).map((code) => (
+                            <button
+                              key={code} type="button" className={`dq-badge dq-badge-sm dq-badge-${flagSeverity(code)}`}
+                              onClick={() => setQuery(code.toLowerCase().replace(/_/g, ' '))}
+                              title={t(`admin.quality.desc.${code}`, '')}
+                            >
+                              {t(`admin.quality.flags.${code}`, code)}
+                            </button>
+                          ))}
+                          {new Set(v.flags.map((f) => f.flag)).size > 3 && (
+                            <span className="dq-more-n">+{new Set(v.flags.map((f) => f.flag)).size - 3}</span>
+                          )}
+                        </div>
+                      )}
                     </td>
                     <td>
                       <button

@@ -43,6 +43,18 @@ function formatVolume(ml, lang) {
   return lang === 'de' ? s.replace('.', ',') : s;
 }
 
+// ─── Price sources ──────────────────────────────────────────────────────────
+
+// Where a price came from. Stored on the beer (the CURRENT price's source) and
+// on each price-history entry. NULL/absent = unknown — never guessed: existing
+// rows predate source tracking and stay unknown until a real event sets one.
+const SOURCE_TYPES = ['ADMIN', 'COMMUNITY', 'VENUE', 'MENU_PHOTO', 'OTHER'];
+const NOTES_MAX_LENGTH = 500; // internal admin notes on a price
+
+function isValidSourceType(value) {
+  return typeof value === 'string' && SOURCE_TYPES.includes(value);
+}
+
 // ─── Normalised 0.5 L price ─────────────────────────────────────────────────
 
 // actual price / serving volume × 500 ml, rounded to cents. Returns null (not 0,
@@ -148,6 +160,9 @@ function resolveObservationDates({ existing, newPrice, newVolume, observedAt }) 
 }
 
 module.exports = {
+  SOURCE_TYPES,
+  NOTES_MAX_LENGTH,
+  isValidSourceType,
   SIZE_TO_ML,
   VALID_SIZES,
   VALID_VOLUMES_ML,

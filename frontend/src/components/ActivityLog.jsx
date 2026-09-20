@@ -5,12 +5,12 @@ import { formatEuro } from '../utils/price';
 
 const ACTION_TYPES = [
   'APPROVE', 'REJECT', 'EDIT_VENUE', 'ADD_VENUE', 'DELETE_VENUE',
-  'ADD_BEER', 'DELETE_BEER', 'EDIT_BEER', 'VERIFY_PRICE', 'TOGGLE_ACTIVE', 'MARK_CLOSED',
+  'ADD_BEER', 'DELETE_BEER', 'EDIT_BEER', 'VERIFY_PRICE', 'DISMISS_FLAG', 'TOGGLE_ACTIVE', 'MARK_CLOSED',
 ];
 const BADGE_COLOR = {
   APPROVE: 'green', ADD_VENUE: 'green', ADD_BEER: 'green', VERIFY_PRICE: 'green',
   REJECT: 'red', DELETE_VENUE: 'red', DELETE_BEER: 'red',
-  EDIT_VENUE: 'amber', TOGGLE_ACTIVE: 'amber', MARK_CLOSED: 'amber', EDIT_BEER: 'amber',
+  EDIT_VENUE: 'amber', TOGGLE_ACTIVE: 'amber', MARK_CLOSED: 'amber', EDIT_BEER: 'amber', DISMISS_FLAG: 'amber',
 };
 const EMPTY_FILTERS = { action_type: '', venue: '', from: '', to: '' };
 
@@ -55,8 +55,15 @@ function formatDetails(log, lang, t) {
       return `${d.brand || ''} — ${eur(d.price)}${d.size ? ` (${d.size})` : ''}`;
     case 'DELETE_BEER':
       return d.brand || '—';
-    case 'EDIT_BEER':
-      return `${d.brand ? d.brand + ' — ' : ''}${eur(d.old_price)} → ${eur(d.new_price)}`;
+    case 'EDIT_BEER': {
+      const head = d.brand ? d.brand + ' — ' : '';
+      // A price change reads "€5,20 → €5,80"; an edit that left the price alone
+      // (size, date, source, notes…) lists what changed instead.
+      if (d.old_price !== d.new_price || !d.changed_fields) return `${head}${eur(d.old_price)} → ${eur(d.new_price)}`;
+      return `${head}${eur(d.new_price)} (${d.changed_fields.join(', ')})`;
+    }
+    case 'DISMISS_FLAG':
+      return `${d.flag}${d.brand ? ` — ${d.brand}` : ''}`;
     case 'VERIFY_PRICE':
       return `${d.brand ? d.brand + ' — ' : ''}${eur(d.price)}`;
     case 'TOGGLE_ACTIVE':

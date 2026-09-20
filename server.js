@@ -14,7 +14,6 @@ const {
   normalizeServeType,
   getVenues,
   getVenue,
-  getVenuesAdmin,
   getVenueAdmin,
   getNeighbourhoods,
   getCities,
@@ -31,6 +30,10 @@ const {
   verifyBeerPrice,
   applyApprovedPrice,
   getPublicPriceHistory,
+  getBeerHistory,
+  dismissFlag,
+  getDataQuality,
+  getAdminSubmissions,
   deleteBeer,
   logAdminAction,
   getAdminLogs,
@@ -45,8 +48,10 @@ const {
   notifyIncorrectInfo,
   notifyDescriptionSuggestion,
   notifyApproved,
+  notifyPriceVerified,
   notifyStartup,
 } = require('./backend/notifications');
+const { FLAG_CODES, THRESHOLDS, summarizeFlags, groupFlagsByVenue } = require('./backend/dataQuality');
 const { filterVenues } = require('./backend/filterVenues');
 const {
   isValidSize,
@@ -55,6 +60,8 @@ const {
   volumeFromSize,
   normalizePrice,
   todayISO,
+  isValidSourceType,
+  NOTES_MAX_LENGTH,
 } = require('./backend/utils/priceUtils');
 
 const UPLOADS_DIR = path.join(__dirname, 'backend', 'uploads');
@@ -466,6 +473,19 @@ app.post('/api/submissions/new-venue', upload.single('photo'), (req, res) => {
 
 // ─── ADMIN ROUTES ────────────────────────────────────────────────────────────
 
+// Every admin response that returns a venue also carries its open data-quality
+// flags, so the venue list's badges and the flag search stay correct after any
+// edit without a full reload. (Flags are computed over ALL venues — duplicate
+// detection needs the whole set — and honour active dismissals.)
+function attachFlags(venue) {
+  if (!venue) return venue;
+  const { flags } = getDataQuality();
+  return {
+    ...venue,
+    flags: flags.filter((f) => f.venue_id === venue.id).map((f) => ({ flag: f.flag, beer_id: f.beer_id, brand: f.brand })),
+  };
+}
+
 // Server-side sanity bound for an admin-entered price (the public submission
 // route already enforces 1–30). Rejects zero, negatives, NaN and typos like
 // 450 — never trust that the admin UI validated it.
@@ -474,8 +494,10 @@ function isSanePrice(n) {
 }
 app.get('/api/admin/submissions', authMiddleware, (req, res) => {
   const { status } = req.query;
-  const rows = status ? S.submissionsByStatus.all(status) : S.allSubmissions.all();
-  res.json(rows);
+  // Each row also carries what a reviewer needs to judge it in place: the
+  // submitted price at its serving size and per 0.5 L, the venue's current
+  // price for that beer, the difference, and a live outlier flag.
+  res.json(getAdminSubmissions(status));
 });
 
 app.patch('/api/admin/submissions/:id', authMiddleware, (req, res) => {
@@ -502,6 +524,15 @@ app.patch('/api/admin/submissions/:id', authMiddleware, (req, res) => {
     let oldPrice = null;
     let approvalExtra = {};
 
+    // Provenance for every price this approval creates: community-sourced,
+    // dated by the visit, attributed to the submitter, one history entry each.
+    const communitySource = {
+      source_type: 'COMMUNITY',
+      record_history_by: sub.submitter_name || 'Anonym',
+      history_submission_id: sub.id,
+      history_event: 'approved_submission',
+    };
+
     if (sub.report_type === 'new_venue') {
       // Build the venue from the captured proposal and materialise it — it then
       // shows up on the map/lists on the next fetch, no other wiring needed.
@@ -526,14 +557,14 @@ app.patch('/api/admin/submissions/:id', authMiddleware, (req, res) => {
         // submitter's visit — that visit date is the observation date.
         [{
           brand: sub.beer_brand, size_05: sub.price, size_mass: sub.size_mass, serve_type: sub.serve_type,
-          serving_volume_ml: 500, price_observed_at: sub.visit_date,
+          serving_volume_ml: 500, price_observed_at: sub.visit_date, ...communitySource,
         }],
       );
       if (sub.extra_beers) {
         let extraBeers = [];
         try { extraBeers = JSON.parse(sub.extra_beers); } catch { /* ignore malformed */ }
         for (const b of extraBeers) {
-          addBeerToVenue(createdVenueId, { ...b, serving_volume_ml: 500, price_observed_at: sub.visit_date });
+          addBeerToVenue(createdVenueId, { ...b, serving_volume_ml: 500, price_observed_at: sub.visit_date, ...communitySource });
         }
       }
       S.setSubmissionVenueId.run(createdVenueId, sub.id);
@@ -653,8 +684,11 @@ app.post('/api/admin/venues', authMiddleware, (req, res) => {
         size_05: parseFloat(b.size_05),
         size_mass: b.size_mass ? parseFloat(b.size_mass) : null,
         serve_type: b.serve_type,
-        // An admin entering a price is recording it as current right now.
+        // An admin entering a price is recording it as current right now,
+        // from the admin; that creation is the price's first history entry.
         price_observed_at: todayISO(),
+        source_type: 'ADMIN',
+        record_history_by: req.user?.username || 'admin',
       })),
     );
     const nHood = getNeighbourhoods().find((n) => n.id === neighbourhood_id);
@@ -663,7 +697,7 @@ app.post('/api/admin/venues', authMiddleware, (req, res) => {
       venueName: name,
       details: { name, neighbourhood: nHood?.name_de || neighbourhood_id, type },
     });
-    res.status(201).json(getVenueAdmin(id));
+    res.status(201).json(attachFlags(getVenueAdmin(id)));
   } catch (err) {
     console.error('Failed to create venue:', err);
     res.status(500).json({ error: 'Could not create venue' });
@@ -673,7 +707,10 @@ app.post('/api/admin/venues', authMiddleware, (req, res) => {
 // Manage Venues table — every venue including inactive ones (the public GET
 // /api/venues hides those, but an admin still needs to see & re-activate them).
 app.get('/api/admin/venues', authMiddleware, (req, res) => {
-  res.json(getVenuesAdmin());
+  const { venues, flags } = getDataQuality();
+  const byVenue = {};
+  for (const f of flags) (byVenue[f.venue_id] ||= []).push({ flag: f.flag, beer_id: f.beer_id, brand: f.brand });
+  res.json(venues.map((v) => ({ ...v, flags: byVenue[v.id] || [] })));
 });
 
 // Full edit — every field the Manage Venues "Edit" form exposes (name, type,
@@ -750,7 +787,7 @@ app.patch('/api/admin/venues/:id', authMiddleware, (req, res) => {
     });
   }
 
-  res.json(getVenueAdmin(req.params.id));
+  res.json(attachFlags(getVenueAdmin(req.params.id)));
 });
 
 // Hard delete — the venue and its beers are gone for good (beers cascade via
@@ -789,19 +826,23 @@ app.post('/api/admin/venues/:id/beers', authMiddleware, (req, res) => {
     size_mass: size_mass ? parseFloat(size_mass) : null,
     serve_type,
     price_observed_at: todayISO(),
+    source_type: 'ADMIN',
+    record_history_by: req.user?.username || 'admin',
   });
   logAdminAction('ADD_BEER', {
     venueId: venue.id,
     venueName: venue.name,
     details: { brand, price: parseFloat(size_05), size: '0.5L', serve_type: normalizeServeType(serve_type) },
   });
-  res.status(201).json(getVenueAdmin(venue.id));
+  res.status(201).json(attachFlags(getVenueAdmin(venue.id)));
 });
 
 // Edit one beer's price directly (admin override — separate from the
 // submit-and-approve workflow, no submission record is created).
 app.patch('/api/admin/venues/:id/beers/:beerId', authMiddleware, (req, res) => {
-  const { size_05, size_mass, serve_type, serving_volume_ml } = req.body || {};
+  const {
+    size_05, size_mass, serve_type, serving_volume_ml, price_observed_at, source_type, notes,
+  } = req.body || {};
   if (size_05 == null || !isSanePrice(parseFloat(size_05))) {
     return res.status(400).json({ error: 'A valid size_05 is required' });
   }
@@ -817,9 +858,30 @@ app.patch('/api/admin/venues/:id/beers/:beerId', authMiddleware, (req, res) => {
       return res.status(400).json({ error: 'Invalid serving_volume_ml' });
     }
   }
-  // Captured before the write so a genuine change can be logged (and a no-op
-  // save — e.g. clicking "Save" without touching anything — doesn't leave a
-  // spurious entry in the Activity Log).
+  // When the price was actually seen. Blank/absent = "not provided" (never
+  // invented here); a given date must be a real one and not in the future.
+  let resolvedObserved;
+  if (price_observed_at !== undefined && price_observed_at !== null && price_observed_at !== '') {
+    const checked = validateVisitDate(price_observed_at);
+    if (!checked.ok) return res.status(400).json({ error: checked.error.replace('visit_date', 'price_observed_at') });
+    resolvedObserved = checked.value;
+  }
+  let resolvedSource;
+  if (source_type !== undefined) {
+    if (source_type === null || source_type === '') resolvedSource = null;
+    else if (isValidSourceType(source_type)) resolvedSource = source_type;
+    else return res.status(400).json({ error: 'Invalid source_type' });
+  }
+  // Internal note — never returned by any public route.
+  let resolvedNotes;
+  if (notes !== undefined) {
+    if (notes !== null && typeof notes !== 'string') return res.status(400).json({ error: 'Invalid notes' });
+    resolvedNotes = String(notes ?? '').trim();
+    if (resolvedNotes.length > NOTES_MAX_LENGTH) {
+      return res.status(400).json({ error: `notes can be at most ${NOTES_MAX_LENGTH} characters` });
+    }
+  }
+
   const venueBefore = getVenueAdmin(req.params.id);
   const beerBefore = venueBefore?.beers.find((b) => b.id === Number(req.params.beerId));
 
@@ -830,30 +892,98 @@ app.patch('/api/admin/venues/:id/beers/:beerId', authMiddleware, (req, res) => {
     // serve_type at all — updateBeerPrice then leaves the existing value alone.
     ...(serve_type !== undefined ? { serve_type } : {}),
     ...(resolvedVolume !== undefined ? { serving_volume_ml: resolvedVolume } : {}),
-  });
+    ...(resolvedObserved !== undefined ? { price_observed_at: resolvedObserved } : {}),
+    ...(resolvedSource !== undefined ? { source_type: resolvedSource } : {}),
+    ...(resolvedNotes !== undefined ? { notes: resolvedNotes } : {}),
+  }, { changedBy: req.user?.username || 'admin' });
   if (!ok) return res.status(404).json({ error: 'Beer not found for this venue' });
 
-  // This is a direct admin override with no submission/approval step, so this
-  // EDIT_BEER entry is the ONLY audit trail a beer-price change like this ever
-  // gets — unlike ADD_BEER/DELETE_BEER below, this route previously logged
-  // nothing at all.
-  if (beerBefore) {
-    const newPrice = parseFloat(size_05);
-    const newMass = size_mass ? parseFloat(size_mass) : null;
-    const newServe = serve_type !== undefined ? normalizeServeType(serve_type) : beerBefore.serve_type;
-    const newVolume = resolvedVolume !== undefined ? resolvedVolume : beerBefore.serving_volume_ml;
-    const changed = beerBefore.size_05 !== newPrice || beerBefore.size_mass !== newMass
-      || beerBefore.serve_type !== newServe || (beerBefore.serving_volume_ml ?? null) !== (newVolume ?? null);
-    if (changed) {
+  // A direct admin override has no submission/approval step, so this EDIT_BEER
+  // entry is its audit trail. What changed is read back from the database
+  // (updateBeerPrice is the single authority on what counts as a change), so a
+  // no-op save leaves no entry and every real change lists exactly its fields.
+  const beerAfter = getVenueAdmin(req.params.id)?.beers.find((b) => b.id === Number(req.params.beerId));
+  if (beerBefore && beerAfter) {
+    const TRACKED = ['size_05', 'size_mass', 'serve_type', 'serving_volume_ml', 'price_observed_at', 'verified_at', 'source_type', 'notes'];
+    const changedFields = TRACKED.filter((f) => (beerBefore[f] ?? null) !== (beerAfter[f] ?? null));
+    if (changedFields.length) {
       logAdminAction('EDIT_BEER', {
         venueId: req.params.id,
         venueName: venueBefore.name,
-        details: { brand: beerBefore.brand, old_price: beerBefore.size_05, new_price: newPrice },
+        performedBy: req.user?.username || 'admin',
+        details: {
+          brand: beerBefore.brand,
+          old_price: beerBefore.size_05,
+          new_price: beerAfter.size_05,
+          changed_fields: changedFields,
+          // Notes are internal free text: log THAT they changed, not their content.
+          ...Object.fromEntries(changedFields
+            .filter((f) => f !== 'notes' && f !== 'size_05')
+            .flatMap((f) => [[`old_${f}`, beerBefore[f] ?? null], [`new_${f}`, beerAfter[f] ?? null]])),
+        },
       });
     }
   }
 
-  res.json(getVenueAdmin(req.params.id));
+  res.json(attachFlags(getVenueAdmin(req.params.id)));
+});
+
+// Full price history of one beer (admin only — it names submitters and admins).
+app.get('/api/admin/venues/:id/beers/:beerId/history', authMiddleware, (req, res) => {
+  const history = getBeerHistory(req.params.id, Number(req.params.beerId));
+  if (!history) return res.status(404).json({ error: 'Beer not found for this venue' });
+  res.json(history);
+});
+
+// ─── DATA QUALITY (admin) ────────────────────────────────────────────────────
+// Flags are for human review only: nothing here edits, deletes or "fixes" data.
+app.get('/api/admin/data-quality', authMiddleware, (req, res) => {
+  const { venues, flags, dismissed_count } = getDataQuality();
+  const grouped = groupFlagsByVenue(flags, venues).map((group) => {
+    const venue = venues.find((v) => v.id === group.venue_id);
+    return {
+      ...group,
+      flags: group.flags.map((f) => {
+        const beer = f.beer_id ? venue.beers.find((b) => b.id === f.beer_id) : null;
+        return {
+          ...f,
+          beer: beer ? {
+            price: beer.size_05, serving_volume_ml: beer.serving_volume_ml,
+            normalized_500ml_price: beer.normalized_500ml_price, freshness_state: beer.freshness_state,
+            price_observed_at: beer.price_observed_at, verified_at: beer.verified_at,
+          } : null,
+        };
+      }),
+    };
+  });
+  res.json({
+    generated_at: new Date().toISOString(),
+    thresholds: THRESHOLDS,
+    summary: { ...summarizeFlags(flags), dismissed_active: dismissed_count },
+    venues: grouped,
+  });
+});
+
+// "Dismiss": hide ONE flag for 7 days. It fixes nothing and deletes nothing —
+// when the week is up the flag simply reappears if the problem is still there.
+app.post('/api/admin/data-quality/dismiss', authMiddleware, (req, res) => {
+  const { flag, venue_id, beer_id } = req.body || {};
+  if (!FLAG_CODES.includes(flag)) return res.status(400).json({ error: 'Unknown flag' });
+  const venue = getVenueAdmin(venue_id);
+  if (!venue) return res.status(404).json({ error: 'Venue not found' });
+  let beer = null;
+  if (beer_id != null && beer_id !== 0) {
+    beer = venue.beers.find((b) => b.id === Number(beer_id));
+    if (!beer) return res.status(404).json({ error: 'Beer not found for this venue' });
+  }
+  const until = dismissFlag({ flag, venue_id, beer_id: beer ? beer.id : 0, by: req.user?.username || 'admin' });
+  logAdminAction('DISMISS_FLAG', {
+    venueId: venue.id,
+    venueName: venue.name,
+    performedBy: req.user?.username || 'admin',
+    details: { flag, brand: beer ? beer.brand : null, dismissed_until: until },
+  });
+  res.json({ dismissed_until: until });
 });
 
 // "This price is still correct." Sets verified_at and nothing else — see
@@ -874,7 +1004,10 @@ app.post('/api/admin/venues/:id/beers/:beerId/verify', authMiddleware, (req, res
     performedBy: req.user?.username || 'admin',
     details: { brand: result.brand, price: result.price, previous_verified_at: result.previous_verified_at },
   });
-  res.json(getVenueAdmin(req.params.id));
+  // Fire-and-forget: sendTelegramMessage swallows its own errors, so a Telegram
+  // outage can never fail (or slow) the verification itself.
+  notifyPriceVerified({ venueName: venueBefore.name, price: result.price, admin: req.user?.username || 'admin' });
+  res.json(attachFlags(getVenueAdmin(req.params.id)));
 });
 
 // Remove one beer from a venue outright — a venue must always keep at least one.
@@ -891,7 +1024,7 @@ app.delete('/api/admin/venues/:id/beers/:beerId', authMiddleware, (req, res) => 
       details: { brand: beer.brand },
     });
   }
-  res.json(getVenueAdmin(req.params.id));
+  res.json(attachFlags(getVenueAdmin(req.params.id)));
 });
 
 // ─── ADMIN CITY MANAGEMENT ───────────────────────────────────────────────────

@@ -47,7 +47,7 @@ after(() => {
 // set) — notifications.js reads process.env.TELEGRAM_BOT_TOKEN once, at
 // module load, to decide whether `bot` exists at all.
 delete require.cache[require.resolve('./notifications')];
-const { notifyApproved } = require('./notifications');
+const { notifyApproved, notifyPriceVerified } = require('./notifications');
 
 describe('notifyApproved', () => {
   test('sends a Telegram message for a price-bearing approval (price_change/new_beer/new_venue)', async () => {
@@ -73,5 +73,28 @@ describe('notifyApproved', () => {
     calls.length = 0;
     await notifyApproved({ venueName: 'Test Venue', price: null, reportType: 'suggest_description' });
     assert.doesNotMatch(calls[0].body, /null|undefined/);
+  });
+});
+
+describe('notifyPriceVerified (admin one-click verify)', () => {
+  const textOf = () => JSON.parse(calls[0].body).text;
+
+  test('sends "✓ Price verified: [venue] €[price] — [admin]"', async () => {
+    calls.length = 0;
+    await notifyPriceVerified({ venueName: 'Alter Simpl', price: 4.5, admin: 'sittan' });
+    assert.equal(calls.length, 1);
+    assert.equal(textOf(), '✓ Price verified: Alter Simpl €4.50 — sittan');
+  });
+
+  test('escapes venue/admin text so it cannot break Telegram\'s HTML parse mode', async () => {
+    calls.length = 0;
+    await notifyPriceVerified({ venueName: 'Bar <b>&Co', price: 5, admin: 'a<b' });
+    assert.equal(textOf(), '✓ Price verified: Bar &lt;b&gt;&amp;Co €5.00 — a&lt;b');
+  });
+
+  test('a missing price never renders "€NaN" / "null"', async () => {
+    calls.length = 0;
+    await notifyPriceVerified({ venueName: 'X', price: null, admin: 'admin' });
+    assert.doesNotMatch(textOf(), /NaN|null|undefined/);
   });
 });
