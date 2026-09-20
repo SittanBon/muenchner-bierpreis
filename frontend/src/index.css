@@ -183,6 +183,19 @@ body{font-family:var(--font-body);background:var(--cream);color:var(--text-prima
 .vc-price-block{text-align:right;flex-shrink:0}
 .vc-price{font-family:var(--font-heading);font-size:20px;font-weight:700;color:var(--amber-800)}
 .vc-size{font-size:11px;color:var(--text-muted)}
+.ob-price-wrap{display:flex;flex-direction:column;align-items:flex-end}
+/* Normalized 0.5 L comparison: always secondary — smaller and muted, next to
+   or under the real menu price, never styled like the price itself. */
+.price-approx{font-size:10.5px;font-weight:400;color:var(--text-muted);line-height:1.25;margin-top:1px}
+.price-size-unknown{font-style:italic}
+.vdp-normalized{font-size:11.5px;color:var(--amber-300);margin-top:3px;opacity:0.9}
+.av-price-wrap{display:flex;flex-direction:column;align-items:flex-end;line-height:1.15}
+.vpc-size{font-family:var(--font-body);font-weight:400;font-size:11px;color:var(--text-secondary)}
+.vpc-approx{font-family:var(--font-body);font-size:10.5px;color:var(--text-muted);margin-top:1px}
+.vm-beer-meta{display:flex;align-items:center;flex-wrap:wrap;gap:8px 12px;margin:-2px 0 8px;padding-left:2px;font-size:11.5px;color:var(--text-secondary)}
+.vm-verify{padding:3px 10px;background:none;border:1.5px solid var(--amber-400);border-radius:6px;color:var(--amber-800);font-size:11.5px;font-weight:500;cursor:pointer;font-family:var(--font-body)}
+.vm-verify:hover:not(:disabled){background:var(--amber-100)}
+.vm-verify:disabled{opacity:0.5;cursor:default}
 .vc-bottom{display:flex;align-items:center;gap:6px;margin-top:8px;flex-wrap:wrap}
 .vc-brand{font-size:12px;color:var(--text-secondary);flex:1}
 .vc-brands-count{font-size:11px;color:var(--text-muted);margin-top:4px}
@@ -212,7 +225,6 @@ body{font-family:var(--font-body);background:var(--cream);color:var(--text-prima
 .vdp-amount-sm{font-family:var(--font-heading);font-size:26px;font-weight:700;color:var(--amber-300);letter-spacing:-0.3px}
 .vdp-brand-block{margin-left:auto;text-align:right}
 .vdp-brand{font-size:14px;color:var(--amber-200);font-weight:500}
-.vdp-updated{font-size:11px;color:var(--amber-400);margin-top:3px}
 .outdated-inline{color:#ffa040}
 .vd-about{margin-bottom:14px}
 .vd-about-label{font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);margin-bottom:4px}
@@ -681,13 +693,17 @@ body{font-family:var(--font-body);background:var(--cream);color:var(--text-prima
 .stats-pill-trends:hover{background:var(--amber-800);border-color:var(--amber-800)}
 
 /* ===== Price-freshness traffic light ===== */
-.freshness{display:inline-flex;align-items:center;gap:4px;font-size:11px;color:var(--text-muted);white-space:nowrap}
+.freshness{display:inline-flex;align-items:center;gap:4px;font-size:11px;color:var(--text-muted)}
+.freshness:not(.freshness-compact){line-height:1.3}
+.freshness-compact{white-space:nowrap}
 .freshness-dot{width:9px;height:9px;border-radius:50%;flex-shrink:0;box-shadow:0 0 0 2px rgba(0,0,0,0.04)}
 .freshness-compact{gap:0}
 .freshness-label{font-weight:500}
-.freshness-green .freshness-label{color:#2f7d2f}
-.freshness-yellow .freshness-label{color:#8a6800}
-.freshness-red .freshness-label{color:#a5361f}
+.freshness-fresh .freshness-label{color:#2f7d2f}
+.freshness-aging .freshness-label{color:#8a6800}
+.freshness-stale .freshness-label{color:#a5361f}
+/* Unknown is neutral grey on purpose: "we don't know" must never read as "fine". */
+.freshness-unknown .freshness-label{color:#6b6b6b}
 .av-right{display:flex;align-items:center;gap:8px}
 .vdp-freshness{width:100%;margin-top:8px;padding-top:8px;border-top:1px solid rgba(255,255,255,0.14)}
 .vdp-freshness .freshness,.vdp-freshness .freshness-label{color:var(--amber-200)!important}

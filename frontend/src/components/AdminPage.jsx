@@ -64,8 +64,9 @@ export default function AdminPage({ onBack }) {
     // Captured before the row disappears from `submissions` below — the toast
     // needs the venue name and report_type of the row that was just actioned.
     const sub = submissions.find((s) => s.id === id);
+    let result;
     try {
-      await adminUpdateSubmission(token, id, status, reject_reason);
+      result = await adminUpdateSubmission(token, id, status, reject_reason);
     } catch {
       // Token likely expired/invalid mid-session — drop back to the login screen
       // rather than leaving the button silently doing nothing.
@@ -80,7 +81,12 @@ export default function AdminPage({ onBack }) {
     } : st);
 
     const venueName = sub?.venue_name || '';
-    if (status === 'approved') {
+    if (status === 'approved' && result?.price_applied === false) {
+      // Approved, but the submission's serving size wasn't a recognised one,
+      // so the public price was deliberately left untouched — say so, rather
+      // than leaving the admin to assume it changed.
+      showToast('warning', t('admin.toast.priceNotApplied'));
+    } else if (status === 'approved') {
       if (sub?.report_type === 'closed') {
         showToast('warning', t('admin.toast.markedClosed', { venue: venueName }));
       } else if (sub?.report_type === 'other_info' || sub?.report_type === 'suggest_description') {

@@ -2,11 +2,13 @@ import { useState, useEffect, useCallback, useMemo, Fragment } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   fetchNeighbourhoods, adminFetchVenues, adminCreateVenue, adminUpdateVenue,
-  adminDeleteVenue, adminAddBeer, adminUpdateBeerPrice, adminDeleteBeer,
+  adminDeleteVenue, adminAddBeer, adminUpdateBeerPrice, adminDeleteBeer, adminVerifyBeer,
 } from '../hooks/useApi';
 import { parsePrice, formatEuro, pricePlaceholder } from '../utils/price';
 import { useToast } from '../hooks/useToast';
 import BrandCombobox from './BrandCombobox';
+import FreshnessLight from './FreshnessLight';
+import { describePrice } from '../utils/priceUtils';
 
 const TYPES = ['beer_garden', 'beer_hall', 'bar', 'restaurant'];
 const SERVE_TYPES = ['tap', 'bottle', 'can', 'unknown'];
@@ -301,6 +303,7 @@ function EditVenueForm({ token, venue, neighbourhoods, onUpdated, onDeleted, onC
   const [prices, setPrices] = useState(() => Object.fromEntries(venue.beers.map((b) => [b.id, String(b.size_05)])));
   const [serveTypes, setServeTypes] = useState(() => Object.fromEntries(venue.beers.map((b) => [b.id, b.serve_type || 'unknown'])));
   const [savingId, setSavingId] = useState(null);
+  const [verifyingId, setVerifyingId] = useState(null);
   const [deletingId, setDeletingId] = useState(null);
   const [error, setError] = useState('');
   const [newBeer, setNewBeer] = useState(emptyBeer());
@@ -338,6 +341,22 @@ function EditVenueForm({ token, venue, neighbourhoods, onUpdated, onDeleted, onC
       setError(err.message);
     }
     setSavingId(null);
+  };
+
+  // "This price is still correct": sets verified_at only. Unlike Save, this
+  // never sends a price — there is nothing to change — so it cannot alter the
+  // price, the observation date or the technical modified date.
+  const verifyPrice = async (beer) => {
+    setError('');
+    setVerifyingId(beer.id);
+    try {
+      const updated = await adminVerifyBeer(token, venue.id, beer.id);
+      onUpdated(updated);
+      showToast('success', t('admin.toast.priceVerified', { brand: beer.brand, venue: venue.name }));
+    } catch (err) {
+      setError(err.message);
+    }
+    setVerifyingId(null);
   };
 
   const deleteBeer = async (beer) => {
@@ -396,7 +415,8 @@ function EditVenueForm({ token, venue, neighbourhoods, onUpdated, onDeleted, onC
 
       <div className="vm-beers-title">{t('admin.venues.beers')}</div>
       {venue.beers.map((b) => (
-        <div key={b.id} className="vm-beer-row vm-edit-row">
+        <Fragment key={b.id}>
+        <div className="vm-beer-row vm-edit-row">
           <span className="vm-beer-brand">{b.brand}</span>
           <input
             className="vm-price-input" inputMode="decimal" placeholder={pricePlaceholder(i18n.language)}
@@ -419,6 +439,28 @@ function EditVenueForm({ token, venue, neighbourhoods, onUpdated, onDeleted, onC
             {deletingId === b.id ? '...' : `🗑 ${t('admin.venues.deleteBeer')}`}
           </button>
         </div>
+        {/* What the price above actually is, and how current it is — from the
+            same shared freshness rules the public site uses. */}
+        <div className="vm-beer-meta">
+          {(() => {
+            const p = describePrice(b, i18n.language);
+            return (
+              <span>
+                {p.sizeUnknown ? t('price.sizeUnknown') : p.volumeLabel}
+                {p.normalized && ` · ${t('price.approxPer05', { price: p.normalized })}`}
+              </span>
+            );
+          })()}
+          <FreshnessLight beer={b} />
+          <button
+            type="button" className="vm-verify"
+            onClick={() => verifyPrice(b)} disabled={verifyingId === b.id}
+            title={t('admin.venues.verifyHint')}
+          >
+            {verifyingId === b.id ? '...' : t('admin.venues.verify')}
+          </button>
+        </div>
+        </Fragment>
       ))}
 
       <div className="vm-beers-title">{t('admin.venues.addAnotherBeer')}</div>

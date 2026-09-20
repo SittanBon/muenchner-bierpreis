@@ -28,6 +28,9 @@ const {
   deleteVenue,
   addBeerToVenue,
   updateBeerPrice,
+  verifyBeerPrice,
+  applyApprovedPrice,
+  getPublicPriceHistory,
   deleteBeer,
   logAdminAction,
   getAdminLogs,
@@ -45,6 +48,14 @@ const {
   notifyStartup,
 } = require('./backend/notifications');
 const { filterVenues } = require('./backend/filterVenues');
+const {
+  isValidSize,
+  isValidVolume,
+  validateVisitDate,
+  volumeFromSize,
+  normalizePrice,
+  todayISO,
+} = require('./backend/utils/priceUtils');
 
 const UPLOADS_DIR = path.join(__dirname, 'backend', 'uploads');
 fs.mkdirSync(UPLOADS_DIR, { recursive: true });
@@ -175,8 +186,9 @@ app.get('/api/venues/:id', (req, res) => {
   const venue = getVenue(req.params.id);
   if (!venue) return res.status(404).json({ error: 'Not found' });
 
-  const price_history = S.approvedHistoryForVenue.all(req.params.id);
-  res.json({ ...venue, price_history });
+  // Allow-listed columns only (see getPublicPriceHistory) — the raw
+  // submission rows carry submitter names, notes and admin reject reasons.
+  res.json({ ...venue, price_history: getPublicPriceHistory(req.params.id) });
 });
 
 // ─── SUBMISSIONS ─────────────────────────────────────────────────────────────
@@ -225,6 +237,20 @@ app.post('/api/submissions', (req, res) => {
     if (Number.isNaN(numPrice) || numPrice < 1 || numPrice > 30) {
       return res.status(400).json({ error: 'Invalid price' });
     }
+    // The serving size is what makes a price meaningful — an unrecognised
+    // size string is rejected here (it used to be stored as-is, and later
+    // treated as if it were a 0.5 L price on approval).
+    if (!isValidSize(size)) {
+      return res.status(400).json({ error: 'Invalid size' });
+    }
+  }
+  // visit_date becomes the price's observation date when an admin approves
+  // this, so it must be a real calendar date that isn't in the future.
+  let resolvedVisitDate = todayISO();
+  if (visit_date !== undefined && visit_date !== null && visit_date !== '') {
+    const checked = validateVisitDate(visit_date);
+    if (!checked.ok) return res.status(400).json({ error: checked.error });
+    resolvedVisitDate = checked.value;
   }
   if (!venue_id) {
     return res.status(400).json({ error: 'venue_id is required' });
@@ -245,12 +271,14 @@ app.post('/api/submissions', (req, res) => {
   }
   const resolvedName = venue_name || venue.name;
   if (numPrice != null) {
+    // Compared per 0.5 L, so a 0.33 L price is judged against the beer's
+    // normalised price rather than its raw number. No known serving size on
+    // the existing price -> nothing comparable -> not flagged.
     const beer = venue.beers.find((b) => b.brand === beer_brand);
-    if (beer) {
-      const currentPrice = size === '1L' ? beer.size_mass : beer.size_05;
-      if (currentPrice && Math.abs(numPrice - currentPrice) / currentPrice > 0.25) {
-        isOutlier = true;
-      }
+    const submitted = normalizePrice(numPrice, volumeFromSize(size));
+    const current = beer?.normalized_500ml_price;
+    if (submitted != null && current && Math.abs(submitted - current) / current > 0.25) {
+      isOutlier = true;
     }
   }
 
@@ -268,7 +296,7 @@ app.post('/api/submissions', (req, res) => {
     // serve-type question at all (closed/other_info).
     serve_type: (report_type === 'price_change' || report_type === 'new_beer')
       ? normalizeServeType(serve_type) : null,
-    visit_date: visit_date || new Date().toISOString().split('T')[0],
+    visit_date: resolvedVisitDate,
     submitter_name: submitter_name || 'Anonym',
     note: note || '',
     status: 'pending',
@@ -373,6 +401,15 @@ app.post('/api/submissions/new-venue', upload.single('photo'), (req, res) => {
     if (req.file) fs.unlink(req.file.path, () => {});
     return res.status(400).json({ error: 'Invalid price' });
   }
+  let newVenueVisitDate = todayISO();
+  if (visit_date !== undefined && visit_date !== null && visit_date !== '') {
+    const checked = validateVisitDate(visit_date);
+    if (!checked.ok) {
+      if (req.file) fs.unlink(req.file.path, () => {});
+      return res.status(400).json({ error: checked.error });
+    }
+    newVenueVisitDate = checked.value;
+  }
   let parsedExtraBeers;
   try {
     parsedExtraBeers = parseExtraBeers(extra_beers);
@@ -392,7 +429,7 @@ app.post('/api/submissions/new-venue', upload.single('photo'), (req, res) => {
     price: numPrice,
     serve_type: normalizeServeType(serve_type),
     extra_beers: parsedExtraBeers.length ? JSON.stringify(parsedExtraBeers) : null,
-    visit_date: visit_date || new Date().toISOString().split('T')[0],
+    visit_date: newVenueVisitDate,
     submitter_name: submitter_name || 'Anonym',
     note: note || '',
     status: 'pending',
@@ -428,6 +465,13 @@ app.post('/api/submissions/new-venue', upload.single('photo'), (req, res) => {
 });
 
 // ─── ADMIN ROUTES ────────────────────────────────────────────────────────────
+
+// Server-side sanity bound for an admin-entered price (the public submission
+// route already enforces 1–30). Rejects zero, negatives, NaN and typos like
+// 450 — never trust that the admin UI validated it.
+function isSanePrice(n) {
+  return Number.isFinite(n) && n > 0 && n <= 100;
+}
 app.get('/api/admin/submissions', authMiddleware, (req, res) => {
   const { status } = req.query;
   const rows = status ? S.submissionsByStatus.all(status) : S.allSubmissions.all();
@@ -445,10 +489,18 @@ app.patch('/api/admin/submissions/:id', authMiddleware, (req, res) => {
   S.setSubmissionStatus.run({ id: sub.id, status, reject_reason: status === 'rejected' ? (reject_reason || null) : null });
 
   let createdVenueId = null;
-  if (status === 'approved') {
+  // null = this submission has no price to apply (closed/other_info/...);
+  // otherwise whether the price actually reached the beers table.
+  let priceApplied = null;
+  let priceSkippedReason = null;
+  // Side effects run only on a real transition INTO approved. Re-sending
+  // "approved" for an already-approved submission used to re-apply the price
+  // and bump the report counter a second time.
+  if (status === 'approved' && sub.status !== 'approved') {
     // Captured for the APPROVE log entry below — null for a brand-new venue
     // (nothing to compare against) or for closed/other_info (no price at all).
     let oldPrice = null;
+    let approvalExtra = {};
 
     if (sub.report_type === 'new_venue') {
       // Build the venue from the captured proposal and materialise it — it then
@@ -470,13 +522,18 @@ app.patch('/api/admin/submissions/:id', authMiddleware, (req, res) => {
           // in; the EN field is left for an admin to translate later.
           description_de: sub.note || null,
         },
-        [{ brand: sub.beer_brand, size_05: sub.price, size_mass: sub.size_mass, serve_type: sub.serve_type }],
+        // A new-venue proposal's prices are 0.5 L prices seen on the
+        // submitter's visit — that visit date is the observation date.
+        [{
+          brand: sub.beer_brand, size_05: sub.price, size_mass: sub.size_mass, serve_type: sub.serve_type,
+          serving_volume_ml: 500, price_observed_at: sub.visit_date,
+        }],
       );
       if (sub.extra_beers) {
         let extraBeers = [];
         try { extraBeers = JSON.parse(sub.extra_beers); } catch { /* ignore malformed */ }
         for (const b of extraBeers) {
-          addBeerToVenue(createdVenueId, b);
+          addBeerToVenue(createdVenueId, { ...b, serving_volume_ml: 500, price_observed_at: sub.visit_date });
         }
       }
       S.setSubmissionVenueId.run(createdVenueId, sub.id);
@@ -484,22 +541,26 @@ app.patch('/api/admin/submissions/:id', authMiddleware, (req, res) => {
       // price_change or new_beer: roll the price into that specific brand's row
       // if the venue already lists it, otherwise add it as a new beer — either
       // way this must never touch the wrong brand (a venue can list several).
-      const venue = getVenueAdmin(sub.venue_id);
-      const existingBeer = venue?.beers.find((b) => b.brand === sub.beer_brand);
-      if (existingBeer) {
-        oldPrice = sub.size === '1L' ? existingBeer.size_mass : existingBeer.size_05;
-        S.updateHeadlinePrice.run({
-          venue_id: sub.venue_id,
-          brand: sub.beer_brand,
+      // applyApprovedPrice enforces the serving-size rules (see database.js):
+      // an unrecognised size writes nothing at all — no price, no `updated`,
+      // no `reports` bump — and is reported back so the admin isn't left
+      // thinking the public price changed.
+      const outcome = applyApprovedPrice(sub);
+      priceApplied = outcome.applied;
+      if (outcome.applied) {
+        oldPrice = outcome.old
+          ? (outcome.target === 'mass' ? outcome.old.size_mass : outcome.old.size_05)
+          : null;
+        approvalExtra = {
           size: sub.size,
-          price: sub.price,
-          visit_date: sub.visit_date,
-          serve_type: sub.serve_type || null,
-        });
+          target: outcome.target,
+          created_beer: outcome.created,
+          ...(outcome.old && outcome.old.serving_volume_ml !== volumeFromSize(sub.size)
+            ? { old_serving_volume_ml: outcome.old.serving_volume_ml } : {}),
+        };
       } else {
-        const size_05 = sub.size === '0.5L' ? sub.price : Math.round((sub.price / 2) * 20) / 20;
-        const size_mass = sub.size === '1L' ? sub.price : null;
-        addBeerToVenue(sub.venue_id, { brand: sub.beer_brand, size_05, size_mass, serve_type: sub.serve_type });
+        priceSkippedReason = outcome.reason;
+        approvalExtra = { size: sub.size, price_applied: false, reason: outcome.reason };
       }
     } else if (sub.report_type === 'closed' && sub.venue_id) {
       // No dedicated "closed" UI action exists — approving the report itself
@@ -532,7 +593,7 @@ app.patch('/api/admin/submissions/:id', authMiddleware, (req, res) => {
     logAdminAction('APPROVE', {
       venueId: createdVenueId || sub.venue_id,
       venueName: sub.venue_name,
-      details: { submission_id: sub.id, old_price: oldPrice, new_price: sub.price, brand: sub.beer_brand },
+      details: { submission_id: sub.id, old_price: oldPrice, new_price: sub.price, brand: sub.beer_brand, ...approvalExtra },
     });
     // Every approved submission gets a Telegram confirmation, not just the
     // price-bearing ones — previously a "closed" or "suggest_description"
@@ -547,7 +608,13 @@ app.patch('/api/admin/submissions/:id', authMiddleware, (req, res) => {
   }
 
   const updated = S.submissionById.get(sub.id);
-  res.json({ message: 'Updated', submission: updated, venue_id: createdVenueId });
+  res.json({
+    message: 'Updated',
+    submission: updated,
+    venue_id: createdVenueId,
+    price_applied: priceApplied,
+    price_skipped_reason: priceSkippedReason,
+  });
 });
 
 // ─── ADMIN VENUE MANAGEMENT ──────────────────────────────────────────────────
@@ -566,8 +633,11 @@ app.post('/api/admin/venues', authMiddleware, (req, res) => {
     return res.status(400).json({ error: 'At least one beer is required' });
   }
   for (const b of beers) {
-    if (!b.brand || b.size_05 == null || Number.isNaN(parseFloat(b.size_05))) {
-      return res.status(400).json({ error: 'Each beer needs a brand and a 0.5L price' });
+    if (!b.brand || b.size_05 == null || !isSanePrice(parseFloat(b.size_05))) {
+      return res.status(400).json({ error: 'Each beer needs a brand and a valid 0.5L price' });
+    }
+    if (b.size_mass && !isSanePrice(parseFloat(b.size_mass))) {
+      return res.status(400).json({ error: 'Invalid 1L price' });
     }
   }
   const validHoods = getNeighbourhoods().map((n) => n.id);
@@ -583,6 +653,8 @@ app.post('/api/admin/venues', authMiddleware, (req, res) => {
         size_05: parseFloat(b.size_05),
         size_mass: b.size_mass ? parseFloat(b.size_mass) : null,
         serve_type: b.serve_type,
+        // An admin entering a price is recording it as current right now.
+        price_observed_at: todayISO(),
       })),
     );
     const nHood = getNeighbourhoods().find((n) => n.id === neighbourhood_id);
@@ -701,8 +773,11 @@ app.post('/api/admin/venues/:id/beers', authMiddleware, (req, res) => {
   if (!venue) return res.status(404).json({ error: 'Venue not found' });
 
   const { brand, size_05, size_mass, serve_type } = req.body || {};
-  if (!brand || size_05 == null || Number.isNaN(parseFloat(size_05))) {
-    return res.status(400).json({ error: 'brand and size_05 are required' });
+  if (!brand || size_05 == null || !isSanePrice(parseFloat(size_05))) {
+    return res.status(400).json({ error: 'brand and a valid size_05 are required' });
+  }
+  if (size_mass && !isSanePrice(parseFloat(size_mass))) {
+    return res.status(400).json({ error: 'Invalid size_mass' });
   }
   if (venue.beers.some((b) => b.brand.toLowerCase() === String(brand).toLowerCase())) {
     return res.status(400).json({ error: 'This venue already lists that brand' });
@@ -713,6 +788,7 @@ app.post('/api/admin/venues/:id/beers', authMiddleware, (req, res) => {
     size_05: parseFloat(size_05),
     size_mass: size_mass ? parseFloat(size_mass) : null,
     serve_type,
+    price_observed_at: todayISO(),
   });
   logAdminAction('ADD_BEER', {
     venueId: venue.id,
@@ -725,9 +801,21 @@ app.post('/api/admin/venues/:id/beers', authMiddleware, (req, res) => {
 // Edit one beer's price directly (admin override — separate from the
 // submit-and-approve workflow, no submission record is created).
 app.patch('/api/admin/venues/:id/beers/:beerId', authMiddleware, (req, res) => {
-  const { size_05, size_mass, serve_type } = req.body || {};
-  if (size_05 == null || Number.isNaN(parseFloat(size_05))) {
-    return res.status(400).json({ error: 'size_05 is required' });
+  const { size_05, size_mass, serve_type, serving_volume_ml } = req.body || {};
+  if (size_05 == null || !isSanePrice(parseFloat(size_05))) {
+    return res.status(400).json({ error: 'A valid size_05 is required' });
+  }
+  if (size_mass && !isSanePrice(parseFloat(size_mass))) {
+    return res.status(400).json({ error: 'Invalid size_mass' });
+  }
+  // Optional. null = "serving size unknown"; anything else must be a size we
+  // actually support.
+  let resolvedVolume;
+  if (serving_volume_ml !== undefined) {
+    resolvedVolume = serving_volume_ml === null ? null : Number(serving_volume_ml);
+    if (resolvedVolume !== null && !isValidVolume(resolvedVolume)) {
+      return res.status(400).json({ error: 'Invalid serving_volume_ml' });
+    }
   }
   // Captured before the write so a genuine change can be logged (and a no-op
   // save — e.g. clicking "Save" without touching anything — doesn't leave a
@@ -741,6 +829,7 @@ app.patch('/api/admin/venues/:id/beers/:beerId', authMiddleware, (req, res) => {
     // Omitted entirely (not just falsy) when the edit form doesn't send a
     // serve_type at all — updateBeerPrice then leaves the existing value alone.
     ...(serve_type !== undefined ? { serve_type } : {}),
+    ...(resolvedVolume !== undefined ? { serving_volume_ml: resolvedVolume } : {}),
   });
   if (!ok) return res.status(404).json({ error: 'Beer not found for this venue' });
 
@@ -752,7 +841,9 @@ app.patch('/api/admin/venues/:id/beers/:beerId', authMiddleware, (req, res) => {
     const newPrice = parseFloat(size_05);
     const newMass = size_mass ? parseFloat(size_mass) : null;
     const newServe = serve_type !== undefined ? normalizeServeType(serve_type) : beerBefore.serve_type;
-    const changed = beerBefore.size_05 !== newPrice || beerBefore.size_mass !== newMass || beerBefore.serve_type !== newServe;
+    const newVolume = resolvedVolume !== undefined ? resolvedVolume : beerBefore.serving_volume_ml;
+    const changed = beerBefore.size_05 !== newPrice || beerBefore.size_mass !== newMass
+      || beerBefore.serve_type !== newServe || (beerBefore.serving_volume_ml ?? null) !== (newVolume ?? null);
     if (changed) {
       logAdminAction('EDIT_BEER', {
         venueId: req.params.id,
@@ -762,6 +853,27 @@ app.patch('/api/admin/venues/:id/beers/:beerId', authMiddleware, (req, res) => {
     }
   }
 
+  res.json(getVenueAdmin(req.params.id));
+});
+
+// "This price is still correct." Sets verified_at and nothing else — see
+// verifyBeerPrice. Deliberately its own action, not a variant of the price
+// edit: confirming an unchanged price is not a price change, so it changes
+// no price, no technical `updated`, and creates no price-history entry.
+app.post('/api/admin/venues/:id/beers/:beerId/verify', authMiddleware, (req, res) => {
+  const venueBefore = getVenueAdmin(req.params.id);
+  if (!venueBefore) return res.status(404).json({ error: 'Venue not found' });
+
+  const result = verifyBeerPrice(req.params.id, Number(req.params.beerId));
+  if (result === 'not_found') return res.status(404).json({ error: 'Beer not found for this venue' });
+  if (result === 'no_price') return res.status(400).json({ error: 'This beer has no price to verify' });
+
+  logAdminAction('VERIFY_PRICE', {
+    venueId: req.params.id,
+    venueName: venueBefore.name,
+    performedBy: req.user?.username || 'admin',
+    details: { brand: result.brand, price: result.price, previous_verified_at: result.previous_verified_at },
+  });
   res.json(getVenueAdmin(req.params.id));
 });
 

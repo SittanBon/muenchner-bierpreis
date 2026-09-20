@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import FreshnessLight from './FreshnessLight';
 import ServeTypeTag from './ServeTypeTag';
 import VenueTypeIcon from './VenueTypeIcon';
+import PriceSecondary from './PriceSecondary';
 import { formatEuro } from '../utils/price';
 
 function ConfidenceBadge({ reports }) {
@@ -41,7 +42,8 @@ export default function VenuePanel({ neighbourhood, venues, onVenueClick, onClos
     }
   };
 
-  const price = (v) => v.beers?.[0]?.size_05 ?? Infinity;
+  // Sorted by the per-0.5 L comparison price; no known serving size = not comparable = last.
+  const price = (v) => v.beers?.[0]?.normalized_500ml_price ?? Infinity;
   const dir = sortDir === 'asc' ? 1 : -1;
   const sorted = [...venues].sort((a, b) => {
     if (sort === 'price') return (price(a) - price(b)) * dir;
@@ -87,14 +89,14 @@ export default function VenuePanel({ neighbourhood, venues, onVenueClick, onClos
               </div>
               <div className="vc-price-block">
                 <div className="vc-price">{formatEuro(v.beers[0]?.size_05, i18n.language)}</div>
-                <div className="vc-size">0,5L</div>
+                <PriceSecondary beer={v.beers[0]} showReferenceSize />
               </div>
             </div>
             <div className="vc-bottom">
               <span className="vc-brand">🍻 {v.beers[0]?.brand}</span>
               <ServeTypeTag serveType={v.beers[0]?.serve_type} variant="badge" />
               <ConfidenceBadge reports={v.beers[0].reports || 1} />
-              <FreshnessLight date={v.beers[0].updated} />
+              <FreshnessLight beer={v.beers[0]} />
             </div>
             {v.beers.length > 1 && (
               <div className="vc-brands-count">🍺 {t('venue.brandsCount', { count: v.beers.length })}</div>

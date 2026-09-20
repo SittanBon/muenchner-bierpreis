@@ -7,11 +7,14 @@
 const { test, describe } = require('node:test');
 const assert = require('node:assert/strict');
 const { filterVenues, parsePriceBound } = require('./filterVenues');
+const { normalizePrice } = require('./utils/priceUtils');
 
 // A small, hand-built fixture — deliberately NOT the live DB — so these tests
 // never depend on (or mutate) real venue data and stay fast/deterministic.
-function venue({ id, type, neighbourhood_id, brand, price, name = id, address = '', serve_type = 'unknown', extraBeer = null }) {
-  const beers = [{ brand, size_05: price, serve_type }];
+// `volume` is the serving size (ml) the price is quoted for; like the real API,
+// every beer carries the server-derived normalized_500ml_price.
+function venue({ id, type, neighbourhood_id, brand, price, name = id, address = '', serve_type = 'unknown', extraBeer = null, volume = 500 }) {
+  const beers = [{ brand, size_05: price, serving_volume_ml: volume, normalized_500ml_price: normalizePrice(price, volume), serve_type }];
   if (extraBeer) beers.push(extraBeer);
   return {
     id, name, type, neighbourhood_id, address,
@@ -172,5 +175,30 @@ describe('parsePriceBound', () => {
   test('valid numeric strings parse correctly', () => {
     assert.equal(parsePriceBound('5.20'), 5.20);
     assert.equal(parsePriceBound('5'), 5);
+  });
+});
+
+describe('filterVenues — price bounds compare normalized 0.5 L prices', () => {
+  const small = venue({ id: 's1', type: 'bar', neighbourhood_id: 'altstadt', brand: 'Helles', price: 3.50, volume: 330 }); // ≈ €5.30 per 0.5 L
+  const unknownSize = venue({ id: 's2', type: 'bar', neighbourhood_id: 'altstadt', brand: 'Helles', price: 4.00, volume: null });
+  const data = [...FIXTURE, small, unknownSize];
+
+  test('€3.50 for 0.33 L is NOT cheap: a max of €4 excludes it', () => {
+    const ids = filterVenues(data, { max_price: '4' }).map((v) => v.id);
+    assert.ok(!ids.includes('s1'));
+  });
+
+  test('…and a min of €5 includes it (≈ €5.30 per 0.5 L)', () => {
+    const ids = filterVenues(data, { min_price: '5' }).map((v) => v.id);
+    assert.ok(ids.includes('s1'));
+  });
+
+  test('a price with no known serving size can\'t satisfy a price bound', () => {
+    assert.ok(!filterVenues(data, { max_price: '10' }).some((v) => v.id === 's2'));
+    assert.ok(!filterVenues(data, { min_price: '1' }).some((v) => v.id === 's2'));
+  });
+
+  test('…but is still listed when no price bound is applied', () => {
+    assert.ok(filterVenues(data, {}).some((v) => v.id === 's2'));
   });
 });

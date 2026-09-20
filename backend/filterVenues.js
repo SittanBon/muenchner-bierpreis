@@ -59,10 +59,16 @@ function filterVenues(venues, query = {}) {
     result = result.filter((v) => v.beers.some((b) => b.serve_type === serve_type));
   }
 
+  // Price bounds are per-0.5 L comparison prices (normalized_500ml_price): a
+  // "max €4" filter must not let through €3.50-for-0.33 L (≈ €5.30 per 0.5 L).
+  // A venue whose headline serving size is unknown has no comparable price, so
+  // it can't satisfy a price bound either way and drops out of a price-filtered
+  // result rather than being assumed to be 0.5 L.
   const min = parsePriceBound(min_price);
   const max = parsePriceBound(max_price);
-  if (min != null) result = result.filter((v) => v.beers[0] && v.beers[0].size_05 >= min);
-  if (max != null) result = result.filter((v) => v.beers[0] && v.beers[0].size_05 <= max);
+  const comparable = (v) => v.beers[0]?.normalized_500ml_price;
+  if (min != null) result = result.filter((v) => comparable(v) != null && comparable(v) >= min);
+  if (max != null) result = result.filter((v) => comparable(v) != null && comparable(v) <= max);
 
   if (q && String(q).trim()) {
     const ql = String(q).trim().toLowerCase();

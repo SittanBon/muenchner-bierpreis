@@ -69,7 +69,6 @@ export const de = {
       price05: "0,5L Helles",
       priceMass: "Maß (1L)",
       brand: "Biermarke",
-      lastUpdated: "Zuletzt geprüft",
       reports: "Meldungen",
       address: "Adresse",
       hours: "Öffnungszeiten",
@@ -87,13 +86,29 @@ export const de = {
         medium: "Einige Meldungen",
         high: "Gut bestätigt"
       },
-      outdated: "Möglicherweise veraltet",
-      freshness: {
-        fresh: "Aktueller Preis",
-        aging: "Etwas älter",
-        stale: "Veraltet",
-        monthsAgo: "Monate her"
-      }
+      outdated: "Möglicherweise veraltet"
+    },
+    // Price freshness (P0): derived ONLY from verified_at / price_observed_at,
+    // never from the technical `updated` column. "Bestätigt" is reserved for
+    // prices someone actually verified; a price merely reported says
+    // "Aktualisiert" so the wording never claims more than the data supports.
+    freshness: {
+      verifiedToday: "✓ Heute bestätigt",
+      verifiedDaysAgo_one: "✓ Bestätigt vor {{count}} Tag",
+      verifiedDaysAgo_other: "✓ Bestätigt vor {{count}} Tagen",
+      observedToday: "✓ Heute aktualisiert",
+      observedDaysAgo_one: "✓ Aktualisiert vor {{count}} Tag",
+      observedDaysAgo_other: "✓ Aktualisiert vor {{count}} Tagen",
+      maybeOutdated: "⚠ Preis möglicherweise veraltet",
+      unknown: "Datum unbekannt",
+      verifiedOn: "Bestätigt am {{date}}",
+      observedOn: "Preis gemeldet am {{date}}"
+    },
+    // Actual menu price is primary; the 0.5 L figure is only a comparison.
+    price: {
+      forSize: "{{size}} Helles",
+      sizeUnknown: "Größe unbekannt",
+      approxPer05: "ca. {{price}} / 0,5L"
     },
     stats: {
       cityAvg: "Ø München",
@@ -204,6 +219,8 @@ export const de = {
         errName: "Name und Stadtteil sind erforderlich",
         errBeer: "Mindestens eine Marke mit Preis ist erforderlich",
         errPrice: "Ungültiger Preis",
+        verify: "✓ Preis bestätigen",
+        verifyHint: "Bestätigt, dass der Preis unverändert stimmt — ändert weder den Preis noch das Änderungsdatum.",
         searchPlaceholder: "Nach Name, Stadtteil oder Marke suchen...",
         deleteBeer: "Löschen",
         confirmDelete: "{{brand}} wirklich löschen?",
@@ -245,6 +262,8 @@ export const de = {
         venueAdded: "✅ {{venue}} zur Karte hinzugefügt.",
         venueDeleted: "🗑️ {{venue}} dauerhaft gelöscht.",
         beerDeleted: "🗑️ {{brand}} von {{venue}} entfernt.",
+        priceVerified: "Preis bestätigt: {{brand}} bei {{venue}}.",
+        priceNotApplied: "Freigegeben, aber der Preis wurde NICHT übernommen (ungültige Größe).",
         toggledInactive: "👁️ {{venue}} von der Karte ausgeblendet."
       },
       logs: {
@@ -275,6 +294,7 @@ export const de = {
           ADD_BEER: "Bier hinzugefügt",
           DELETE_BEER: "Bier gelöscht",
           EDIT_BEER: "Bierpreis bearbeitet",
+          VERIFY_PRICE: "Preis bestätigt",
           TOGGLE_ACTIVE: "Sichtbarkeit geändert",
           MARK_CLOSED: "Als geschlossen markiert"
         }
@@ -433,7 +453,6 @@ export const en = {
       price05: "0.5L Helles",
       priceMass: "Maß (1L)",
       brand: "Beer brand",
-      lastUpdated: "Last confirmed",
       reports: "reports",
       address: "Address",
       hours: "Opening hours",
@@ -451,13 +470,24 @@ export const en = {
         medium: "Some reports",
         high: "Well confirmed"
       },
-      outdated: "Possibly outdated",
-      freshness: {
-        fresh: "Fresh price",
-        aging: "Getting old",
-        stale: "Outdated",
-        monthsAgo: "months ago"
-      }
+      outdated: "Possibly outdated"
+    },
+    freshness: {
+      verifiedToday: "✓ Verified today",
+      verifiedDaysAgo_one: "✓ Verified {{count}} day ago",
+      verifiedDaysAgo_other: "✓ Verified {{count}} days ago",
+      observedToday: "✓ Updated today",
+      observedDaysAgo_one: "✓ Updated {{count}} day ago",
+      observedDaysAgo_other: "✓ Updated {{count}} days ago",
+      maybeOutdated: "⚠ Price may be outdated",
+      unknown: "Date unknown",
+      verifiedOn: "Verified on {{date}}",
+      observedOn: "Price reported on {{date}}"
+    },
+    price: {
+      forSize: "{{size}} Helles",
+      sizeUnknown: "Size unknown",
+      approxPer05: "approx. {{price}} / 0.5L"
     },
     stats: {
       cityAvg: "Munich avg",
@@ -568,6 +598,8 @@ export const en = {
         errName: "Name and neighbourhood are required",
         errBeer: "At least one brand with a price is required",
         errPrice: "Invalid price",
+        verify: "✓ Verify price",
+        verifyHint: "Confirms the price is still correct — changes neither the price nor the modified date.",
         searchPlaceholder: "Search by name, neighbourhood or brand...",
         deleteBeer: "Delete",
         confirmDelete: "Really delete {{brand}}?",
@@ -609,6 +641,8 @@ export const en = {
         venueAdded: "✅ {{venue}} added to the map.",
         venueDeleted: "🗑️ {{venue}} permanently deleted.",
         beerDeleted: "🗑️ {{brand}} removed from {{venue}}.",
+        priceVerified: "Price verified: {{brand}} at {{venue}}.",
+        priceNotApplied: "Approved, but the price was NOT applied (invalid serving size).",
         toggledInactive: "👁️ {{venue}} hidden from map."
       },
       logs: {
@@ -639,6 +673,7 @@ export const en = {
           ADD_BEER: "Beer added",
           DELETE_BEER: "Beer deleted",
           EDIT_BEER: "Beer price edited",
+          VERIFY_PRICE: "Price verified",
           TOGGLE_ACTIVE: "Visibility toggled",
           MARK_CLOSED: "Marked closed"
         }

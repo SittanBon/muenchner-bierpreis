@@ -17,3 +17,6 @@ dist/
 # Logs / OS
 *.log
 .DS_Store
+
+# Pre-migration database backups (VACUUM INTO copies, see database.js)
+*.bak

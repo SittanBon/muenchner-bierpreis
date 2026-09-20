@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { neighbourhoodGeoJSON } from '../data/neighbourhoodGeoJSON';
 import { formatEuro } from '../utils/price';
+import { describePrice } from '../utils/priceUtils';
 
 // Price → colour scale (amber/brown tones — Bavarian feel)
 function priceToColor(price, min = 4.40, max = 6.30) {
@@ -43,8 +44,8 @@ const TYPE_META = {
 };
 const DEFAULT_TYPE_META = { color: '#d97706' };
 
-// A solid-filled, coloured circle with a centred white Lucide icon —
-// createVenueIcon returns a ready-to-use L.divIcon, no Leaflet state
+// A white circle with a coloured border and a centred Lucide icon in the
+// same colour — createVenueIcon returns a ready-to-use L.divIcon, no Leaflet state
 // involved, so it's a pure function of (venue, isSelected) and safe to call
 // for every marker on every rebuild. The icon itself is inline SVG (not a
 // raster image), so it's pixel-sharp at any DPI/zoom with no @2x asset
@@ -113,8 +114,18 @@ function buildVenuePopupContent(v, { t, i18n, onViewDetails }) {
     priceLine.className = 'vpc-price-line';
     const price = document.createElement('span');
     price.className = 'vpc-price';
-    price.textContent = formatEuro(cheapest.size_05, i18n.language);
+    // Actual menu price first; the serving size sits right beside it, and the
+    // per-0.5 L comparison (only when the size is known and isn't 0.5 L) goes
+    // on its own muted line below — never presented as what the guest pays.
+    const p = describePrice(cheapest, i18n.language);
+    price.textContent = p.actual;
     priceLine.appendChild(price);
+    if (!p.isReferenceSize) {
+      const size = document.createElement('span');
+      size.className = 'vpc-size';
+      size.textContent = ` ${p.sizeUnknown ? t('price.sizeUnknown') : p.volumeLabel}`;
+      priceLine.appendChild(size);
+    }
     if (cheapest.brand) {
       priceLine.appendChild(document.createTextNode(' · '));
       const brand = document.createElement('span');
@@ -123,6 +134,12 @@ function buildVenuePopupContent(v, { t, i18n, onViewDetails }) {
       priceLine.appendChild(brand);
     }
     card.appendChild(priceLine);
+    if (p.normalized) {
+      const approx = document.createElement('div');
+      approx.className = 'vpc-approx';
+      approx.textContent = t('price.approxPer05', { price: p.normalized });
+      card.appendChild(approx);
+    }
   }
 
   const link = document.createElement('button');
@@ -223,9 +240,10 @@ export default function MunichMap({ neighbourhoods, venues, onNeighbourhoodClick
     // neighbourhood with no rows here simply has nothing matching the query.
     const filteredStats = {};
     neighbourhoods.forEach(n => {
-      const nv = venues.filter(v => v.neighbourhood_id === n.id && v.beers[0]?.size_05 != null);
+      // Shading compares per-0.5 L prices; a venue with no known serving size is left out.
+      const nv = venues.filter(v => v.neighbourhood_id === n.id && v.beers[0]?.normalized_500ml_price != null);
       if (nv.length) {
-        const avg = nv.reduce((s, v) => s + v.beers[0].size_05, 0) / nv.length;
+        const avg = nv.reduce((s, v) => s + v.beers[0].normalized_500ml_price, 0) / nv.length;
         filteredStats[n.id] = { avg: Math.round(avg * 100) / 100, count: nv.length };
       }
     });
@@ -389,8 +407,10 @@ export default function MunichMap({ neighbourhoods, venues, onNeighbourhoodClick
 
         const cheapest = v.beers?.[0];
         if (cheapest) {
+          const tp = describePrice(cheapest, i18n.language);
+          const sizeNote = tp.isReferenceSize ? '' : ` (${tp.sizeUnknown ? t('price.sizeUnknown') : tp.volumeLabel})`;
           marker.bindTooltip(
-            `${escapeHtml(v.name)} · ${formatEuro(cheapest.size_05, i18n.language)}`,
+            `${escapeHtml(v.name)} · ${tp.actual}${escapeHtml(sizeNote)}`,
             { direction: 'top', offset: [0, -18] }
           );
         }

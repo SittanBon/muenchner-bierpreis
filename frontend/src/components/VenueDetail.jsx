@@ -8,7 +8,9 @@ import ReportForm from './ReportForm';
 import FreshnessLight from './FreshnessLight';
 import ServeTypeTag from './ServeTypeTag';
 import VenueTypeIcon from './VenueTypeIcon';
+import PriceSecondary from './PriceSecondary';
 import { formatEuro } from '../utils/price';
+import { describePrice } from '../utils/priceUtils';
 
 // Same validated categorical order used for the Price Trends chart (dataviz
 // skill's default palette) — assigned by the beer's position in the venue's
@@ -155,8 +157,14 @@ export default function VenueDetail({ venue: initialVenue, onBack }) {
   }, [initialVenue.id]);
 
   const beers = venue.beers || [];
-  const headline = beers[0]; // cheapest active beer — the API sorts beers ASC by price
+  const headline = beers[0]; // cheapest per 0.5 L — the API sorts beers by the normalized price
   const otherBeers = beers.slice(1);
+  const headlinePrice = headline ? describePrice(headline, i18n.language) : null;
+  // The price chart compares like with like: each historical price at its
+  // per-0.5 L equivalent, and a report whose size isn't a known one is left out.
+  const comparableHistory = useMemo(() => (venue.price_history || [])
+    .filter((h) => h.normalized_500ml_price != null)
+    .map((h) => ({ ...h, price: h.normalized_500ml_price })), [venue.price_history]);
   const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(venue.name + ' ' + venue.address)}`;
 
   const handleSubmitSuccess = () => {
@@ -190,8 +198,14 @@ export default function VenueDetail({ venue: initialVenue, onBack }) {
       {headline && (
         <div className="vd-price-block">
           <div className="vdp-main">
-            <div className="vdp-amount">{formatEuro(headline.size_05, i18n.language)}</div>
-            <div className="vdp-label">{t('venue.price05')}</div>
+            <div className="vdp-amount">{headlinePrice.actual}</div>
+            <div className="vdp-label">
+              {headlinePrice.sizeUnknown ? t('price.sizeUnknown') : t('price.forSize', { size: headlinePrice.volumeLabel })}
+            </div>
+            {/* Secondary, muted: only when the size is known and isn't 0.5 L already */}
+            {headlinePrice.normalized && (
+              <div className="vdp-normalized">{t('price.approxPer05', { price: headlinePrice.normalized })}</div>
+            )}
           </div>
           {headline.size_mass && (
             <div className="vdp-mass">
@@ -201,12 +215,9 @@ export default function VenueDetail({ venue: initialVenue, onBack }) {
           )}
           <div className="vdp-brand-block">
             <div className="vdp-brand">🍻 {headline.brand}</div>
-            <div className="vdp-updated">
-              {t('venue.lastUpdated')}: {new Date(headline.updated).toLocaleDateString()}
-            </div>
             <div className="vdp-serve-type"><ServeTypeTag serveType={headline.serve_type} /></div>
             <div className="vdp-freshness">
-              <FreshnessLight date={headline.updated} />
+              <FreshnessLight beer={headline} />
             </div>
           </div>
         </div>
@@ -237,9 +248,12 @@ export default function VenueDetail({ venue: initialVenue, onBack }) {
               <div className="ob-info">
                 <span className="ob-brand">🍺 {b.brand}</span>
                 <ServeTypeTag serveType={b.serve_type} />
-                <FreshnessLight date={b.updated} compact />
+                <FreshnessLight beer={b} compact />
               </div>
-              <span className="ob-price">{formatEuro(b.size_05, i18n.language)}</span>
+              <span className="ob-price-wrap">
+                <span className="ob-price">{formatEuro(b.size_05, i18n.language)}</span>
+                <PriceSecondary beer={b} />
+              </span>
             </div>
           ))}
         </div>
@@ -301,7 +315,7 @@ export default function VenueDetail({ venue: initialVenue, onBack }) {
       {!loading && (
         <div className="price-history">
           <div className="section-title">{t('priceHistory')}</div>
-          <BrandHistoryChart history={venue.price_history} beers={beers} />
+          <BrandHistoryChart history={comparableHistory} beers={beers} />
         </div>
       )}
 

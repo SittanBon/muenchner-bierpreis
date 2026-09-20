@@ -140,6 +140,15 @@ export async function adminUpdateBeerPrice(token, venueId, beerId, data) {
   });
 }
 
+// "This price is still correct" — sets verified_at only; the price itself,
+// its observation date and the technical modified date are left alone.
+export async function adminVerifyBeer(token, venueId, beerId) {
+  return authedFetch(`${BASE}/admin/venues/${venueId}/beers/${beerId}/verify`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` }
+  });
+}
+
 export async function adminDeleteBeer(token, venueId, beerId) {
   return authedFetch(`${BASE}/admin/venues/${venueId}/beers/${beerId}`, {
     method: 'DELETE',

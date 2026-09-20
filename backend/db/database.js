@@ -5,6 +5,16 @@
 const fs = require('fs');
 const path = require('path');
 const Database = require('better-sqlite3');
+const {
+  SIZE_TO_ML,
+  REFERENCE_VOLUME_ML,
+  normalizePrice,
+  getFreshness,
+  todayISO,
+  toDateOnly,
+  volumeFromSize,
+  resolveObservationDates,
+} = require('../utils/priceUtils');
 
 // Railway mounts the persistent volume at /app/data — without DATABASE_PATH
 // explicitly pointing there, a production deploy would silently fall back to
@@ -38,6 +48,24 @@ function initSchema() {
   migrate();
 }
 
+// A consistent point-in-time copy of the database (VACUUM INTO, not a raw
+// file copy — the DB runs in WAL mode, so copying the main file alone can miss
+// committed data still sitting in the -wal sidecar) written next to the DB
+// file, taken once, right before a schema migration that touches real data.
+// Restoring it is the rollback path. A failed backup is logged loudly but
+// doesn't block the migration: the migrations here only ADD columns.
+function backupBeforeMigration(label) {
+  try {
+    if (db.prepare('SELECT COUNT(*) AS n FROM beers').get().n === 0) return; // nothing worth saving
+    const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const target = `${DB_PATH}.pre-${label}-${stamp}.bak`;
+    db.prepare('VACUUM INTO ?').run(target);
+    console.log(`🛟 Pre-migration backup written: ${target}`);
+  } catch (err) {
+    console.error(`⚠️  Pre-migration backup FAILED (${err.message}) — continuing, the migration only adds columns.`);
+  }
+}
+
 // CREATE TABLE IF NOT EXISTS leaves an already-existing `beers` table without new
 // columns added to schema.sql later — add them by hand, guarded so this is safe
 // to run on every boot.
@@ -56,6 +84,32 @@ function migrate() {
   }
   if (!submissionCols.includes('extra_beers')) {
     db.exec('ALTER TABLE submissions ADD COLUMN extra_beers TEXT');
+  }
+  // P0 Phase 1 — price trust columns. `beers.updated` stays exactly as it is
+  // but is now only a technical modification date; freshness comes from these:
+  //   price_observed_at — when this price was actually seen/reported
+  //   verified_at       — when someone later confirmed it is still correct
+  //   serving_volume_ml — the serving size `size_05` is quoted for (ml)
+  // Both dates are added NULL for every existing row on purpose: nothing in
+  // the legacy data proves a price was observed or verified (`updated` is a
+  // mix of seed-script staggering, admin-edit dates and user-claimed dates),
+  // so copying it across would manufacture trust. Existing rows read as
+  // "date unknown" until a real observation/verification is recorded.
+  // serving_volume_ml is backfilled to 500 because `size_05` IS, by
+  // definition, the 0.5 L price. The backfill sits inside the "column is
+  // missing" branch so it runs exactly once — never on a later boot, where it
+  // could overwrite real data.
+  const beerColsNow = db.prepare('PRAGMA table_info(beers)').all().map((c) => c.name);
+  const missingTrustCols = ['price_observed_at', 'verified_at', 'serving_volume_ml']
+    .filter((c) => !beerColsNow.includes(c));
+  if (missingTrustCols.length) {
+    backupBeforeMigration('phase1');
+    if (!beerColsNow.includes('price_observed_at')) db.exec('ALTER TABLE beers ADD COLUMN price_observed_at TEXT');
+    if (!beerColsNow.includes('verified_at')) db.exec('ALTER TABLE beers ADD COLUMN verified_at TEXT');
+    if (!beerColsNow.includes('serving_volume_ml')) {
+      db.exec('ALTER TABLE beers ADD COLUMN serving_volume_ml INTEGER');
+      db.exec(`UPDATE beers SET serving_volume_ml = ${REFERENCE_VOLUME_ML} WHERE size_05 IS NOT NULL`);
+    }
   }
   const venueCols = db.prepare('PRAGMA table_info(venues)').all().map((c) => c.name);
   if (!venueCols.includes('active')) {
@@ -112,10 +166,31 @@ function isEmpty() {
 // Cheapest active beer first — every consumer that reads beers[0] as "the
 // headline price" (stats, map shading, sidebar cards, venue detail) gets the
 // cheapest brand for free, with no special-casing needed at the call site.
+//
+// "Cheapest" means cheapest per 0.5 L (size_05 × 500 / serving_volume_ml), not
+// the smallest raw number — €3.50 for 0.33 L is NOT cheaper than €4.20 for
+// 0.5 L. A price with no known serving size can't be compared, so it sorts
+// after every comparable one instead of being assumed to be 0.5 L.
 const beersForVenue = db.prepare(
-  `SELECT id, venue_id, brand, size_05, size_mass, updated, reports, serve_type
-     FROM beers WHERE venue_id = ? AND active = 1 ORDER BY size_05 ASC`
+  `SELECT id, venue_id, brand, size_05, size_mass, updated, reports, serve_type,
+          serving_volume_ml, price_observed_at, verified_at
+     FROM beers WHERE venue_id = ? AND active = 1
+    ORDER BY CASE WHEN serving_volume_ml > 0 AND size_05 > 0 THEN 0 ELSE 1 END,
+             size_05 * ${REFERENCE_VOLUME_ML}.0 / serving_volume_ml ASC,
+             id ASC`
 );
+
+// Adds the server-derived fields every public/admin beer carries: the price
+// normalised to 0.5 L (null when the serving size or price is unknown) and
+// the freshness state. The API sends only what the UI needs — no admin ids,
+// submitter details or notes ever ride along on a beer.
+function hydrateBeer(row) {
+  return {
+    ...row,
+    normalized_500ml_price: normalizePrice(row.size_05, row.serving_volume_ml),
+    freshness_state: getFreshness(row).state,
+  };
+}
 
 const SERVE_TYPES = ['tap', 'bottle', 'can', 'unknown'];
 function normalizeServeType(v) {
@@ -156,7 +231,7 @@ function hydrateVenue(row) {
     description_en: row.description_en,
     active: row.active === 1,
     outside_modelled_area: row.outside_modelled_area === 1,
-    beers: beersForVenue.all(row.id),
+    beers: beersForVenue.all(row.id).map(hydrateBeer),
   };
 }
 
@@ -182,9 +257,12 @@ const neighbourhoodsStmt = db.prepare('SELECT * FROM neighbourhoods ORDER BY nam
 function getNeighbourhoods() {
   const venues = getVenues();
   return neighbourhoodsStmt.all().map((n) => {
+    // Averages compare like with like: every price is the normalised 0.5 L
+    // price, and a venue whose serving size is unknown is left out rather
+    // than assumed to be 0.5 L.
     const prices = venues
-      .filter((v) => v.neighbourhood_id === n.id && v.beers[0]?.size_05 != null)
-      .map((v) => v.beers[0].size_05);
+      .filter((v) => v.neighbourhood_id === n.id && v.beers[0]?.normalized_500ml_price != null)
+      .map((v) => v.beers[0].normalized_500ml_price);
     const avg = prices.length
       ? Math.round((prices.reduce((a, b) => a + b, 0) / prices.length) * 100) / 100
       : null;
@@ -361,12 +439,13 @@ function getAdminLogsForExport(filters = {}) {
 
 // City-wide stats for the public stats bar.
 function getStats() {
-  const venues = getVenues().filter((v) => v.beers[0]?.size_05 != null);
+  // City-wide numbers are per-0.5 L comparison prices (see getNeighbourhoods).
+  const venues = getVenues().filter((v) => v.beers[0]?.normalized_500ml_price != null);
   const priced = venues.map((v) => ({
     id: v.id,
     name: v.name,
     neighbourhood_id: v.neighbourhood_id,
-    price: v.beers[0].size_05,
+    price: v.beers[0].normalized_500ml_price,
   }));
 
   const cityAvg = priced.length
@@ -428,33 +507,40 @@ const setSubmissionStatus = db.prepare(
 const setSubmissionVenueId = db.prepare(`UPDATE submissions SET venue_id = ? WHERE id = ?`);
 // Only price_change/new_beer rows carry a real (brand, price) pair — a 'closed'
 // or 'other_info' report has neither, so it must never show up as a history point.
-const approvedHistoryForVenue = db.prepare(`
-  SELECT * FROM submissions
+// PUBLIC price history: deliberately a column allow-list, not SELECT * — a
+// submission row also carries the submitter's name, their free-text note, the
+// admin's reject reason and (for new venues) coordinates/photo path, none of
+// which belong in a public API response.
+const approvedHistoryForVenueStmt = db.prepare(`
+  SELECT beer_brand, size, price, visit_date FROM submissions
    WHERE venue_id = ? AND status = 'approved'
      AND beer_brand IS NOT NULL AND price IS NOT NULL
    ORDER BY visit_date DESC
 `);
 
-// Rolls an approved submission's price into THAT SPECIFIC BRAND's row — a venue
-// can list several beers, so this must never just grab "the first beer by id".
-// serve_type only overwrites when the submission actually carried one — an
-// older, pre-serve_type submission (still NULL here) must never reset an
-// already-known 'tap'/'bottle'/'can' back to 'unknown'.
-const updateHeadlinePrice = db.prepare(`
-  UPDATE beers
-     SET size_05    = CASE WHEN @size = '0.5L' THEN @price ELSE size_05 END,
-         size_mass  = CASE WHEN @size = '1L'   THEN @price ELSE size_mass END,
-         updated    = @visit_date,
-         reports    = reports + 1,
-         serve_type = CASE WHEN @serve_type IS NOT NULL THEN @serve_type ELSE serve_type END
-   WHERE venue_id = @venue_id AND brand = @brand AND active = 1
-`);
+// History rows carry both the price as reported and the same price
+// normalised to 0.5 L (null when the reported size isn't a known one), so a
+// chart can plot comparable numbers without re-deriving the conversion.
+function getPublicPriceHistory(venueId) {
+  return approvedHistoryForVenueStmt.all(venueId).map((row) => ({
+    ...row,
+    normalized_500ml_price: normalizePrice(row.price, volumeFromSize(row.size)),
+  }));
+}
 
 // Applies an approved "suggest a description" report — the one place a
 // venue's description is ever set outside the admin edit form itself.
 const setVenueDescriptionDe = db.prepare(
   'UPDATE venues SET description_de = @description_de WHERE id = @venue_id'
 );
+
+// Trend averages compare like with like: each submission's price is converted
+// to its per-0.5 L equivalent from the size it was reported for, and a
+// submission with no recognised size (or no price) is left out entirely
+// instead of being averaged in as if it were a 0.5 L price.
+const SUBMISSION_ML_SQL = `CASE s.size ${Object.entries(SIZE_TO_ML).map(([k, v]) => `WHEN '${k}' THEN ${v}`).join(' ')} END`;
+const SUBMISSION_PRICE_500_SQL = `(s.price * ${REFERENCE_VOLUME_ML}.0 / ${SUBMISSION_ML_SQL})`;
+const COMPARABLE_SUBMISSION_SQL = `s.price IS NOT NULL AND ${SUBMISSION_ML_SQL} IS NOT NULL`;
 
 // Monthly average Helles price per neighbourhood, from approved submissions —
 // powers the Price Trends chart. Each row is one (month, neighbourhood) average.
@@ -465,11 +551,12 @@ const setVenueDescriptionDe = db.prepare(
 const trendsByNeighbourhood = db.prepare(`
   SELECT strftime('%Y-%m', s.visit_date) AS month,
          v.neighbourhood_id            AS neighbourhood_id,
-         ROUND(AVG(s.price), 2)        AS avg_price,
+         ROUND(AVG(${SUBMISSION_PRICE_500_SQL}), 2) AS avg_price,
          COUNT(*)                      AS n
     FROM submissions s
     JOIN venues v ON v.id = s.venue_id
    WHERE s.status = 'approved' AND s.visit_date IS NOT NULL
+     AND ${COMPARABLE_SUBMISSION_SQL}
    GROUP BY month, v.neighbourhood_id
    ORDER BY month
 `);
@@ -477,11 +564,12 @@ const trendsByNeighbourhood = db.prepare(`
 // Same, collapsed across all neighbourhoods — the Munich city-wide line.
 const trendsCityWide = db.prepare(`
   SELECT strftime('%Y-%m', s.visit_date) AS month,
-         ROUND(AVG(s.price), 2)          AS avg_price,
+         ROUND(AVG(${SUBMISSION_PRICE_500_SQL}), 2) AS avg_price,
          COUNT(*)                        AS n
     FROM submissions s
     JOIN venues v ON v.id = s.venue_id
    WHERE s.status = 'approved' AND s.visit_date IS NOT NULL
+     AND ${COMPARABLE_SUBMISSION_SQL}
    GROUP BY month
    ORDER BY month
 `);
@@ -505,10 +593,11 @@ function brandBucketSql(column) {
 const trendsByBrand = db.prepare(`
   SELECT strftime('%Y-%m', s.visit_date) AS month,
          ${brandBucketSql('s.beer_brand')} AS brand,
-         ROUND(AVG(s.price), 2)            AS avg_price,
+         ROUND(AVG(${SUBMISSION_PRICE_500_SQL}), 2) AS avg_price,
          COUNT(*)                          AS n
     FROM submissions s
    WHERE s.status = 'approved' AND s.visit_date IS NOT NULL
+     AND ${COMPARABLE_SUBMISSION_SQL}
      AND s.beer_brand IS NOT NULL AND s.beer_brand != ''
    GROUP BY month, brand
    ORDER BY month
@@ -518,9 +607,9 @@ const trendsByBrand = db.prepare(`
 // at all yet — same live beers table the map/stats bar already reads from.
 const currentByBrandStmt = db.prepare(`
   SELECT ${brandBucketSql('brand')} AS brand,
-         ROUND(AVG(size_05), 2)     AS avg_price
+         ROUND(AVG(size_05 * ${REFERENCE_VOLUME_ML}.0 / serving_volume_ml), 2) AS avg_price
     FROM beers
-   WHERE active = 1 AND size_05 IS NOT NULL
+   WHERE active = 1 AND size_05 > 0 AND serving_volume_ml > 0
    GROUP BY brand
 `);
 
@@ -604,17 +693,43 @@ function updateVenue(id, fields) {
 }
 
 const insertBeerStmt = db.prepare(`
-  INSERT INTO beers (venue_id, brand, size_05, size_mass, updated, reports, active, serve_type)
-  VALUES (@venue_id, @brand, @size_05, @size_mass, @updated, 1, 1, @serve_type)
+  INSERT INTO beers
+    (venue_id, brand, size_05, size_mass, updated, reports, active, serve_type,
+     serving_volume_ml, price_observed_at, verified_at)
+  VALUES
+    (@venue_id, @brand, @size_05, @size_mass, @updated, 1, 1, @serve_type,
+     @serving_volume_ml, @price_observed_at, NULL)
 `);
 
-const updateBeerPriceStmt = db.prepare(`
-  UPDATE beers SET size_05 = @size_05, size_mass = @size_mass, updated = @updated, serve_type = @serve_type
-   WHERE id = @beer_id AND venue_id = @venue_id
-`);
+// Bound parameters for insertBeerStmt from a caller's beer object.
+//  - serving_volume_ml defaults to 500: every creation path (admin form,
+//    new-venue proposal, the research/backfill scripts) collects the "0.5 L
+//    price", so 500 is a fact about the input, not a guess. A caller that
+//    genuinely doesn't know passes null and the size stays unknown.
+//  - price_observed_at defaults to NULL. Only a caller that can vouch for
+//    WHEN the price was seen passes one (an approved submission's visit date,
+//    or an admin entering a price right now). Scripts that insert researched
+//    prices at boot leave it NULL rather than stamping "today" on them.
+//  - `updated` is the technical modification date: the date this row was written.
+function beerInsertParams(venue_id, b) {
+  return {
+    venue_id,
+    brand: b.brand,
+    size_05: b.size_05,
+    size_mass: b.size_mass ?? null,
+    updated: todayISO(),
+    serve_type: normalizeServeType(b.serve_type),
+    serving_volume_ml: b.serving_volume_ml === undefined ? REFERENCE_VOLUME_ML : b.serving_volume_ml,
+    price_observed_at: toDateOnly(b.price_observed_at),
+  };
+}
 
 const beerBelongsToVenueStmt = db.prepare('SELECT id FROM beers WHERE id = ? AND venue_id = ?');
 const beerByIdStmt = db.prepare('SELECT * FROM beers WHERE id = ?');
+const beerForVenueStmt = db.prepare('SELECT * FROM beers WHERE id = ? AND venue_id = ?');
+const activeBeerByBrandStmt = db.prepare(
+  'SELECT * FROM beers WHERE venue_id = ? AND brand = ? AND active = 1'
+);
 
 function slugify(s) {
   return String(s).toLowerCase()
@@ -635,10 +750,10 @@ function uniqueVenueId(name) {
 }
 
 // Creates a venue with one or more beers in a single transaction. `beersInput`
-// is [{ brand, size_05, size_mass }, ...] — at least one required.
+// is [{ brand, size_05, size_mass, serve_type?, serving_volume_ml?,
+// price_observed_at? }, ...] — at least one required.
 const createVenue = db.transaction((venue, beersInput) => {
   const id = uniqueVenueId(venue.name);
-  const today = new Date().toISOString().slice(0, 10);
 
   // Descriptions are never auto-generated — a venue created without one (admin
   // form left blank, or a user-submitted new-venue proposal with no "about
@@ -661,47 +776,145 @@ const createVenue = db.transaction((venue, beersInput) => {
   });
 
   for (const b of beersInput) {
-    insertBeerStmt.run({
-      venue_id: id,
-      brand: b.brand,
-      size_05: b.size_05,
-      size_mass: b.size_mass ?? null,
-      updated: today,
-      serve_type: normalizeServeType(b.serve_type),
-    });
+    insertBeerStmt.run(beerInsertParams(id, b));
   }
 
   return id;
 });
 
 function addBeerToVenue(venue_id, beer) {
-  const today = new Date().toISOString().slice(0, 10);
-  insertBeerStmt.run({
-    venue_id,
-    brand: beer.brand,
-    size_05: beer.size_05,
-    size_mass: beer.size_mass ?? null,
-    updated: today,
-    serve_type: normalizeServeType(beer.serve_type),
-  });
+  insertBeerStmt.run(beerInsertParams(venue_id, beer));
 }
 
-// Returns false if the beer doesn't exist / doesn't belong to that venue.
-// serve_type is optional here — a plain price edit (the existing behaviour
-// before serve_type existed) must never silently reset it back to 'unknown',
-// so an omitted value falls back to whatever the beer already has.
-function updateBeerPrice(venue_id, beer_id, { size_05, size_mass, serve_type }) {
-  if (!beerBelongsToVenueStmt.get(beer_id, venue_id)) return false;
-  const today = new Date().toISOString().slice(0, 10);
-  const resolvedServeType = serve_type !== undefined
-    ? normalizeServeType(serve_type)
-    : beerByIdStmt.get(beer_id).serve_type;
-  updateBeerPriceStmt.run({
-    beer_id, venue_id, size_05, size_mass: size_mass ?? null, updated: today,
-    serve_type: resolvedServeType,
+// Admin price edit. Returns false if the beer doesn't exist / doesn't belong to
+// that venue.
+//
+//  * A save that changes nothing writes nothing — not even `updated`. (It used
+//    to stamp `updated = today` on every save, so clicking Save on an old
+//    price made it look freshly confirmed.)
+//  * `updated` (technical) moves only when a stored value actually changed.
+//  * A changed headline price or serving size is a new observation by the
+//    admin: price_observed_at = today, and verified_at is cleared — any
+//    earlier verification was of the OLD value.
+//  * A change to size_mass or serve_type alone touches `updated` only; it says
+//    nothing about how current the headline price is, so the freshness dates
+//    stay as they were.
+//  * serve_type / serving_volume_ml are optional — an omitted value keeps
+//    what the beer already has (a plain price edit must never silently reset
+//    a known 'tap' back to 'unknown').
+function updateBeerPrice(venue_id, beer_id, { size_05, size_mass, serve_type, serving_volume_ml }) {
+  const existing = beerForVenueStmt.get(beer_id, venue_id);
+  if (!existing) return false;
+
+  const nextServe = serve_type !== undefined ? normalizeServeType(serve_type) : existing.serve_type;
+  const nextVolume = serving_volume_ml !== undefined ? serving_volume_ml : existing.serving_volume_ml;
+  const nextMass = size_mass ?? null;
+
+  const headlineChanged = existing.size_05 !== size_05
+    || (existing.serving_volume_ml ?? null) !== (nextVolume ?? null);
+  const massChanged = (existing.size_mass ?? null) !== nextMass;
+  const serveChanged = existing.serve_type !== nextServe;
+  if (!headlineChanged && !massChanged && !serveChanged) return true;
+
+  const today = todayISO();
+  db.prepare(`
+    UPDATE beers
+       SET size_05 = @size_05, size_mass = @size_mass, serve_type = @serve_type,
+           serving_volume_ml = @serving_volume_ml, updated = @today,
+           price_observed_at = @price_observed_at, verified_at = @verified_at
+     WHERE id = @beer_id AND venue_id = @venue_id
+  `).run({
+    beer_id, venue_id, today,
+    size_05, size_mass: nextMass, serve_type: nextServe, serving_volume_ml: nextVolume ?? null,
+    price_observed_at: headlineChanged ? today : existing.price_observed_at,
+    verified_at: headlineChanged ? null : existing.verified_at,
   });
   return true;
 }
+
+// "This price is still correct." Sets verified_at = today and NOTHING else:
+// the price, its observation date and the technical `updated` are untouched,
+// and no history/log-of-a-price-change is implied — confirming an unchanged
+// price is not a price change. Returns 'not_found' | 'no_price' | { ... }.
+function verifyBeerPrice(venue_id, beer_id) {
+  const existing = beerForVenueStmt.get(beer_id, venue_id);
+  if (!existing) return 'not_found';
+  if (!(existing.size_05 > 0)) return 'no_price'; // nothing to confirm
+  const verified_at = todayISO();
+  db.prepare('UPDATE beers SET verified_at = ? WHERE id = ? AND venue_id = ?').run(verified_at, beer_id, venue_id);
+  return { brand: existing.brand, price: existing.size_05, verified_at, previous_verified_at: existing.verified_at };
+}
+
+// Applies an approved price_change / new_beer submission to the beers table.
+// Returns { applied: false, reason } — writing NOTHING, not even `reports` or
+// `updated` — when the submission's size isn't a recognised one or its price
+// isn't usable; otherwise { applied: true, created, old: {...}, target }.
+//
+// A price can only be applied for a KNOWN serving size, because the size is
+// what makes the number mean anything:
+//  * A 1 L (Maß) price for a beer whose headline is not itself the 1 L price
+//    goes to size_mass and leaves the headline's dates alone — seeing the
+//    Maß price says nothing about the 0.5 L price's age.
+//  * Anything else becomes the beer's headline price at that serving size,
+//    with price_observed_at = the submission's visit date (resolved by
+//    resolveObservationDates: a changed value clears any earlier
+//    verification). A different serving size replaces the headline — the row
+//    holds one headline price — and the previous price/size is returned so the
+//    caller can put it in the audit log; a displaced 1 L headline price is
+//    kept in size_mass rather than lost.
+//  * An unknown beer is created. Its price is stored as reported, at the
+//    reported size — never converted to "0.5 L" and stored as if observed
+//    (a 1 L price used to be halved into size_05 as an invented 0.5 L price).
+const applyApprovedPrice = db.transaction((sub) => {
+  const volume = volumeFromSize(sub.size);
+  if (volume === null) return { applied: false, reason: 'invalid_size' };
+  if (!(Number(sub.price) > 0)) return { applied: false, reason: 'invalid_price' };
+
+  const price = Number(sub.price);
+  const observedAt = toDateOnly(sub.visit_date); // null if the stored value is unusable — never invented
+  const today = todayISO();
+  const serveType = sub.serve_type || null;
+  const existing = activeBeerByBrandStmt.get(sub.venue_id, sub.beer_brand);
+
+  if (!existing) {
+    insertBeerStmt.run({
+      ...beerInsertParams(sub.venue_id, {
+        brand: sub.beer_brand, size_05: price, size_mass: null, serve_type: serveType,
+        serving_volume_ml: volume, price_observed_at: observedAt,
+      }),
+    });
+    return { applied: true, created: true, target: 'headline', old: null };
+  }
+
+  const old = { size_05: existing.size_05, size_mass: existing.size_mass, serving_volume_ml: existing.serving_volume_ml };
+
+  if (volume === 1000 && existing.serving_volume_ml !== 1000) {
+    db.prepare(`
+      UPDATE beers SET size_mass = @price, updated = @today, reports = reports + 1,
+             serve_type = COALESCE(@serve_type, serve_type)
+       WHERE id = @id
+    `).run({ id: existing.id, price, today, serve_type: serveType });
+    return { applied: true, created: false, target: 'mass', old };
+  }
+
+  const dates = resolveObservationDates({ existing, newPrice: price, newVolume: volume, observedAt });
+  const keepDisplacedMass = existing.serving_volume_ml === 1000 && volume !== 1000 && existing.size_mass == null
+    ? existing.size_05
+    : existing.size_mass;
+  db.prepare(`
+    UPDATE beers
+       SET size_05 = @price, serving_volume_ml = @volume, size_mass = @size_mass,
+           price_observed_at = @price_observed_at, verified_at = @verified_at,
+           updated = @today, reports = reports + 1,
+           serve_type = COALESCE(@serve_type, serve_type)
+     WHERE id = @id
+  `).run({
+    id: existing.id, price, volume, size_mass: keepDisplacedMass ?? null,
+    price_observed_at: dates.price_observed_at, verified_at: dates.verified_at,
+    today, serve_type: serveType,
+  });
+  return { applied: true, created: false, target: 'headline', old };
+});
 
 // Raw active-flag flip, independent of the full-edit form — used when
 // approving a "closed" report auto-deactivates the venue (MARK_CLOSED).
@@ -779,6 +992,10 @@ module.exports = {
   deleteVenue,
   addBeerToVenue,
   updateBeerPrice,
+  verifyBeerPrice,
+  applyApprovedPrice,
+  getPublicPriceHistory,
+  hydrateBeer,
   deleteBeer,
   statements: {
     insertSubmission,
@@ -788,8 +1005,6 @@ module.exports = {
     submissionById,
     setSubmissionStatus,
     setSubmissionVenueId,
-    approvedHistoryForVenue,
-    updateHeadlinePrice,
     setVenueDescriptionDe,
     countVenues,
     countSubmissionsByStatus,

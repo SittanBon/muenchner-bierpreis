@@ -48,18 +48,26 @@ CREATE TABLE IF NOT EXISTS venues (
 );
 
 -- One row per beer offered at a venue. A venue can list several brands; beers[0]
--- in the API response is always the CHEAPEST active one (the headline price) —
--- see beersForVenue in database.js, which sorts by size_05 ASC.
+-- in the API response is always the one with the lowest COMPARABLE price (the
+-- headline price) — see beersForVenue in database.js, which orders by the
+-- price normalised to 0.5 L, with unknown-serving-size prices last.
+--
+-- Price trust model (P0 Phase 1): a price's age comes ONLY from verified_at /
+-- price_observed_at. `updated` is a technical modification date and is never
+-- evidence that a price is current.
 CREATE TABLE IF NOT EXISTS beers (
   id         INTEGER PRIMARY KEY AUTOINCREMENT,
   venue_id   TEXT NOT NULL REFERENCES venues(id) ON DELETE CASCADE,
   brand      TEXT NOT NULL,
-  size_05    REAL,            -- price for 0.5 L (Halbe), EUR
-  size_mass  REAL,            -- price for 1 L (Maß), EUR, nullable
-  updated    TEXT,            -- ISO date the price was last confirmed
+  size_05    REAL,            -- the headline price, EUR, for serving_volume_ml (0.5 L unless that says otherwise)
+  size_mass  REAL,            -- price for 1 L (Maß), EUR, nullable — secondary price, no timestamps of its own
+  updated    TEXT,            -- TECHNICAL modification date (YYYY-MM-DD) — NOT price freshness
   reports    INTEGER NOT NULL DEFAULT 1,
   active     INTEGER NOT NULL DEFAULT 1,  -- 0 = delisted; kept for price history, hidden from the menu
-  serve_type TEXT NOT NULL DEFAULT 'unknown'  -- 'tap' | 'bottle' | 'can' | 'unknown'
+  serve_type TEXT NOT NULL DEFAULT 'unknown',  -- 'tap' | 'bottle' | 'can' | 'unknown'
+  price_observed_at TEXT,     -- when size_05 was actually seen/reported (YYYY-MM-DD); NULL = unknown
+  verified_at       TEXT,     -- when someone confirmed size_05 is still correct; NULL = never verified
+  serving_volume_ml INTEGER   -- serving size size_05 is quoted for: 250|330|400|500|1000; NULL = unknown
 );
 
 -- report_type: price_change | new_beer | closed | other_info | new_venue.

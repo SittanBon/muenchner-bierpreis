@@ -15,6 +15,7 @@ import { ToastProvider } from './hooks/ToastProvider';
 // needed when a user actually opens the trends modal (brief Section 12).
 const PriceTrends = lazy(() => import('./components/PriceTrends'));
 import FreshnessLight from './components/FreshnessLight';
+import PriceSecondary from './components/PriceSecondary';
 import Footer from './components/Footer';
 import Impressum from './pages/Impressum';
 import Datenschutz from './pages/Datenschutz';
@@ -422,7 +423,8 @@ function AppContent({ navigate }) {
                     </div>
                     <div className="av-list">
                       {[...filteredVenues]
-                        .sort((a, b) => (a.beers[0]?.size_05 ?? 99) - (b.beers[0]?.size_05 ?? 99))
+                        // cheapest per 0.5 L first; a price with no known serving size can't be compared, so it goes last
+                        .sort((a, b) => (a.beers[0]?.normalized_500ml_price ?? Infinity) - (b.beers[0]?.normalized_500ml_price ?? Infinity))
                         .map(v => (
                           <div key={v.id} className="av-item" onClick={() => handleVenueClick(v)}>
                             <span className="av-name">
@@ -432,8 +434,11 @@ function AppContent({ navigate }) {
                               )}
                             </span>
                             <span className="av-right">
-                              <FreshnessLight date={v.beers[0]?.updated} compact />
-                              <span className="av-price">{formatEuro(v.beers[0]?.size_05, i18n.language)}</span>
+                              <FreshnessLight beer={v.beers[0]} compact />
+                              <span className="av-price-wrap">
+                                <span className="av-price">{formatEuro(v.beers[0]?.size_05, i18n.language)}</span>
+                                <PriceSecondary beer={v.beers[0]} />
+                              </span>
                             </span>
                           </div>
                         ))}

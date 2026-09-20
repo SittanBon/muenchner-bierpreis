@@ -38,18 +38,56 @@ JWT_SECRET, TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID in the local
   out to be real Haidhausen/Untergiesing/Westend addresses — none of which
   are modelled neighbourhoods yet).
 - Tables: cities, neighbourhoods, venues, beers,
-  venue_beers, submissions, admin_logs
+  submissions, admin_logs (the price table is `beers` — there is no
+  `venue_beers` table; older notes calling it that mean `beers`)
 - Run locally: npm run seed
 - Geocode: npm run geocode
 - Production DB: /app/data/bierpreis.db
 - Volume: muenchner-bierpreis-volume
 
+## Price data trust model (P0 Phase 1 — READ BEFORE TOUCHING PRICES)
+A price's age comes ONLY from two columns on `beers`:
+- `verified_at` — someone confirmed the price is still correct
+- `price_observed_at` — when the price was actually seen/reported
+- Freshness = verified_at if set, else price_observed_at, else UNKNOWN
+  ("Datum unbekannt"). FRESH ≤30 days, AGING 31–90, STALE >90
+  (`FRESH_DAYS`/`AGING_DAYS` at the top of frontend/src/utils/freshness.js
+  and backend/utils/priceUtils.js — keep them equal; the parity test
+  enforces it).
+- `beers.updated` is a TECHNICAL modification date only (the table has no
+  `updated_at`). NEVER derive freshness from it — an unrelated edit would
+  make an old price look new. It changes only when stored data changes.
+- NEVER invent a date. Existing rows migrated with both dates NULL (the
+  legacy `updated` was not proof of observation). Scripts that insert
+  researched prices leave `price_observed_at` NULL; only an approved
+  submission (its visit date) or an admin entering/changing a price today
+  sets it.
+- Admin "✓ Verify price" (POST /api/admin/venues/:id/beers/:beerId/verify)
+  sets `verified_at` only — no price, no `updated`, no history entry.
+  An admin Save that changes nothing writes nothing. A changed price
+  clears `verified_at` (the old verification was of the old value).
+- `serving_volume_ml` (250/330/400/500/1000; NULL = unknown) is the size
+  `size_05` is quoted for (`size_mass` stays the secondary 1 L price).
+  Actual menu price is ALWAYS primary in the UI; the per-0.5 L
+  `normalized_500ml_price` (server-calculated: price / volume × 500) is
+  secondary, shown only when the size is known and isn't 0.5 L, and is
+  never presented as what the customer pays. Unknown size → no normalized
+  price. Averages, stats, sorting and price filters all use the
+  normalized price.
+- Every API beer carries: price_observed_at, verified_at,
+  serving_volume_ml, normalized_500ml_price, freshness_state. The public
+  `price_history` is an allow-list (no submitter/notes).
+- Submissions: `size` must be one of 0.25L/0.33L/0.4L/0.5L/1L and
+  `visit_date` a real, non-future date (it becomes price_observed_at on
+  approval). Approving an unrecognised size writes nothing.
+- The DB migration takes a `VACUUM INTO` backup (`<db>.pre-phase1-<ts>.bak`,
+  gitignored) once, before adding the columns — restore it to roll back.
+
 ## Tier 1 Stadtteile
 Altstadt-Lehel, Maxvorstadt, Schwabing-West, Schwabing-Freimann,
 Ludwigsvorstadt-Isarvorstadt, Schwanthalerhöhe
 (matches Munich's official Stadtbezirk structure — Altstadt+Lehel are one
-district, Schwabing-West/Schwabing-Freimann are two separate ones) (now the full
-Ludwigsvorstadt-Isarvorstadt district), Lehel, Schwanthalerhöhe
+district, Schwabing-West/Schwabing-Freimann are two separate ones)
 
 ## Cities (future expansion)
 München (active), Berlin/Hamburg/Wien (coming soon)
@@ -121,6 +159,21 @@ Railway auto-deploys from main branch.
 - Altstadt + Lehel merged into one "Altstadt-Lehel" district; Schwabing split
   into "Schwabing-West" + "Schwabing-Freimann" — now matches Munich's real
   Stadtbezirk structure (still 6 Stadtteile total)
+
+## P0 roadmap (spec: Bierpreis_P0_Master_Implementation_Prompt.pdf)
+- ✅ Phase 0 — audit
+- ✅ Phase 1 — data foundation (this section's trust model): verified_at /
+  price_observed_at added, serving_volume_ml added, freshness thresholds
+  corrected to 30/90 days, fake seed data removed (seed.js no longer
+  staggers dates or generates trend-history submissions)
+- ⬜ Phase 2 admin foundation · 3 public core UI · 4 map (price-first
+  markers) · 5 venue experience · 6 discovery (chips/list/bottom nav) ·
+  7 contribution ("Preis falsch?") · 8 desktop · 9 QA
+- Known remaining data-trust debt (NOT fixed in Phase 1, needs a decision):
+  production still holds the fabricated `Community / "seeded price-trend
+  history"` submissions (Price Trends chart is built on them) and
+  seed-invented `reports` counts (the "N reports" badge). Every existing
+  price shows "Datum unbekannt" until verified or re-reported.
 
 ## Still To Do ❌
 - Venue descriptions DE+EN for all venues

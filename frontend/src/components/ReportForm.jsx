@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { submitReport } from '../hooks/useApi';
 import { parsePrice } from '../utils/price';
+import { SERVING_SIZES, formatVolume } from '../utils/priceUtils';
 import { useToast } from '../hooks/useToast';
 import BrandCombobox from './BrandCombobox';
 
@@ -27,7 +28,7 @@ const TOPICS = [
 // incorrect info") with one funnel, all landing in the same admin queue
 // labelled by `report_type`.
 export default function ReportForm({ venueId, venueName, onSuccess, onCancel }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const showToast = useToast();
   const [topic, setTopic] = useState(null);
   // Only meaningful while topic === 'other_info' — null shows the sub-menu
@@ -141,8 +142,11 @@ export default function ReportForm({ venueId, venueName, onSuccess, onCancel }) 
             <div className="sf-field half">
               <label>{t('submission.size')}</label>
               <select value={form.size} onChange={(e) => set('size', e.target.value)}>
-                <option value="0.5L">0,5L (Halbe)</option>
-                <option value="1L">1L (Maß)</option>
+                {SERVING_SIZES.map(({ size, ml }) => (
+                  <option key={size} value={size}>
+                    {formatVolume(ml, i18n.language)}{ml === 500 ? ' (Halbe)' : ml === 1000 ? ' (Maß)' : ''}
+                  </option>
+                ))}
               </select>
             </div>
             <div className="sf-field half">
