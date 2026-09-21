@@ -10,6 +10,7 @@ import FilterPanel from './components/FilterPanel';
 import NearbyCta from './components/NearbyCta';
 import BottomNav from './components/BottomNav';
 import VenueList, { VenueListSkeleton } from './components/VenueList';
+import ListHeader from './components/ListHeader';
 import EmptyState from './components/EmptyState';
 import StatsBar from './components/StatsBar';
 import CitySelector from './components/CitySelector';
@@ -29,9 +30,12 @@ import { useNearby } from './hooks/useNearby';
 import { useToast } from './hooks/useToast';
 import { useIsMobileLayout } from './hooks/useMediaQuery';
 import { useSheetDrag } from './hooks/useSheetDrag';
+import { useNow } from './hooks/useNow';
 import { createSequencedLoader } from './utils/sequencedLoader';
 import { emptyFilters, countActiveFilters } from './utils/quickFilters';
-import { nearbyVenues, comparablePrice, NEARBY_RADIUS_M } from './utils/geo';
+import { nearbyVenues, inBounds, NEARBY_RADIUS_M } from './utils/geo';
+import { sortVenues, DEFAULT_SORT } from './utils/sortVenues';
+import { isOpenNow } from './utils/openingHours';
 import { formatPrice } from './utils/priceUtils';
 
 const MUNICH_VIEW = { lat: 48.145, lng: 11.578, zoom: 13 };
@@ -124,6 +128,9 @@ function AppContent({ navigate }) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false); // ☰ dropdown (mobile header)
   const [highlightId, setHighlightId] = useState(null);       // venue emphasised on the map <-> list
   const [viewCommand, setViewCommand] = useState(null);       // one-off "fly the map here"
+  const [sortKey, setSortKey] = useState(DEFAULT_SORT);        // list order (never affects the map)
+  const [areaBounds, setAreaBounds] = useState(null);          // applied "Diesen Bereich durchsuchen"
+  const [pendingBounds, setPendingBounds] = useState(null);    // the map was moved: the button offers these
   const nearby = useNearby();
   const { request: requestNearby, clear: clearNearby } = nearby;
 
@@ -244,13 +251,29 @@ function AppContent({ navigate }) {
     loadFiltered(filtersRef.current, searchRef.current);
   }, [loadFiltered]);
 
-  // "Reset": every filter AND the search text (the search field is controlled now, so
-  // it can be cleared from here), plus the focused neighbourhood.
-  const clearAll = useCallback(() => {
+  // "Alle Filter zurücksetzen": every filter (chips AND the full panel, incl. price range and
+  // "open now"), the applied map area and the focused neighbourhood. The search text stays.
+  const clearFilters = useCallback(() => {
     setFilters(emptyFilters());
-    setSearchQuery('');
+    setAreaBounds(null);
     selectNeighbourhood(null);
   }, [selectNeighbourhood]);
+  // The empty state's reset also clears the search text (the field is controlled by App).
+  const clearAll = useCallback(() => {
+    clearFilters();
+    setSearchQuery('');
+  }, [clearFilters]);
+
+  // "Diesen Bereich durchsuchen": keep only venues inside the map's current bounds.
+  const handleUserMoved = useCallback((bounds) => setPendingBounds(bounds), []);
+  const applyArea = useCallback(() => { setAreaBounds(pendingBounds); setPendingBounds(null); }, [pendingBounds]);
+  const clearArea = useCallback(() => setAreaBounds(null), []);
+
+  // Karte / Liste. Coming to the list, bring the venue that is highlighted on the map into view.
+  const handleTab = useCallback((tab) => {
+    setMobileTab(tab);
+    if (tab === 'list') setTimeout(() => document.querySelector('.vl-row.is-active')?.scrollIntoView({ block: 'center' }), 80);
+  }, []);
 
   const handleVenueClick = useCallback((venue) => {
     setSelectedVenue(venue); setView('venue'); setSheetLevel('half'); setHighlightId(venue.id);
@@ -283,24 +306,40 @@ function AppContent({ navigate }) {
   }, [clearNearby]);
 
   // ─── What both views show ──────────────────────────────────────────────────
-  // ONE dataset for map and list: the filtered/searched venues — or, after "nearby",
-  // only those within 1 km, each with its distance. Cheapest per 0.5 L first; a venue
-  // whose serving size is unknown can't be compared, so it goes last.
-  const displayVenues = useMemo(() => {
-    if (nearby.status === 'ok') return nearbyVenues(filteredVenues, nearby.coords);
-    return [...filteredVenues].sort((a, b) => comparablePrice(a) - comparablePrice(b));
-  }, [filteredVenues, nearby.status, nearby.coords]);
+  // ONE dataset for map and list. Starting from the server-filtered/searched venues:
+  //   · "Diesen Bereich durchsuchen" keeps those inside the applied map bounds;
+  //   · "Jetzt geöffnet" keeps those whose stored opening hours are readable AND say open now
+  //     (a venue with missing/unreadable hours is never treated as open);
+  //   · after "nearby" only those within 1 km remain, each with its distance.
+  // The MAP gets this set as is (its markers have no order, so changing the sort never
+  // rebuilds them); the LIST gets it sorted (sortVenues).
   const nearbyActive = nearby.status === 'ok';
+  const now = useNow(60000, !!filters.open_now);
+  const openNowAvailable = useMemo(() => allVenues.some((v) => isOpenNow(v.opening_hours, now) !== null), [allVenues, now]);
+  const baseVenues = useMemo(() => {
+    let list = filteredVenues;
+    if (areaBounds) list = list.filter((v) => inBounds(v, areaBounds));
+    if (filters.open_now) list = list.filter((v) => isOpenNow(v.opening_hours, now) === true);
+    return list;
+  }, [filteredVenues, areaBounds, filters.open_now, now]);
+  const displayVenues = useMemo(
+    () => (nearbyActive ? nearbyVenues(baseVenues, nearby.coords) : baseVenues),
+    [baseVenues, nearbyActive, nearby.coords],
+  );
+  // "Entfernung" exists only while the location is active; if it goes away, fall back.
+  const effectiveSort = sortKey === 'distance' && !nearbyActive ? DEFAULT_SORT : sortKey;
+  const listVenues = useMemo(() => sortVenues(displayVenues, effectiveSort), [displayVenues, effectiveSort]);
   const radiusLabel = `${NEARBY_RADIUS_M / 1000} km`;
+  const activeFilterCount = countActiveFilters(filters) + (areaBounds ? 1 : 0);
 
   // Venues in the focused neighbourhood — always derived from the full DB set,
   // then narrowed by the active filters/search so the panel matches the map.
-  const filteredIds = new Set(filteredVenues.map((v) => v.id));
-  const anyFilterActive = !!(countActiveFilters(filters) || searchQuery);
+  const baseIds = new Set(baseVenues.map((v) => v.id));
+  const anyFilterActive = !!(activeFilterCount || searchQuery);
   const panelVenues = activeNeighbourhood
     ? allVenues
         .filter((v) => v.neighbourhood_id === activeNeighbourhood)
-        .filter((v) => !anyFilterActive || filteredIds.has(v.id))
+        .filter((v) => !anyFilterActive || baseIds.has(v.id))
     : [];
   const activeNInfo = neighbourhoods.find((n) => n.id === activeNeighbourhood);
 
@@ -433,6 +472,7 @@ function AppContent({ navigate }) {
             <MunichMap
               neighbourhoods={neighbourhoods}
               venues={displayVenues}
+              onUserMoved={handleUserMoved}
               onNeighbourhoodClick={selectNeighbourhood}
               onVenueClick={handleVenueClick}
               onVenueFocus={handleVenueFocus}
@@ -449,6 +489,9 @@ function AppContent({ navigate }) {
             </div>
           )}
           {noVenues && <div className="map-empty">{emptyState}</div>}
+          {pendingBounds && (
+            <button type="button" className="search-area-btn" onClick={applyArea}>{t('map.searchArea')}</button>
+          )}
           <button className="missing-bar-fab" onClick={openReport}>
             <span className="missing-bar-fab-icon">🍺</span>
             {t('missingBar.fab')}
@@ -466,7 +509,8 @@ function AppContent({ navigate }) {
             filters={filters} onFilterChange={setFilters} neighbourhoods={neighbourhoods}
             moreOpen={showFilters} onToggleMore={() => setShowFilters((o) => !o)}
             onSoon={() => showToast('warning', `${t('chips.open')} — ${t('chips.soon')}`)}
-            onClearAll={clearAll}
+            onClearAll={clearFilters}
+            openNowAvailable={openNowAvailable} areaActive={!!areaBounds} onClearArea={clearArea} activeCount={activeFilterCount}
           />
           {showFilters && (
             <>
@@ -484,6 +528,9 @@ function AppContent({ navigate }) {
                   filters={filters} onFilterChange={setFilters} neighbourhoods={neighbourhoods}
                   onNeighbourhoodSelect={selectNeighbourhood}
                 />
+                {activeFilterCount > 0 && (
+                  <button type="button" className="btn-outline filter-sheet-reset" onClick={clearFilters}>{t('filterSheet.reset')}</button>
+                )}
                 <button type="button" className="btn-amber filter-sheet-show" onClick={closeFilters}>
                   {t('filterSheet.show', { count: displayVenues.length })}
                 </button>
@@ -553,9 +600,10 @@ function AppContent({ navigate }) {
           ) : (
             <div className="pub-list">
               <p className="pub-hint">{t('app.mapHint')}</p>
-              <div className="av-title">
-                {t('app.allVenues')}{` (${displayVenues.length})`}{searchQuery && ` — "${searchQuery}"`}
-              </div>
+              <ListHeader
+                count={displayVenues.length} sort={effectiveSort} onSort={setSortKey}
+                distanceAvailable={nearbyActive} openNowActive={!!filters.open_now}
+              />
               {loadError ? (
                 <div className="load-error-state">
                   <div className="load-error-icon">⚠️</div>
@@ -567,14 +615,14 @@ function AppContent({ navigate }) {
               ) : noVenues ? (
                 emptyState
               ) : (
-                <VenueList venues={displayVenues} highlightId={highlightId} onVenueClick={handleVenueClick} onHover={setHighlightId} />
+                <VenueList venues={listVenues} highlightId={highlightId} onVenueClick={handleVenueClick} onHover={setHighlightId} />
               )}
             </div>
           )}
         </section>
       </main>
 
-      <BottomNav tab={mobileTab} onTab={setMobileTab} onReport={openReport} />
+      <BottomNav tab={mobileTab} onTab={handleTab} onReport={openReport} />
       <Footer navigate={navigate} />
 
       {showMissingBar && (

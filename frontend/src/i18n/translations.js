@@ -72,10 +72,10 @@ export const de = {
       noData: "Noch keine Daten",
       viewDetails: "Details ansehen",
       legend: {
-        title: `Preis pro ${REF_DE}`,
-        cheap: "Günstig",
-        expensive: "Teuer"
-      }
+        title: `Preisniveau (Ø pro ${REF_DE})`,
+        toggle: "Preisniveau"
+      },
+      searchArea: "Diesen Bereich durchsuchen"
     },
     venue: {
       priceMass: `${MASS_NAME_DE} (${MASS_DE})`,
@@ -182,7 +182,8 @@ export const de = {
       soon: "Demnächst",
       more: "Mehr",
       remove: "Filter entfernen: {{name}}",
-      reset: "Zurücksetzen",
+      reset: "Alle Filter zurücksetzen",
+      area: "Kartenausschnitt",
     },
     bottomNav: {
       label: "Hauptnavigation",
@@ -199,6 +200,27 @@ export const de = {
       title: "Filter",
       done: "Fertig",
       show: "{{count}} Lokale anzeigen",
+      reset: "Alle Filter zurücksetzen",
+    },
+    list: {
+      found_one: "{{count}} Lokal gefunden",
+      found_other: "{{count}} Lokale gefunden",
+      sortLabel: "Sortieren nach",
+      sort: {
+        price_asc: "Preis ↑",
+        price_desc: "Preis ↓",
+        name: "Name",
+        distance: "Entfernung",
+        freshness: "Frische",
+      },
+      sortName: {
+        price_asc: "Preis aufsteigend",
+        price_desc: "Preis absteigend",
+        name: "Name A–Z",
+        distance: "Entfernung",
+        freshness: "Aktualität, neueste zuerst",
+      },
+      openNote: "Nur Lokale, deren gespeicherte Öffnungszeiten „geöffnet“ ergeben — Lokale ohne lesbare Zeiten sind nicht dabei.",
     },
     brandPicker: {
       clear: "Leeren",
@@ -628,10 +650,10 @@ export const en = {
       noData: "No data yet",
       viewDetails: "View details",
       legend: {
-        title: `Price per ${REF_EN}`,
-        cheap: "Cheap",
-        expensive: "Expensive"
-      }
+        title: `Price level (avg per ${REF_EN})`,
+        toggle: "Price level"
+      },
+      searchArea: "Search this area"
     },
     venue: {
       priceMass: `${MASS_NAME_EN} (${MASS_EN})`,
@@ -733,7 +755,8 @@ export const en = {
       soon: "Coming soon",
       more: "More",
       remove: "Remove filter: {{name}}",
-      reset: "Reset",
+      reset: "Reset all filters",
+      area: "Map area",
     },
     bottomNav: {
       label: "Main navigation",
@@ -750,6 +773,27 @@ export const en = {
       title: "Filters",
       done: "Done",
       show: "Show {{count}} venues",
+      reset: "Reset all filters",
+    },
+    list: {
+      found_one: "{{count}} venue found",
+      found_other: "{{count}} venues found",
+      sortLabel: "Sort by",
+      sort: {
+        price_asc: "Price ↑",
+        price_desc: "Price ↓",
+        name: "Name",
+        distance: "Distance",
+        freshness: "Freshness",
+      },
+      sortName: {
+        price_asc: "Price, low to high",
+        price_desc: "Price, high to low",
+        name: "Name A–Z",
+        distance: "Distance",
+        freshness: "Most recently updated first",
+      },
+      openNote: "Only venues whose stored opening hours say they are open now — venues without readable hours are not included.",
     },
     brandPicker: {
       clear: "Clear",

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { QUICK_FILTERS, toggleQuickFilter, extraActiveFilters, countActiveFilters, emptyFilters } from './quickFilters';
+import { QUICK_FILTERS, OPEN_NOW_CHIP, toggleQuickFilter, extraActiveFilters, countActiveFilters, emptyFilters } from './quickFilters';
 
 describe('quick filter chips', () => {
   it('map to exactly the filters in the brief', () => {
@@ -32,8 +32,12 @@ describe('quick filter chips', () => {
     const f = emptyFilters();
     expect(toggleQuickFilter(f, 'nope')).toBe(f);
   });
-  it('"Jetzt geöffnet" is not a filter (no reliable opening-hours data)', () => {
+  it('"Jetzt geöffnet" is its own chip (it is only offered when hours are readable) and toggles open_now', () => {
     expect(QUICK_FILTERS.map((q) => q.id)).not.toContain('open');
+    const on = toggleQuickFilter(emptyFilters(), 'open');
+    expect(on.open_now).toBe(true);
+    expect(OPEN_NOW_CHIP.isActive(on)).toBe(true);
+    expect(toggleQuickFilter(on, 'open')).toEqual(emptyFilters());
   });
 });
 
@@ -51,7 +55,17 @@ describe('extraActiveFilters — filters no chip shows', () => {
   });
 });
 
-describe('countActiveFilters', () => {
+describe('countActiveFilters — the "Mehr (n)" badge', () => {
+  it('a price range counts ONCE, however many of min/max are set', () => {
+    expect(countActiveFilters({ ...emptyFilters(), min_price: '3.5' })).toBe(1);
+    expect(countActiveFilters({ ...emptyFilters(), max_price: '5' })).toBe(1);
+    expect(countActiveFilters({ ...emptyFilters(), min_price: '3.5', max_price: '5' })).toBe(1);
+  });
+  it('counts open-now like any other filter; "Biergarten + ≤ €4" is 2', () => {
+    expect(countActiveFilters({ ...emptyFilters(), open_now: true })).toBe(1);
+    expect(countActiveFilters({ ...emptyFilters(), type: 'beer_garden', max_price: '4.00' })).toBe(2);
+  });
+
   it('counts every non-empty filter', () => {
     expect(countActiveFilters(emptyFilters())).toBe(0);
     expect(countActiveFilters({ ...emptyFilters(), type: 'bar', max_price: '4.00', brand: 'x' })).toBe(3);

@@ -38,3 +38,10 @@ export function nearbyVenues(venues, coords, radius = NEARBY_RADIUS_M) {
     .filter((v) => v.distance_m <= radius)
     .sort((a, b) => (comparablePrice(a) - comparablePrice(b)) || (a.distance_m - b.distance_m));
 }
+
+// Is a venue inside a map's visible bounds { south, west, north, east }? A venue without
+// coordinates can't be placed, so it is never "in the area".
+export function inBounds(venue, b) {
+  if (!b || !Number.isFinite(venue?.lat) || !Number.isFinite(venue?.lng)) return false;
+  return venue.lat >= b.south && venue.lat <= b.north && venue.lng >= b.west && venue.lng <= b.east;
+}

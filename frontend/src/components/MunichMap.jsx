@@ -5,16 +5,8 @@ import { formatEuro } from '../utils/price';
 import { describePrice } from '../utils/priceUtils';
 import { pillModel, pillText, TYPE_COLORS, DEFAULT_TYPE_COLOR } from '../utils/markerModel';
 import { freshnessText, getFreshness } from '../utils/freshness';
-
-// Price → colour scale (amber/brown tones — Bavarian feel)
-function priceToColor(price, min = 4.40, max = 6.30) {
-  const t = Math.max(0, Math.min(1, (price - min) / (max - min)));
-  // Light amber (cheap) → deep amber-brown (expensive)
-  const r = Math.round(255 - t * 60);
-  const g = Math.round(200 - t * 110);
-  const b = Math.round(80 - t * 60);
-  return `rgb(${r},${g},${b})`;
-}
+import { priceLevel, levelLabel } from '../constants/priceLevels';
+import MapLegend from './MapLegend';
 
 // Lucide icon path data (24x24 viewBox, stroke-based) copied verbatim from
 // lucide-icons/lucide's own SVG source rather than approximated by hand, so
@@ -195,7 +187,7 @@ function clusterVenuesByPixel(map, venues, zoom) {
 
 export default function MunichMap({
   neighbourhoods, venues, onNeighbourhoodClick, onVenueClick, onVenueFocus, activeId, selectedVenueId,
-  highlightId = null, highlight = false, userLocation = null, viewCommand = null,
+  highlightId = null, highlight = false, userLocation = null, viewCommand = null, onUserMoved,
 }) {
   const mapRef = useRef(null);
   const leafletMap = useRef(null);
@@ -219,12 +211,17 @@ export default function MunichMap({
   const popupVenueRef = useRef(null); // venue whose desktop popup is open
   const pendingViewRef = useRef(null); // a fly-to that arrived while the map had no size
   const venuesRef = useRef(venues);
+  const onUserMovedRef = useRef(onUserMoved);
+  const gestureAt = useRef(0);          // last time the USER touched the map
+  const programmaticUntil = useRef(0);  // our own flyTo / pan is running until then
+  const lastView = useRef(null);
   const pinsRef = useRef(new Map());  // venue id -> Leaflet marker
   useEffect(() => {
     onVenueClickRef.current = onVenueClick;
     onVenueFocusRef.current = onVenueFocus;
     tRef.current = t;
     venuesRef.current = venues;
+    onUserMovedRef.current = onUserMoved;
   });
 
   // selected (open in the panel/popup) = stronger outline + larger + on top;
@@ -265,6 +262,28 @@ export default function MunichMap({
     const attr = document.querySelector('.leaflet-control-attribution');
     if (attr) attr.style.cssText = 'font-size:9px;background:rgba(255,255,255,0.7);padding:2px 4px;';
 
+    // "Search this area": tell the app when the USER moved or zoomed the map. Resizes
+    // (tab switch, sheet opening — invalidateSize fires moveend too) and our own flyTo /
+    // pan must not count, so a move only counts when a user gesture (touch, wheel,
+    // keys, zoom buttons, drag end) happened just before it and our own animation is not running.
+    const gestureEl = mapRef.current;
+    const markGesture = () => { gestureAt.current = Date.now(); };
+    ['pointerdown', 'touchstart', 'wheel', 'keydown', 'dblclick'].forEach((ev) => gestureEl.addEventListener(ev, markGesture, { passive: true }));
+    leafletMap.current.on('dragend', markGesture);
+    lastView.current = { c: leafletMap.current.getCenter(), z: leafletMap.current.getZoom() };
+    leafletMap.current.on('moveend', () => {
+      const m = leafletMap.current;
+      if (!m) return;
+      const prev = lastView.current;
+      const view = { c: m.getCenter(), z: m.getZoom() };
+      lastView.current = view;
+      const now = Date.now();
+      if (now < programmaticUntil.current || now - gestureAt.current > 3000) return;
+      if (prev && view.z === prev.z && m.distance(view.c, prev.c) < 25) return;
+      const b = m.getBounds();
+      onUserMovedRef.current?.({ south: b.getSouth(), west: b.getWest(), north: b.getNorth(), east: b.getEast() });
+    });
+
     // The map's box changes without a window resize when the Karte/Liste tab flips,
     // the bottom sheet moves or a banner appears above it — keep Leaflet's size in sync.
     const resizeObserver = typeof ResizeObserver !== 'undefined'
@@ -276,6 +295,7 @@ export default function MunichMap({
           if (pendingViewRef.current && size.x > 0 && size.y > 0) {
             const { lat, lng, zoom } = pendingViewRef.current;
             pendingViewRef.current = null;
+            programmaticUntil.current = Date.now() + 2500;
             m.setView([lat, lng], zoom);
           }
         })
@@ -283,6 +303,7 @@ export default function MunichMap({
     resizeObserver?.observe(mapRef.current);
 
     return () => {
+      ['pointerdown', 'touchstart', 'wheel', 'keydown', 'dblclick'].forEach((ev) => gestureEl.removeEventListener(ev, markGesture));
       resizeObserver?.disconnect();
       leafletMap.current?.remove();
       leafletMap.current = null;
@@ -329,21 +350,21 @@ export default function MunichMap({
     // colour/weight does the feedback work, never a dark opaque wash.
     function neighbourhoodStyle(id, stat, isActiveNow, isHoveredNow) {
       const hasFilteredData = !!stat;
+      // The fill is the price LEVEL of the neighbourhood's average per-0.5 L price
+      // (constants/priceLevels.js — the same table the legend reads); grey without data.
+      // The levels are pastel, so the fill is stronger than the old amber wash; the
+      // border keeps the amber identity and carries hover/active/search-match states.
+      const fillColor = priceLevel(hasFilteredData ? stat.avg : null).color;
       // When a search is running, ring the neighbourhoods that still have
       // matches — its own distinct state, only shown when neither hovered nor
       // active (hover/active still take priority, same as before).
       const isMatch = highlight && hasFilteredData;
+      const dashArray = hasFilteredData ? null : '4 4';
 
-      if (isActiveNow) {
-        return { fillColor: hasFilteredData ? priceToColor(stat.avg) : '#d4cfc8', fillOpacity: 0.25, color: '#3d2200', weight: 3, dashArray: null };
-      }
-      if (isHoveredNow) {
-        return { fillColor: hasFilteredData ? priceToColor(stat.avg) : '#d4cfc8', fillOpacity: 0.20, color: '#7a4a06', weight: 2.5, dashArray: hasFilteredData ? null : '4 4' };
-      }
-      if (isMatch) {
-        return { fillColor: priceToColor(stat.avg), fillOpacity: 0.22, color: '#c88010', weight: 3, dashArray: null };
-      }
-      return { fillColor: hasFilteredData ? priceToColor(stat.avg) : '#d4cfc8', fillOpacity: 0.12, color: '#b87310', weight: 1.5, dashArray: hasFilteredData ? null : '4 4' };
+      if (isActiveNow) return { fillColor, fillOpacity: 0.75, color: '#3d2200', weight: 3, dashArray: null };
+      if (isHoveredNow) return { fillColor, fillOpacity: 0.7, color: '#7a4a06', weight: 2.5, dashArray };
+      if (isMatch) return { fillColor, fillOpacity: 0.65, color: '#c88010', weight: 3, dashArray: null };
+      return { fillColor, fillOpacity: 0.55, color: '#b87310', weight: 1.5, dashArray };
     }
 
     layerRef.current = L.geoJSON(neighbourhoodGeoJSON, {
@@ -371,6 +392,7 @@ export default function MunichMap({
                 ? `<div class="map-tooltip">
                     <div class="tt-name">${name}</div>
                     <div class="tt-price">Ø <strong>${formatEuro(stat.avg, i18n.language)}</strong></div>
+                    <div class="tt-level">${levelLabel(priceLevel(stat.avg), i18n.language)}</div>
                     <div class="tt-count">${stat.count} ${t('map.venues')}</div>
                    </div>`
                 : `<div class="map-tooltip">
@@ -537,6 +559,7 @@ export default function MunichMap({
       if (visibleH < 80) return;
       const pt = map.latLngToContainerPoint([v.lat, v.lng]);
       const reduce = typeof window.matchMedia === 'function' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      programmaticUntil.current = Date.now() + 2500;
       map.panBy([pt.x - box.width / 2, pt.y - visibleH / 2], { animate: !reduce });
     }, 450); // after the sheet's slide-in has settled
     return () => clearTimeout(timer);
@@ -571,6 +594,7 @@ export default function MunichMap({
     map.invalidateSize();
     const size = map.getSize();
     if (!size.x || !size.y) { pendingViewRef.current = viewCommand; return; }
+    programmaticUntil.current = Date.now() + 2500; // our own move — not a user pan
     const reduceMotion = typeof window.matchMedia === 'function' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     if (reduceMotion) map.setView([lat, lng], zoom);
     else map.flyTo([lat, lng], zoom, { duration: 0.8 });
@@ -583,22 +607,7 @@ export default function MunichMap({
       {/* Floating tooltip */}
       <div ref={tooltipRef} className="map-tooltip-container" style={{ display: 'none', position: 'absolute', pointerEvents: 'none', zIndex: 1000 }} />
 
-      {/* Legend */}
-      <div className="map-legend">
-        <div className="legend-title">{t('map.legend.title')}</div>
-        <div className="legend-bar">
-          <div className="legend-gradient" />
-          <div className="legend-labels">
-            <span>€4.40</span>
-            <span>€5.40</span>
-            <span>€6.30+</span>
-          </div>
-        </div>
-        <div className="legend-extremes">
-          <span>{t('map.legend.cheap')}</span>
-          <span>{t('map.legend.expensive')}</span>
-        </div>
-      </div>
+      <MapLegend />
     </div>
   );
 }

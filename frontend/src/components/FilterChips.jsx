@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next';
 import { ChevronDown, X } from 'lucide-react';
-import { QUICK_FILTERS, toggleQuickFilter, extraActiveFilters } from '../utils/quickFilters';
+import { QUICK_FILTERS, OPEN_NOW_CHIP, toggleQuickFilter, extraActiveFilters } from '../utils/quickFilters';
 import { neighbourhoodName } from '../utils/neighbourhoods';
 
 // One horizontally scrolling row of filter chips (no wrapping, no visible scrollbar):
@@ -10,9 +10,14 @@ import { neighbourhoodName } from '../utils/neighbourhoods';
 // neighbourhood, a custom maximum…) appears as a removable chip, so a filter set in
 // the full panel is never invisible.
 //
-// "Jetzt geöffnet" is shown but not functional — the app has no reliable opening-hours
-// data. It uses aria-disabled (not `disabled`) so a tap can still explain "coming soon".
-export default function FilterChips({ filters, onFilterChange, neighbourhoods, moreOpen, onToggleMore, onSoon, onClearAll }) {
+// "Jetzt geöffnet" is a real filter ONLY when some venue has opening hours we can read
+// (openNowAvailable); otherwise it is shown disabled as "Demnächst" — never faked. It uses
+// aria-disabled (not `disabled`) so a tap can still explain "coming soon".
+// The map area ("Diesen Bereich durchsuchen") appears as a removable chip while it is applied.
+export default function FilterChips({
+  filters, onFilterChange, neighbourhoods, moreOpen, onToggleMore, onSoon, onClearAll,
+  openNowAvailable = false, areaActive = false, onClearArea, activeCount = 0,
+}) {
   const { t, i18n } = useTranslation();
   const extras = extraActiveFilters(filters);
 
@@ -27,7 +32,7 @@ export default function FilterChips({ filters, onFilterChange, neighbourhoods, m
       default: return e.value;
     }
   };
-  const anyActive = QUICK_FILTERS.some((q) => q.isActive(filters)) || extras.length > 0;
+  const anyActive = QUICK_FILTERS.some((q) => q.isActive(filters)) || extras.length > 0 || OPEN_NOW_CHIP.isActive(filters) || areaActive;
 
   return (
     <div className="chip-row" role="group" aria-label={t('chips.label')}>
@@ -43,12 +48,24 @@ export default function FilterChips({ filters, onFilterChange, neighbourhoods, m
         );
       })}
 
-      <button
-        type="button" className="chip-btn is-soon" aria-disabled="true" title={t('chips.soon')}
-        onClick={onSoon}
-      >
-        {t('chips.open')}
-      </button>
+      {openNowAvailable ? (
+        <button
+          type="button" className={`chip-btn${OPEN_NOW_CHIP.isActive(filters) ? ' is-active' : ''}`} aria-pressed={OPEN_NOW_CHIP.isActive(filters)}
+          onClick={() => onFilterChange(toggleQuickFilter(filters, OPEN_NOW_CHIP.id))}
+        >
+          {t('chips.open')}
+        </button>
+      ) : (
+        <button type="button" className="chip-btn is-soon" aria-disabled="true" title={t('chips.soon')} onClick={onSoon}>
+          {t('chips.open')}
+        </button>
+      )}
+
+      {areaActive && (
+        <button type="button" className="chip-btn is-active is-extra" aria-label={t('chips.remove', { name: t('chips.area') })} onClick={onClearArea}>
+          <span>{t('chips.area')}</span> <X size={14} aria-hidden="true" />
+        </button>
+      )}
 
       {extras.map((e) => (
         <button
@@ -68,7 +85,7 @@ export default function FilterChips({ filters, onFilterChange, neighbourhoods, m
         type="button" className={`chip-btn is-more${moreOpen ? ' is-open' : ''}`}
         aria-expanded={moreOpen} aria-controls="filter-sheet" onClick={onToggleMore}
       >
-        {t('chips.more')} <ChevronDown size={16} aria-hidden="true" />
+        <span>{t('chips.more')}{activeCount > 0 && <span className="chip-count"> ({activeCount})</span>}</span> <ChevronDown size={16} aria-hidden="true" />
       </button>
     </div>
   );

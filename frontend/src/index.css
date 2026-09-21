@@ -296,13 +296,6 @@ body{font-family:var(--font-body);background:var(--cream);color:var(--text-prima
 .tt-nodata{font-size:12px;color:var(--amber-400)}
 
 /* Map legend */
-.map-legend{position:absolute;bottom:28px;left:12px;background:rgba(26,9,0,0.88);border-radius:10px;padding:10px 14px;box-shadow:var(--shadow-lg);z-index:500;min-width:160px}
-.legend-title{font-size:11px;color:var(--amber-400);font-weight:600;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px}
-.legend-gradient{height:8px;border-radius:4px;background:linear-gradient(to right,rgb(255,200,80),rgb(220,140,40),rgb(195,90,20));margin-bottom:4px}
-.legend-labels{display:flex;justify-content:space-between;margin-bottom:2px}
-.legend-labels span{font-size:10px;color:var(--amber-300)}
-.legend-extremes{display:flex;justify-content:space-between}
-.legend-extremes span{font-size:10px;color:var(--amber-500)}
 
 /* Admin */
 .admin-login-page{min-height:100vh;background:var(--cream);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px}
@@ -991,7 +984,6 @@ body{font-family:var(--font-body);background:var(--cream);color:var(--text-prima
 .map-skeleton{position:absolute;inset:0;background:linear-gradient(90deg,#efe8da 25%,#f7f2e8 50%,#efe8da 75%);background-size:200% 100%;animation:skeleton-shimmer 1.4s ease-in-out infinite}
 .map-empty{position:absolute;left:12px;right:12px;bottom:12px;z-index:800}
 .map-empty .empty-state{box-shadow:var(--shadow-lg)}
-.map-legend{display:none}
 .missing-bar-fab{display:none}
 /* 44px map zoom buttons, kept off the bottom-right corner's attribution */
 .leaflet-control-zoom{bottom:12px!important;right:10px!important}
@@ -1187,7 +1179,6 @@ body{font-family:var(--font-body);background:var(--cream);color:var(--text-prima
   [data-mtab] .pub-intro,[data-mtab] .pub-cta{display:block}
   [data-mtab] .map-container{position:relative;width:auto;height:auto;visibility:visible;pointer-events:auto}
   [data-mtab=list] .pub{overflow:hidden}
-  .map-legend{display:block}
   .missing-bar-fab{display:flex}
   .map-empty{display:none}
   .leaflet-control-zoom{bottom:160px!important}
@@ -1276,3 +1267,33 @@ body{font-family:var(--font-body);background:var(--cream);color:var(--text-prima
 @media (min-width:1024px){
   [data-sheet=open] .pub-intro,[data-sheet=open] .pub-cta,[data-sheet=open] .pub-filters{display:none}
 }
+
+/* ═════════════════════════════════════════════════════════════════════════════
+   PHASE 5 — discovery: list header + sorting, "Diesen Bereich durchsuchen", legend
+   ═════════════════════════════════════════════════════════════════════════════ */
+/* List header: live count + sort chips, sticky above the cards */
+.list-head{position:sticky;top:0;z-index:5;margin:-14px calc(var(--gutter) * -1) 10px;padding:12px var(--gutter) 2px;background:var(--cream);border-bottom:1px solid var(--border)}
+@media (min-width:1024px){.list-head{margin:-14px -20px 10px;padding:12px 20px 2px}}
+.list-count{font-family:var(--font-heading);font-weight:700;font-size:16px;color:var(--amber-900)}
+.list-note{margin:4px 0 0;font-size:12px;color:var(--text-secondary);line-height:1.35}
+.sort-row{display:flex;flex-wrap:nowrap;gap:8px;align-items:center;overflow-x:auto;padding:4px 0 4px;margin:0 calc(var(--gutter) * -1);padding-left:var(--gutter);padding-right:var(--gutter);scrollbar-width:none;-webkit-overflow-scrolling:touch}
+.sort-row::-webkit-scrollbar{display:none}
+@media (min-width:1024px){.sort-row{margin:0 -20px;padding-left:20px;padding-right:20px}}
+.chip-count{font-weight:700}
+.filter-sheet-reset{width:100%;margin-top:12px;min-height:48px}
+
+/* "Diesen Bereich durchsuchen" — small pill over the map, centred just above the chips */
+.search-area-btn{position:absolute;left:50%;bottom:12px;transform:translateX(-50%);z-index:850;min-height:44px;padding:0 18px;border-radius:22px;background:#fff;border:2px solid var(--cta-bg);color:var(--amber-900);font-family:var(--font-heading);font-size:14px;font-weight:700;white-space:nowrap;cursor:pointer;box-shadow:0 3px 10px rgba(0,0,0,.22)}
+.search-area-btn:hover{background:var(--amber-50)}
+@media (min-width:1024px){.search-area-btn{bottom:auto;top:14px}}
+
+/* Legend: price levels with names and ranges */
+.map-legend{position:absolute;left:12px;bottom:28px;z-index:500;min-width:190px;padding:10px 12px;background:rgba(26,9,0,.9);border-radius:10px;box-shadow:var(--shadow-lg)}
+.legend-title{margin-bottom:6px;font-size:11px;font-weight:600;letter-spacing:.4px;text-transform:uppercase;color:var(--amber-300)}
+.legend-levels{list-style:none;display:flex;flex-direction:column;gap:4px}
+.legend-level{display:grid;grid-template-columns:16px 1fr auto;column-gap:8px;align-items:center;font-size:12px;color:#fff}
+.legend-swatch{width:16px;height:16px;border-radius:4px;border:1px solid rgba(255,255,255,.55)}
+.legend-level-range{color:var(--amber-200);font-variant-numeric:tabular-nums}
+.legend-toggle{position:absolute;left:10px;top:10px;z-index:800;min-height:44px;padding:0 14px;border-radius:22px;background:rgba(26,9,0,.88);border:0;color:#fff;font-family:var(--font-body);font-size:13px;font-weight:600;cursor:pointer;box-shadow:var(--shadow-md)}
+@media (max-width:1023px){.map-legend{top:62px;bottom:auto;left:10px}}
+.tt-level{margin-top:2px;font-size:12px;color:var(--amber-300)}

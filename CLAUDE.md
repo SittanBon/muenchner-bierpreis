@@ -157,6 +157,40 @@ opens the unchanged 4-topic ReportForm). Rules live in `utils/venueView.js` (uni
   auf Google Maps" = the place search link. (There was NO reviews link before this phase.)
 - Desktop: while a venue is open the intro/CTA/chips step aside so the panel has room.
 
+## Discovery (P0 Phase 5)
+- **One dataset, two views.** App.jsx derives `baseVenues` (server filters/search → map area →
+  "open now") then `displayVenues` (→ within 1 km after "nearby"). The MAP gets `displayVenues`
+  unsorted; the LIST gets `sortVenues(displayVenues, sort)`. So changing the sort never rebuilds
+  the markers. Filters, search, area and location are App state, so they survive Karte ↔ Liste.
+- **List header** (`ListHeader.jsx`, sticky): live "X Lokale gefunden" + sort chips
+  Preis ↑ (default) · Preis ↓ · Name · Frische · Entfernung (ONLY while location is active; if it
+  goes away the sort falls back to Preis ↑). Rules in `utils/sortVenues.js`: unknown prices never
+  lead (either direction); freshness sorts by the date the freshness text uses
+  (`verified_at`, else `price_observed_at`, never `updated`), unknown last; ties by name.
+- **Marker → list**: a tapped marker highlights its card and scrolls it into view (also when you
+  switch to the Liste tab afterwards); a tapped card opens the sheet and selects its marker.
+- **"Diesen Bereich durchsuchen"**: MunichMap reports a move to the app only when it was the
+  USER's (a touch/wheel/key/zoom-button just before it) — `invalidateSize` (tab switch, sheet) and
+  our own flyTo/pan also fire `moveend` and are ignored (`programmaticUntil`). Clicking the pill
+  keeps venues inside the bounds (`inBounds`); it shows as a removable "Kartenausschnitt" chip
+  and counts in "Mehr (n)".
+- **Filter badge / reset**: "Mehr ↓ (n)" counts type, brand, serve type, neighbourhood, price range
+  (min/max = ONE), open-now and the map area. "Alle Filter zurücksetzen" (chip row and inside the
+  full panel) clears all of that; the search text is cleared only by the empty state's reset.
+- **"Jetzt geöffnet"** (`utils/openingHours.js`): a real filter ONLY when some venue's stored
+  hours are readable; otherwise the chip stays greyed "Demnächst". The parser accepts
+  `Mo–So 17:00–1:00`, `Mo, Do–So 6:30–1:00`, `Mo–Fr 11:00–3:00, Sa–So 12:00–3:00` (past-midnight
+  rules stay open into the next day, Munich time). Anything with parentheses ("saisonal"),
+  open-ended "ab 10:00" or free text is UNKNOWN — never open, never closed. The filter keeps only
+  venues that are provably open by their stored text, and the list says so.
+- **Price levels** (`constants/priceLevels.js`, ONE table for polygons, legend and tooltip): by
+  the neighbourhood's average `normalized_500ml_price` — VERY_CHEAP <4.50 #dcfce7 · CHEAP
+  4.50–<5.00 #fef9c3 · MODERATE 5.00–<5.50 #ffedd5 · EXPENSIVE 5.50–6.00 #fee2e2 ·
+  VERY_EXPENSIVE >6.00 #fecaca · NO_DATA #f5f5f5. Levels are pastel, so polygons use a stronger
+  fill (0.55) than the old amber wash; borders keep the amber look. `MapLegend.jsx` lists every
+  level with its name and range (always on desktop, behind a "Preisniveau" toggle on mobile).
+  The thresholds are the ones requested for current Munich data — revisit them as data changes.
+
 ## Shared constants & consistency rules (READ BEFORE ADDING A FORM OR LABEL)
 Each of these has ONE source; components import it and never re-type it. Tests
 fail if a copy drifts.
@@ -358,10 +392,11 @@ Railway auto-deploys from main branch.
 - ✅ Phase 4 (the prompt's numbering; spec phase 5) — venue experience: draggable
   bottom sheet, honest data display, multiple beers, list card, desktop panel
   (see "Venue experience" above).
-- ⬜ Still open from the spec: price COLOUR scale + centralised thresholds and
-  "Diesen Bereich durchsuchen" · list sorting (Nähe/Preis/Aktualität) ·
-  contribution ("Preis falsch?" pre-filled correction, pick-a-venue report flow) ·
-  QA on real iOS/Android devices
+- ✅ Phase 5 (the prompt's numbering; spec phases 4/6) — discovery: list header + sorting,
+  map/list sync, "Diesen Bereich durchsuchen", filter badge/reset/persistence, honest
+  "Jetzt geöffnet", data-driven price-level colours + legend (see "Discovery" above).
+- ⬜ Still open from the spec: contribution ("Preis falsch?" pre-filled correction, pick-a-venue
+  report flow) · QA on real iOS/Android devices
 - Known remaining data-trust debt: seed-invented `reports` counts (the "N reports"
   badge) are still in the data. Every price shows "Datum unbekannt" until
   verified, re-reported or bulk-verified. The fabricated Price Trends
