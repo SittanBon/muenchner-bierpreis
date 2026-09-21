@@ -13,6 +13,13 @@
   font-display:swap;src:url('/fonts/dm-sans-latin.woff2') format('woff2');
   unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD;
 }
+/* DM Sans italic — used by the header tagline "Faires Bier für Alle." (weight 400).
+   Same self-hosting approach and latin subset as the upright file above. */
+@font-face{
+  font-family:'DM Sans';font-style:italic;font-weight:400 700;
+  font-display:swap;src:url('/fonts/dm-sans-italic-latin.woff2') format('woff2');
+  unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD;
+}
 @font-face{
   font-family:'Inter';font-style:normal;font-weight:300 600;
   font-display:swap;src:url('/fonts/inter-latin.woff2') format('woff2');
@@ -98,29 +105,8 @@ body{font-family:var(--font-body);background:var(--cream);color:var(--text-prima
    with no way to scroll to it. dvh tracks the real, current viewport; the
    vh line stays first as a fallback for browsers that don't support dvh. */
 .app{display:flex;flex-direction:column;height:100vh;height:100dvh;overflow:hidden}
-.main-layout{display:flex;flex:1;overflow:hidden}
-.sidebar{width:360px;min-width:320px;background:var(--cream);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden;box-shadow:2px 0 12px rgba(107,76,30,0.08)}
-.map-container{flex:1;position:relative;overflow:hidden}
-
 /* Search */
-.search-bar-wrapper{padding:12px;border-bottom:1px solid var(--border);background:var(--surface)}
-.search-row{display:flex;gap:8px}
-.search-input-wrap{flex:1;position:relative;display:flex;align-items:center}
-.search-icon{position:absolute;left:10px;font-size:14px;pointer-events:none}
-.search-input{width:100%;padding:9px 32px 9px 34px;border:1.5px solid var(--border-md);border-radius:8px;font-family:var(--font-body);font-size:14px;background:var(--cream);color:var(--text-primary);transition:border-color 0.2s;outline:none}
-.search-input:focus{border-color:var(--amber-600);background:#fff}
-.search-input::placeholder{color:var(--text-muted)}
-.search-clear{position:absolute;right:8px;background:none;border:none;cursor:pointer;color:var(--text-muted);font-size:13px;padding:2px 4px}
-.filter-toggle-btn{padding:9px 12px;background:var(--amber-50);border:1.5px solid var(--border-md);border-radius:8px;font-size:13px;cursor:pointer;white-space:nowrap;font-family:var(--font-body);color:var(--text-secondary);transition:all 0.2s}
-.filter-toggle-btn.active{background:var(--amber-100);border-color:var(--amber-600)}
-.filter-toggle-btn:hover{background:var(--amber-100)}
-.filter-count{display:inline-flex;align-items:center;justify-content:center;background:var(--amber-600);color:#fff;border-radius:50%;width:16px;height:16px;font-size:10px;font-weight:700;margin-left:5px}
 .search-result-count{font-size:12px;color:var(--text-muted);margin-top:6px;padding-left:2px}
-.filter-chips{display:flex;flex-wrap:wrap;gap:5px;margin-top:8px}
-.chip{display:inline-flex;align-items:center;gap:4px;background:var(--amber-100);border:1px solid var(--amber-200);color:var(--amber-800);padding:3px 8px;border-radius:20px;font-size:12px;font-weight:500}
-.chip button{background:none;border:none;cursor:pointer;color:var(--amber-600);font-size:11px;padding:0 0 0 2px;line-height:1}
-.chip-clear{background:var(--brown-100);border-color:var(--brown-200);color:var(--brown-600);cursor:pointer}
-.filter-panel{margin-top:10px;padding:12px;background:var(--amber-50);border:1px solid var(--border);border-radius:8px}
 .filter-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .filter-group{display:flex;flex-direction:column;gap:4px}
 .filter-label{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted)}
@@ -131,7 +117,6 @@ body{font-family:var(--font-body);background:var(--cream);color:var(--text-prima
 .price-range-inputs span{color:var(--text-muted);font-size:13px}
 
 /* Hint */
-.sidebar-hint{flex:1;overflow-y:auto;padding:16px 14px}
 .loading-state{display:flex;flex-direction:column;align-items:center;gap:10px;padding:24px 0 10px;color:var(--text-muted);width:100%}
 .loading-spinner{font-size:32px;animation:spin 2s linear infinite}
 @keyframes spin{to{transform:rotate(360deg)}}
@@ -151,16 +136,7 @@ body{font-family:var(--font-body);background:var(--cream);color:var(--text-prima
 .load-error-text{color:var(--text-secondary);font-size:14px}
 .load-error-retry{padding:8px 18px;background:var(--amber-900);border:none;border-radius:20px;color:var(--amber-100);font-size:13px;font-weight:600;cursor:pointer;font-family:var(--font-body);transition:background 0.2s}
 .load-error-retry:hover{background:var(--amber-800)}
-.hint-icon{font-size:28px;margin-bottom:8px}
-.hint-text{color:var(--text-secondary);font-size:14px;margin-bottom:20px}
 .av-title{font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);margin-bottom:8px}
-.av-list{display:flex;flex-direction:column;gap:4px}
-.av-item{display:flex;justify-content:space-between;align-items:center;padding:9px 10px;background:var(--surface);border:1px solid var(--border);border-radius:8px;cursor:pointer;transition:all 0.15s}
-.av-item:hover{background:var(--amber-50);border-color:var(--amber-400);transform:translateX(2px)}
-.av-name{font-family:var(--font-heading);font-weight:600;font-size:14px;color:var(--text-primary)}
-.av-price{font-family:var(--font-heading);font-weight:700;font-size:15px;color:var(--amber-800)}
-.av-brands-count{font-size:11px;color:var(--text-muted)}
-
 /* Venue Panel */
 .venue-panel{flex:1;display:flex;flex-direction:column;overflow:hidden}
 .panel-header{padding:14px 14px 10px;background:var(--amber-900);display:flex;align-items:flex-start;justify-content:space-between}
@@ -189,7 +165,6 @@ body{font-family:var(--font-body);background:var(--cream);color:var(--text-prima
 .price-approx{font-size:10.5px;font-weight:400;color:var(--text-muted);line-height:1.25;margin-top:1px}
 .price-size-unknown{font-style:italic}
 .vdp-normalized{font-size:11.5px;color:var(--amber-300);margin-top:3px;opacity:0.9}
-.av-price-wrap{display:flex;flex-direction:column;align-items:flex-end;line-height:1.15}
 .vpc-size{font-family:var(--font-body);font-weight:400;font-size:11px;color:var(--text-secondary)}
 .vpc-approx{font-family:var(--font-body);font-size:10.5px;color:var(--text-muted);margin-top:1px}
 .vm-verify{padding:3px 10px;background:none;border:1.5px solid var(--amber-400);border-radius:6px;color:var(--amber-800);font-size:11.5px;font-weight:500;cursor:pointer;font-family:var(--font-body)}
@@ -199,10 +174,6 @@ body{font-family:var(--font-body);background:var(--cream);color:var(--text-prima
 .vc-brand{font-size:12px;color:var(--text-secondary);flex:1}
 .vc-brands-count{font-size:11px;color:var(--text-muted);margin-top:4px}
 .outdated-badge{font-size:11px;color:#b05000}
-.no-venues{text-align:center;color:var(--text-muted);padding:30px 0 8px;font-size:14px}
-.no-venues-block{text-align:center;padding-bottom:20px}
-.no-venues-clear-btn{padding:7px 16px;background:var(--amber-50);border:1.5px solid var(--amber-400);border-radius:20px;color:var(--amber-800);font-size:12.5px;font-weight:600;cursor:pointer;font-family:var(--font-body);transition:background 0.2s}
-.no-venues-clear-btn:hover{background:var(--amber-100)}
 .panel-footer{padding:10px 12px;border-top:1px solid var(--border);background:var(--surface)}
 .add-venue-btn{width:100%;padding:10px;background:var(--amber-50);border:1.5px dashed var(--amber-400);border-radius:8px;color:var(--amber-800);font-size:13px;font-weight:500;cursor:pointer;font-family:var(--font-body);transition:all 0.2s}
 .add-venue-btn:hover{background:var(--amber-100);border-style:solid}
@@ -575,36 +546,12 @@ body{font-family:var(--font-body);background:var(--cream);color:var(--text-prima
    normal CSS cascade — an inline style beats any stylesheet rule for the
    same property, custom-property indirection is what makes it overridable. */
 .venue-pin{background:none;border:none}
-.venue-pin-wrap{
-  width:100%;height:100%;display:flex;align-items:center;justify-content:center;
-  position:relative;
-}
-.venue-pin-circle{
-  width:36px;height:36px;border-radius:50%;
-  display:flex;align-items:center;justify-content:center;
-  background:#fff;border:2.5px solid var(--pin-color);color:var(--pin-color);
-  box-shadow:0 2px 8px rgba(0,0,0,0.25);
-  cursor:pointer;transition:transform 0.15s,box-shadow 0.15s,border-width 0.15s;
-}
-.venue-pin-circle svg{display:block}
-.venue-pin-wrap:hover .venue-pin-circle{transform:scale(1.08)}
 /* Selected pin (marker clicked — popup open, or its full detail is showing
    in the sidebar/bottom sheet): darker/thicker border, a white ring just
    outside it, a stronger shadow, and 1.15x scale — all per the design spec,
    layered as one box-shadow (ring first, then the drop shadow). */
-.venue-pin-wrap.selected .venue-pin-circle{
-  border-width:3.5px;border-color:#3d2200;
-  box-shadow:0 0 0 2px #fff,0 4px 12px rgba(0,0,0,0.35);
-  transform:scale(1.15);
-}
 /* Venue name label under the pin — only shown (via the mobile media query
    below) while that venue's neighbourhood is the active one. */
-.venue-pin-label{
-  display:none;position:absolute;top:100%;left:50%;transform:translateX(-50%);
-  margin-top:2px;padding:1px 6px;border-radius:5px;white-space:nowrap;
-  background:rgba(26,9,0,0.75);color:#fff;font-size:10px;font-weight:600;
-  font-family:var(--font-body);pointer-events:none;
-}
 /* Cluster pin — venues stacked within ~25m collapse into one numbered marker.
    Same footprint as a regular pin, solid amber, white DM Sans number. */
 .venue-cluster-wrap{width:100%;height:100%;display:flex;align-items:center;justify-content:center}
@@ -651,10 +598,8 @@ body{font-family:var(--font-body);background:var(--cream);color:var(--text-prima
 }
 .vpc-link:hover{text-decoration:underline}
 
-@media (max-width:768px){
-  .venue-pin-circle{width:42px;height:42px}
+@media (max-width:1023px){
   .venue-cluster-circle{width:42px;height:42px;font-size:14px}
-  .venue-pin-label{display:block}
 }
 
 /* ===== Stats bar ===== */
@@ -703,110 +648,9 @@ body{font-family:var(--font-body);background:var(--cream);color:var(--text-prima
 .freshness-stale .freshness-label{color:#a5361f}
 /* Unknown is neutral grey on purpose: "we don't know" must never read as "fine". */
 .freshness-unknown .freshness-label{color:#6b6b6b}
-.av-right{display:flex;align-items:center;gap:8px}
 .vdp-freshness{width:100%;margin-top:8px;padding-top:8px;border-top:1px solid rgba(255,255,255,0.14)}
 .vdp-freshness .freshness,.vdp-freshness .freshness-label{color:var(--amber-200)!important}
 
-/* ===== Mobile bottom sheet (hidden handle on desktop) ===== */
-.sheet-handle{display:none}
-
-@media (max-width:768px){
-  /* Navbar — more breathing room, logo + hamburger. Title and subtitle both stay
-     visible (mirroring desktop) — a taller bar makes room for the stacked pair
-     instead of dropping the subtitle. */
-  .navbar{padding:0 16px;height:68px}
-  .nav-left{gap:8px;min-width:0;overflow:hidden}
-  .nav-brand{gap:12px;min-width:0}
-  .nav-logo{font-size:26px}
-  .nav-title{font-size:16px}
-  .nav-subtitle{font-size:10px}
-  .nav-actions{display:none}
-
-  /* Condense to a flag-only button — there isn't room for the full city name
-     next to the stacked title/subtitle and the hamburger. */
-  .city-selector-btn{padding:6px 8px}
-  .city-name,.city-caret{display:none}
-  /* Anchored to the viewport instead of the button — on mobile the flag-only
-     button can sit anywhere along a wide title/subtitle block, so a
-     button-relative dropdown risks overflowing either edge of the screen. */
-  .city-dropdown{position:fixed;top:76px;left:16px;right:16px;width:auto;max-width:none}
-
-  .nav-mobile-menu{display:block;position:relative}
-  .hamburger-btn{
-    width:44px;height:44px;display:flex;align-items:center;justify-content:center;
-    background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);
-    border-radius:9px;color:var(--amber-100);font-size:20px;cursor:pointer;
-    font-family:var(--font-body);
-  }
-  .hamburger-btn:active{background:rgba(255,255,255,0.2)}
-  .mobile-menu-backdrop{position:fixed;inset:0;background:rgba(0,0,0,0.15);z-index:1300}
-  .mobile-menu-dropdown{
-    position:absolute;top:calc(100% + 10px);right:0;z-index:1400;
-    background:var(--amber-900);border:1px solid rgba(255,255,255,0.15);
-    border-radius:12px;box-shadow:var(--shadow-lg);
-    display:flex;flex-direction:column;min-width:200px;overflow:hidden;
-  }
-  .mobile-menu-dropdown button{
-    background:none;border:none;color:var(--amber-100);text-align:left;
-    padding:14px 18px;font-size:14.5px;cursor:pointer;font-family:var(--font-body);
-    border-bottom:1px solid rgba(255,255,255,0.08);
-  }
-  .mobile-menu-dropdown button:last-child{border-bottom:none}
-  .mobile-menu-dropdown button:active{background:rgba(255,255,255,0.12)}
-
-  .vm-form-grid{grid-template-columns:1fr}
-  .admin-stats{grid-template-columns:repeat(2,1fr)}
-
-  /* Stats bar — 3 stacked rows, no ambient horizontal scroll of the whole bar */
-  .stats-bar{
-    display:flex;flex-direction:column;align-items:stretch;gap:6px;
-    padding:8px 12px;overflow:visible;
-  }
-  .stats-tiles{display:grid;grid-template-columns:1fr 1fr;gap:6px}
-  .stat-tile{min-width:0;padding:6px 10px}
-  .stat-tile:first-child{
-    grid-column:1 / -1;flex-direction:row;align-items:baseline;gap:6px;flex-wrap:wrap;
-  }
-  .stat-tile:first-child .stat-tile-sub::before{content:'· '}
-  .stat-tile-value{font-size:16px}
-  .stat-tile-sub{max-width:none}
-  .stats-pills{flex-wrap:nowrap;overflow-x:auto;padding-bottom:2px;-webkit-overflow-scrolling:touch}
-  .stats-pills-label{display:none}
-  .stats-pill-trends:active{background:var(--amber-800)}
-
-  .main-layout{position:relative}
-  .map-container{position:absolute;inset:0}
-  .map-legend{bottom:20px;left:10px;transform:scale(0.9);transform-origin:bottom left}
-
-  /* Bottom sheet — 3 stops: collapsed (~15% visible), half (~60%), full (~90%).
-     Height is fixed at 90vh; each stop just translates it down by a different
-     amount, so "how much is visible" and "how tall the sheet is" stay decoupled
-     from the transform math. */
-  .sidebar{
-    position:fixed;left:0;right:0;bottom:0;top:auto;
-    width:auto;min-width:0;
-    height:90vh;max-height:90vh;
-    border-right:none;border-top:1px solid var(--border-md);
-    border-radius:18px 18px 0 0;
-    box-shadow:0 -8px 32px rgba(107,76,30,0.22);
-    transform:translateY(75vh); /* collapsed: 90vh - 15vh visible */
-    transition:transform 0.4s cubic-bezier(0.34,1.56,0.64,1); /* springy ease-out-back */
-    z-index:1200;
-  }
-  .sidebar.sheet-half{transform:translateY(30vh)} /* 90vh - 60vh visible */
-  .sidebar.sheet-full{transform:translateY(0)}    /* full 90vh visible */
-
-  .sheet-handle{
-    display:flex;position:relative;align-items:center;
-    width:100%;height:52px;flex-shrink:0;padding:0 18px;
-    background:var(--amber-900);color:var(--amber-100);
-    border:none;cursor:pointer;border-radius:18px 18px 0 0;
-    font-family:var(--font-body);
-    touch-action:none; /* the handle owns vertical touch gestures — swipe, don't scroll */
-  }
-  .sheet-grip{position:absolute;top:7px;left:50%;transform:translateX(-50%);width:38px;height:4px;border-radius:2px;background:rgba(255,255,255,0.4)}
-  .sheet-handle-text{font-weight:600;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--amber-100)}
-}
 
 /* ===== Toasts ===== */
 .toast-container{
@@ -888,21 +732,6 @@ body{font-family:var(--font-body);background:var(--cream);color:var(--text-prima
 .app-footer-sep{opacity:0.5}
 .app-footer a{color:rgba(255,255,255,0.25);font-size:10px;text-decoration:none;transition:color 0.2s}
 .app-footer a:hover{color:rgba(255,255,255,0.5)}
-
-@media (max-width:768px){
-  /* The bottom sheet is position:fixed and, in every stop (collapsed/half/
-     full), its box extends to the true viewport bottom — only how much of
-     its TOP is revealed changes. So the footer's own 32px strip always sits
-     geometrically "under" the sheet's box, in every state. Rather than
-     fight that with pixel-perfect transform math (risking the sheet's
-     already-tuned, bug-prone geometry), the footer just wins the paint
-     order — position:relative is required for z-index to apply to an
-     element that's otherwise in normal flow. z-index:1201 clears the
-     sheet's 1200 by exactly one, matching the existing app-wide precedent
-     that sheet-adjacent chrome sits above modal overlays (the sheet itself
-     is already above .modal-overlay's 1000) rather than inventing a new one. */
-  .app-footer{position:relative;z-index:1201}
-}
 
 /* ===== Legal pages (Impressum / Datenschutz) ===== */
 /* Same dvh reasoning as .app above — these pages have their own Footer too. */
@@ -1077,3 +906,300 @@ body{font-family:var(--font-body);background:var(--cream);color:var(--text-prima
 .admin-page button.dq-badge-medium { --dq-pill-bg: #fff3d6; --dq-pill-bd: #f0dca0; }
 .admin-page button.dq-badge-low { --dq-pill-bg: #eeeae2; --dq-pill-bd: #dcd4c4; }
 .admin-page .vm-active-toggle { min-height: 44px; }
+
+/* ═════════════════════════════════════════════════════════════════════════════
+   PHASE 3 — public mobile-first redesign
+   Mobile + tablet (<1024px): one column — header, intro, search, CTA, map, chips,
+   fixed bottom nav. Desktop (≥1024px): the SAME elements become a 400px left panel
+   + map (CSS grid), so search/filter/list state exists once.
+   ═════════════════════════════════════════════════════════════════════════════ */
+:root{
+  --safe-top:env(safe-area-inset-top,0px);
+  --safe-bottom:env(safe-area-inset-bottom,0px);
+  --safe-left:env(safe-area-inset-left,0px);
+  --safe-right:env(safe-area-inset-right,0px);
+  --header-h:56px;
+  --bn-h:56px;
+  --gutter:20px;
+  /* CTA / active-chip colours as tokens so a contrast fix is a one-line change
+     (white on #e8a020 is only ~2.1:1). */
+  --cta-bg:#e8a020;--cta-fg:#ffffff;
+  --focus:#1d4ed8;
+}
+
+.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+
+/* Visible keyboard focus on everything interactive (never removed, only restyled). */
+:where(a,button,input,select,textarea,[tabindex]):focus-visible{outline:3px solid var(--focus);outline-offset:2px}
+.navbar :where(a,button):focus-visible,.bottom-nav :where(button):focus-visible{outline-color:#fff}
+.leaflet-marker-icon:focus-visible{outline:none}
+.leaflet-marker-icon:focus-visible .price-pill,.leaflet-marker-icon:focus-visible .venue-cluster-circle{outline:3px solid var(--focus);outline-offset:3px}
+
+/* ── Header ───────────────────────────────────────────────────────────────── */
+.navbar{height:var(--header-h);padding:var(--safe-top) max(var(--gutter),var(--safe-right)) 0 max(var(--gutter),var(--safe-left));box-sizing:content-box}
+.nav-brand{display:flex;align-items:center;gap:10px;text-decoration:none;color:inherit;min-height:44px;min-width:0}
+.nav-brand-text{min-width:0}
+.nav-logo{font-size:24px;line-height:1}
+.nav-title{font-family:var(--font-heading);font-size:18px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--amber-200);line-height:1.1}
+/* The tagline — "Faires Bier für Alle." — is part of the brand and always visible. */
+.nav-subtitle{font-family:var(--font-heading);font-style:italic;font-weight:400;font-size:12px;letter-spacing:0;text-transform:none;color:var(--amber-400);line-height:1.25;white-space:nowrap}
+.lang-btn{min-width:44px;min-height:44px;padding:0 8px;background:none;border:none;border-radius:8px;color:var(--amber-200);font-size:12px;font-weight:600;letter-spacing:.04em}
+.lang-btn:hover{background:rgba(255,255,255,.12)}
+.admin-link-btn{min-height:44px;padding:0 10px}
+
+/* ── Intro ────────────────────────────────────────────────────────────────── */
+.pub{display:flex;flex-direction:column;flex:1;min-height:0;position:relative;overflow-y:auto;overscroll-behavior:contain}
+.pub-intro{padding:16px var(--gutter) 0;background:var(--cream)}
+.pub-intro-title{font-family:var(--font-heading);font-weight:700;font-size:clamp(21px,6.2vw,26px);line-height:1.2;color:var(--amber-900);letter-spacing:-.005em}
+
+/* ── Search ───────────────────────────────────────────────────────────────── */
+.pub-search{padding:14px var(--gutter) 0;background:var(--cream)}
+.search-field{position:relative;display:flex;align-items:center;height:54px;background:#fff;border:1.5px solid var(--border-md);border-radius:16px;box-shadow:var(--shadow-sm);transition:border-color .15s}
+.search-field-icon{position:absolute;left:16px;color:var(--text-muted);pointer-events:none}
+.search-field-input{flex:1;min-width:0;height:100%;padding:0 52px 0 48px;border:0;background:transparent;border-radius:16px;font-family:var(--font-body);font-size:16px;color:var(--text-primary);outline:none;-webkit-appearance:none;appearance:none}
+.search-field-input::placeholder{color:var(--text-muted)}
+.search-field-input:placeholder-shown{padding-right:12px}
+.search-field-input::-webkit-search-cancel-button{display:none}
+.search-field-clear{position:absolute;right:4px;width:44px;height:44px;display:flex;align-items:center;justify-content:center;background:none;border:0;border-radius:12px;color:var(--text-muted);cursor:pointer}
+.search-field:focus-within{outline:3px solid var(--focus);outline-offset:2px}
+.search-field-input:focus-visible{outline:none}
+.search-result-count{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;font-size:12.5px;color:var(--text-secondary);margin:8px 2px 0}
+.search-show-list{min-height:44px;padding:0 6px;background:none;border:0;color:var(--amber-800);font-weight:700;font-size:13px;text-decoration:underline;cursor:pointer;font-family:var(--font-body)}
+
+/* ── Primary CTA ──────────────────────────────────────────────────────────── */
+.pub-cta{padding:12px var(--gutter) 14px;background:var(--cream)}
+.nearby-cta{display:flex;align-items:center;justify-content:space-between;gap:12px;width:100%;height:58px;padding:0 20px;border:0;border-radius:16px;background:var(--cta-bg);color:var(--cta-fg);font-family:var(--font-heading);font-size:15px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;cursor:pointer;box-shadow:0 4px 12px rgba(232,160,32,.35);transition:transform .12s,filter .12s}
+.nearby-cta:hover:not(:disabled){filter:brightness(.96)}
+.nearby-cta:active:not(:disabled){transform:scale(.99)}
+.nearby-cta:disabled{cursor:progress;filter:saturate(.85)}
+.nearby-cta-label{display:flex;align-items:center;gap:10px;min-width:0;text-align:left}
+.nearby-spin{animation:nearby-spin 1s linear infinite;flex-shrink:0}
+@keyframes nearby-spin{to{transform:rotate(360deg)}}
+.nearby-error{margin-top:10px;padding:12px 14px;background:#fff;border:1.5px solid #f0c2b7;border-radius:14px;color:var(--text-primary);font-size:14px}
+.nearby-error p{margin:0 0 10px;font-weight:600}
+.nearby-error-actions{display:flex;gap:8px;flex-wrap:wrap}
+
+/* Shared buttons */
+.btn-amber,.btn-outline{display:inline-flex;align-items:center;justify-content:center;min-height:44px;padding:0 18px;border-radius:22px;font-family:var(--font-heading);font-size:14px;font-weight:700;cursor:pointer;text-align:center}
+.btn-amber{background:var(--cta-bg);color:var(--cta-fg);border:1.5px solid var(--cta-bg);letter-spacing:.03em;text-transform:uppercase}
+.btn-outline{background:#fff;color:var(--amber-900);border:1.5px solid var(--border-md)}
+.btn-outline:hover{background:var(--amber-50)}
+
+/* ── Map ──────────────────────────────────────────────────────────────────── */
+.map-container{position:relative;overflow:hidden;flex:1 1 0;min-height:max(180px,45vh);background:#f5f0e8}
+@media (max-height:700px){.map-container{min-height:180px}}
+.map-skeleton{position:absolute;inset:0;background:linear-gradient(90deg,#efe8da 25%,#f7f2e8 50%,#efe8da 75%);background-size:200% 100%;animation:skeleton-shimmer 1.4s ease-in-out infinite}
+.map-empty{position:absolute;left:12px;right:12px;bottom:12px;z-index:800}
+.map-empty .empty-state{box-shadow:var(--shadow-lg)}
+.map-legend{display:none}
+.missing-bar-fab{display:none}
+/* 44px map zoom buttons, kept off the bottom-right corner's attribution */
+.leaflet-control-zoom{bottom:12px!important;right:10px!important}
+.leaflet-control-zoom a{width:44px!important;height:44px!important;line-height:44px!important;font-size:20px!important}
+
+/* Price-first marker: a white pill, actual price, left border = venue type,
+   tint = price freshness (with a "!" / "?" so it is never colour alone). */
+.price-pill-anchor{background:none;border:none;overflow:visible}
+.price-pill{position:absolute;left:0;top:0;transform:translate(-50%,-50%);display:flex;align-items:center;gap:4px;height:28px;padding:5px 10px;box-sizing:border-box;
+  background:var(--pp-bg,#fff);border:1px solid rgba(0,0,0,.12);border-left:4px solid var(--pp-type,#92400e);border-radius:20px;box-shadow:0 2px 6px rgba(0,0,0,.2);
+  font-family:var(--font-heading);font-weight:700;font-size:13px;line-height:1;color:var(--text-primary);white-space:nowrap;cursor:pointer;
+  transition:transform .12s,box-shadow .12s}
+/* Invisible extension so the touch target is at least 44px tall (28 + 2×9) */
+.price-pill::after{content:'';position:absolute;inset:-9px -6px}
+.price-pill.no-price{color:var(--text-muted)}
+.pp-glyph{font-size:11px;font-weight:800;line-height:1}
+.price-pill[data-freshness=STALE] .pp-glyph{color:#a5361f}
+.price-pill[data-freshness=UNKNOWN] .pp-glyph{color:#525252}
+.price-pill.is-hover{box-shadow:0 0 0 2px var(--pp-type),0 3px 8px rgba(0,0,0,.3)}
+.price-pill.selected{border:2.5px solid var(--pp-type);border-left-width:5px;transform:translate(-50%,-50%) scale(1.15);box-shadow:0 4px 12px rgba(0,0,0,.4)}
+.price-pill-label{position:absolute;top:100%;left:50%;transform:translateX(-50%);margin-top:3px;padding:1px 6px;border-radius:5px;background:rgba(26,9,0,.78);color:#fff;font-size:10px;font-weight:600;font-family:var(--font-body);pointer-events:none}
+.user-dot-anchor{background:none;border:none}
+.user-dot{position:absolute;left:0;top:0;width:18px;height:18px;transform:translate(-50%,-50%);border-radius:50%;background:#2563eb;border:3px solid #fff;box-shadow:0 0 0 2px rgba(37,99,235,.35)}
+.user-accuracy{fill:#2563eb;fill-opacity:.1;stroke:#2563eb;stroke-opacity:.4;stroke-width:1}
+
+/* ── Filter chips ─────────────────────────────────────────────────────────── */
+.pub-filters{position:relative;background:#fff;border-top:1px solid #e5e7eb;flex-shrink:0}
+.chip-row{display:flex;flex-wrap:nowrap;gap:8px;align-items:center;overflow-x:auto;overflow-y:hidden;padding:4px var(--gutter);height:52px;-webkit-overflow-scrolling:touch;scrollbar-width:none;overscroll-behavior-x:contain}
+.chip-row::-webkit-scrollbar{display:none}
+.chip-btn{position:relative;isolation:isolate;flex:0 0 auto;display:inline-flex;align-items:center;gap:6px;height:44px;padding:0 14px;background:none;border:0;border-radius:22px;color:var(--text-primary);font-family:var(--font-body);font-size:14px;font-weight:600;white-space:nowrap;cursor:pointer}
+/* The button is a real 44px touch target; the chip you SEE is a 36px pill painted behind the text. */
+.chip-btn::before{content:'';position:absolute;z-index:-1;left:0;right:0;top:4px;bottom:4px;border-radius:18px;background:#fff;border:1.5px solid #d1d5db;transition:background .12s,border-color .12s}
+.chip-btn:hover::before{border-color:var(--amber-400)}
+.chip-btn.is-active{color:var(--cta-fg)}
+.chip-btn.is-active::before{background:var(--cta-bg);border-color:var(--cta-bg)}
+.chip-btn.is-soon{color:#6b7280;cursor:not-allowed}
+.chip-btn.is-soon::before{background:#f3f4f6;border-style:dashed}
+.chip-btn.is-reset{color:var(--brown-600)}
+.chip-btn.is-reset::before{background:var(--brown-100);border-color:var(--brown-200)}
+.chip-btn.is-more.is-open svg{transform:rotate(180deg)}
+
+.nearby-banner{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px var(--gutter);background:var(--amber-50);border-bottom:1px solid var(--border);font-size:13px;font-weight:600;color:var(--amber-900)}
+.nearby-banner-btn{flex-shrink:0;min-height:44px;padding:0 6px;background:none;border:0;color:var(--amber-800);font-weight:700;font-size:13px;text-decoration:underline;cursor:pointer;font-family:var(--font-body)}
+
+/* "Mehr ↓" — the full filter panel: a bottom sheet on mobile … */
+.filter-backdrop{position:fixed;inset:0;background:rgba(26,9,0,.45);z-index:1590}
+.filter-sheet{position:fixed;left:0;right:0;bottom:0;z-index:1600;max-height:85dvh;overflow-y:auto;padding:16px var(--gutter) calc(16px + var(--safe-bottom));background:var(--cream);border-radius:18px 18px 0 0;box-shadow:0 -8px 32px rgba(107,76,30,.25)}
+.filter-sheet-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+.filter-sheet-title{font-family:var(--font-heading);font-size:18px;font-weight:700;color:var(--amber-900)}
+.filter-sheet-close{min-height:44px;padding:0 14px;background:none;border:0;color:var(--amber-800);font-weight:700;font-size:15px;cursor:pointer;font-family:var(--font-body)}
+.filter-sheet-show{width:100%;margin-top:16px;min-height:52px}
+.filter-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.filter-group-wide{grid-column:1 / -1}
+.filter-group select,.filter-group input{min-height:44px;font-size:16px}
+
+/* ── List + panel ─────────────────────────────────────────────────────────── */
+.stats-slot--mobile,.pub-hint{display:none}
+.pub-panel{display:flex;flex-direction:column;background:var(--cream);min-height:0}
+.pub-list{padding:14px var(--gutter) 24px}
+.av-title{margin-bottom:10px}
+.vl-list{list-style:none;display:flex;flex-direction:column;gap:8px}
+.vl-row{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;width:100%;min-height:64px;padding:12px 14px;background:#fff;border:1px solid var(--border);border-radius:12px;text-align:left;cursor:pointer;font-family:var(--font-body);transition:border-color .12s,background .12s}
+.vl-row:hover,.vl-row.is-active{border-color:var(--amber-400);background:var(--amber-50)}
+.vl-main{display:flex;flex-direction:column;gap:3px;min-width:0}
+.vl-name{font-family:var(--font-heading);font-weight:600;font-size:15px;color:var(--text-primary)}
+.vl-more{font-weight:400;font-size:11px;color:var(--text-muted)}
+.vl-sub{font-size:12.5px;color:var(--text-secondary)}
+.vl-price{display:flex;flex-direction:column;align-items:flex-end;flex-shrink:0;line-height:1.15}
+.vl-price-main{font-family:var(--font-heading);font-weight:700;font-size:20px;color:var(--amber-800)}
+.empty-state{padding:20px 18px;background:#fff;border:1.5px solid var(--border-md);border-radius:16px;text-align:center}
+.empty-title{font-family:var(--font-heading);font-weight:700;font-size:17px;color:var(--amber-900)}
+.empty-sub{margin-top:2px;color:var(--text-secondary);font-size:14px}
+.empty-actions{display:flex;justify-content:center;gap:8px;flex-wrap:wrap;margin-top:14px}
+.load-error-retry{min-height:44px}
+
+/* ── Bottom navigation ────────────────────────────────────────────────────── */
+.bottom-nav{position:fixed;left:0;right:0;bottom:0;z-index:1100;display:flex;height:calc(var(--bn-h) + var(--safe-bottom));padding:0 var(--safe-right) var(--safe-bottom) var(--safe-left);background:#fff;border-top:1px solid #e5e7eb}
+.bn-item{position:relative;flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;min-width:44px;min-height:44px;background:none;border:0;color:#6b7280;font-family:var(--font-body);font-size:12px;font-weight:600;cursor:pointer}
+.bn-item.is-active{color:var(--amber-800)}
+.bn-item.is-active svg{color:#e8a020}
+.bn-item.is-active::before{content:'';position:absolute;top:0;left:22%;right:22%;height:3px;border-radius:0 0 3px 3px;background:#e8a020}
+.bn-report{color:var(--amber-900)}
+.bn-plus{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;background:#e8a020;color:#fff}
+
+/* ── Bottom sheet (venue details / a neighbourhood's venues) ──────────────── */
+.sheet-handle{display:flex;position:relative;align-items:center;width:100%;height:52px;flex-shrink:0;padding:0 18px;background:var(--amber-900);color:var(--amber-100);border:none;cursor:pointer;border-radius:18px 18px 0 0;font-family:var(--font-body);touch-action:none}
+.sheet-grip{position:absolute;top:7px;left:50%;transform:translateX(-50%);width:38px;height:4px;border-radius:2px;background:rgba(255,255,255,.4)}
+.sheet-handle-text{font-weight:600;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--amber-100)}
+.pub-panel .sidebar-content.scrollable,.pub-panel .venue-panel{flex:1;min-height:0;overflow-y:auto}
+
+/* Karte / Liste — two views of one dataset */
+[data-mtab=map] .pub-panel--list{display:none}
+[data-mtab=map] .stats-slot--mobile{display:none}
+[data-mtab=list] .pub-intro,[data-mtab=list] .pub-cta{display:none}
+/* The map is hidden on the Liste tab but stays LAID OUT (invisible, off the flow), so it
+   never collapses to 0×0 — Leaflet cannot fly/fit a zero-size map. */
+[data-mtab=list] .map-container{position:absolute;left:0;top:0;width:100%;height:60vh;flex:none;min-height:0;visibility:hidden;pointer-events:none}
+[data-mtab=list] .stats-slot--mobile{display:block}
+[data-mtab=list] .pub-panel--list{flex:none}
+
+.app-footer{display:none}
+.stats-slot--desktop{display:none}
+
+/* ── Mobile / tablet only ─────────────────────────────────────────────────── */
+@media (max-width:1023px){
+  .pub{padding-bottom:calc(var(--bn-h) + var(--safe-bottom))}
+  .pub-panel--detail,.pub-panel--hood{
+    position:fixed;left:0;right:0;z-index:1150;
+    bottom:calc(var(--bn-h) + var(--safe-bottom));
+    height:calc(100dvh - var(--header-h) - var(--safe-top) - var(--bn-h) - var(--safe-bottom) - 8px);
+    border-radius:18px 18px 0 0;border-top:1px solid var(--border-md);box-shadow:0 -8px 32px rgba(107,76,30,.22);
+    transition:transform .35s cubic-bezier(.2,.8,.2,1);
+  }
+  .pub-panel--detail.sheet-collapsed,.pub-panel--hood.sheet-collapsed{transform:translateY(calc(100% - 52px))}
+  .pub-panel--detail.sheet-half,.pub-panel--hood.sheet-half{transform:translateY(42%)}
+  .pub-panel--detail.sheet-full,.pub-panel--hood.sheet-full{transform:translateY(0)}
+
+  /* Header: brand + city + language + ☰ */
+  .nav-left{gap:6px;min-width:0;overflow:hidden}
+  .nav-actions .admin-link-btn{display:none}
+  .nav-actions{gap:0}
+  .city-selector-btn{min-width:44px;min-height:44px;padding:0 8px;justify-content:center;background:none;border-color:transparent}
+  .city-name,.city-caret{display:none}
+  .city-dropdown{position:fixed;top:calc(var(--header-h) + var(--safe-top) + 8px);left:16px;right:16px;width:auto;max-width:none}
+  .nav-mobile-menu{display:block;position:relative}
+  .hamburger-btn{width:44px;height:44px;display:flex;align-items:center;justify-content:center;background:none;border:0;border-radius:9px;color:var(--amber-100);font-size:22px;cursor:pointer;font-family:var(--font-body)}
+  .hamburger-btn:active{background:rgba(255,255,255,.2)}
+  .mobile-menu-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.15);z-index:1300}
+  .mobile-menu-dropdown{position:absolute;top:calc(100% + 6px);right:0;z-index:1400;background:var(--amber-900);border:1px solid rgba(255,255,255,.15);border-radius:12px;box-shadow:var(--shadow-lg);display:flex;flex-direction:column;min-width:210px;overflow:hidden}
+  .mobile-menu-dropdown button,.mobile-menu-dropdown a{display:flex;align-items:center;min-height:48px;background:none;border:none;border-bottom:1px solid rgba(255,255,255,.08);color:var(--amber-100);text-align:left;padding:0 18px;font-size:14.5px;cursor:pointer;font-family:var(--font-body);text-decoration:none}
+  .mobile-menu-dropdown > :last-child{border-bottom:none}
+  .mobile-menu-dropdown button:active,.mobile-menu-dropdown a:active{background:rgba(255,255,255,.12)}
+
+  .vm-form-grid{grid-template-columns:1fr}
+  .admin-stats{grid-template-columns:repeat(2,1fr)}
+
+  /* Stats bar (now inside the Liste tab): stacked rows, no ambient horizontal scroll */
+  .stats-bar{display:flex;flex-direction:column;align-items:stretch;gap:6px;padding:8px 12px;overflow:visible}
+  .stats-tiles{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+  .stat-tile{min-width:0;padding:6px 10px}
+  .stat-tile:first-child{grid-column:1 / -1;flex-direction:row;align-items:baseline;gap:6px;flex-wrap:wrap}
+  .stat-tile:first-child .stat-tile-sub::before{content:'· '}
+  .stat-tile-value{font-size:16px}
+  .stat-tile-sub{max-width:none}
+  .stats-pills{flex-wrap:nowrap;overflow-x:auto;padding-bottom:2px;-webkit-overflow-scrolling:touch}
+  .stats-pills-label{display:none}
+  .stats-pill{min-height:44px}
+  .stats-pill-trends:active{background:var(--amber-800)}
+
+  .toast-container{bottom:calc(var(--bn-h) + var(--safe-bottom) + 12px)}
+
+  /* While a venue / neighbourhood sheet is open the intro, search and CTA step aside so the
+     map (with the selected pill) stays visible above the sheet. */
+  [data-sheet=open] .pub-intro,[data-sheet=open] .pub-search,[data-sheet=open] .pub-cta{display:none}
+  .pub-panel--detail.sheet-half,.pub-panel--hood.sheet-half{transform:translateY(46%)}
+  /* Munich-wide stats mean nothing above a "within 1 km" list */
+  [data-nearby=on] .stats-slot--mobile{display:none!important}
+}
+
+/* ── Desktop (≥1024px): 400px left panel + map ────────────────────────────── */
+@media (min-width:1024px){
+  .navbar{height:58px;padding-top:0;padding-left:20px;padding-right:20px}
+  .bottom-nav{display:none}
+  .app-footer{display:flex}
+  .stats-slot--desktop{display:block;flex-shrink:0}
+  .stats-slot--mobile{display:none!important}
+  .sheet-handle{display:none}
+  .pub{overflow-y:hidden;display:grid;grid-template-columns:400px minmax(0,1fr);grid-template-rows:auto auto auto auto minmax(0,1fr);overflow:hidden}
+  .pub-intro,.pub-search,.pub-cta,.pub-filters,.pub-panel{grid-column:1;background:var(--cream)}
+  .pub-intro{grid-row:1;padding:14px 20px 0}
+  .pub-intro-title{font-size:20px}
+  .pub-search{grid-row:2;padding:10px 20px 0}
+  .pub-cta{grid-row:3;padding:10px 20px 12px}
+  .nearby-cta{height:52px}
+  .pub-filters{grid-row:4;background:#fff}
+  .pub-panel{grid-row:5;overflow-y:auto;border-right:1px solid var(--border);box-shadow:2px 0 12px rgba(107,76,30,.08)}
+  .pub-filters,.pub-search,.pub-cta,.pub-intro{border-right:1px solid var(--border)}
+  .pub-panel--list{display:flex!important}
+  .pub-hint{display:block;margin-bottom:12px;color:var(--text-secondary);font-size:13px}
+  .map-container{grid-column:2;grid-row:1 / -1;min-height:0}
+  [data-mtab] .pub-intro,[data-mtab] .pub-cta{display:block}
+  [data-mtab] .map-container{position:relative;width:auto;height:auto;visibility:visible;pointer-events:auto}
+  [data-mtab=list] .pub{overflow:hidden}
+  .map-legend{display:block}
+  .missing-bar-fab{display:flex}
+  .map-empty{display:none}
+  .leaflet-control-zoom{bottom:160px!important}
+  /* on desktop the chips wrap onto a second line instead of scrolling sideways */
+  .chip-row{padding:4px 20px;flex-wrap:wrap;height:auto;overflow:visible}
+  /* "Mehr ↓" opens inline under the chips instead of as a sheet */
+  .filter-backdrop{display:none}
+  .filter-sheet{position:static;max-height:none;padding:12px 20px 16px;border-radius:0;box-shadow:none;background:var(--amber-50);border-top:1px solid var(--border)}
+  .filter-sheet-head,.filter-sheet-show{display:none}
+  .filter-group select,.filter-group input{font-size:14px}
+  .toast-container{bottom:20px}
+}
+
+/* Tablet: a little more room for the single column */
+@media (min-width:768px) and (max-width:1023px){
+  :root{--gutter:32px}
+  .pub-intro-title{font-size:28px}
+  .vl-list{display:grid;grid-template-columns:1fr 1fr}
+}
+
+/* Motion: nothing essential depends on animation */
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation-duration:.001ms!important;animation-iteration-count:1!important;transition-duration:.001ms!important;scroll-behavior:auto!important}
+  .nearby-spin{animation:none}
+}
+
+@media (max-width:359px){.search-field-input{font-size:15px}.nearby-cta{font-size:14px;letter-spacing:.03em}}

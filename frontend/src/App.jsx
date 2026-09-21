@@ -4,24 +4,36 @@ import './i18n/i18n.js';
 import MunichMap from './components/MunichMap';
 import VenuePanel from './components/VenuePanel';
 import VenueDetail from './components/VenueDetail';
-import SearchBar from './components/SearchBar';
-import MissingBarModal from './components/MissingBarModal';
-import AdminPage from './components/AdminPage';
+import SearchInput from './components/SearchInput';
+import FilterChips from './components/FilterChips';
+import FilterPanel from './components/FilterPanel';
+import NearbyCta from './components/NearbyCta';
+import BottomNav from './components/BottomNav';
+import VenueList, { VenueListSkeleton } from './components/VenueList';
+import EmptyState from './components/EmptyState';
 import StatsBar from './components/StatsBar';
 import CitySelector from './components/CitySelector';
 import ToastContainer from './components/ToastContainer';
 import { ToastProvider } from './hooks/ToastProvider';
-// Lazy-loaded: PriceTrends pulls in recharts, a sizeable dependency only
-// needed when a user actually opens the trends modal (brief Section 12).
+// Lazy-loaded: none of these is needed to show the map. PriceTrends pulls in recharts
+// (brief Section 12); the admin dashboard and the report modal are only ever opened
+// on demand, so a first-time visitor never downloads them.
 const PriceTrends = lazy(() => import('./components/PriceTrends'));
-import FreshnessLight from './components/FreshnessLight';
-import PriceSecondary from './components/PriceSecondary';
+const AdminPage = lazy(() => import('./components/AdminPage'));
+const MissingBarModal = lazy(() => import('./components/MissingBarModal'));
 import Footer from './components/Footer';
 import Impressum from './pages/Impressum';
 import Datenschutz from './pages/Datenschutz';
 import { fetchNeighbourhoods, fetchVenues, fetchStats } from './hooks/useApi';
-import { formatEuro } from './utils/price';
+import { useNearby } from './hooks/useNearby';
+import { useToast } from './hooks/useToast';
+import { useIsMobileLayout } from './hooks/useMediaQuery';
 import { createSequencedLoader } from './utils/sequencedLoader';
+import { emptyFilters, countActiveFilters } from './utils/quickFilters';
+import { nearbyVenues, comparablePrice, NEARBY_RADIUS_M } from './utils/geo';
+
+const MUNICH_VIEW = { lat: 48.145, lng: 11.578, zoom: 13 };
+const NEARBY_ZOOM = 15; // ~1 km around the user fits a phone-width map
 
 // Query params for GET /api/venues. Neighbourhood is deliberately NOT included —
 // the focused-neighbourhood list is scoped client-side from the full venue set so
@@ -87,6 +99,8 @@ export default function App() {
 // otherwise have skipped the provider entirely for that branch).
 function AppContent({ navigate }) {
   const { t, i18n } = useTranslation();
+  const showToast = useToast();
+  const isMobile = useIsMobileLayout();
   const [neighbourhoods, setNeighbourhoods] = useState([]);
   const [allVenues, setAllVenues] = useState([]);       // every venue in the DB
   const [filteredVenues, setFilteredVenues] = useState([]); // type/brand/price/search applied
@@ -96,14 +110,21 @@ function AppContent({ navigate }) {
   const [view, setView] = useState('map');
   const [showMissingBar, setShowMissingBar] = useState(false);
   const [showTrends, setShowTrends] = useState(false);
-  const [filters, setFilters] = useState({ type: '', brand: '', serve_type: '', neighbourhood: '', min_price: '', max_price: '' });
+  const [filters, setFilters] = useState(emptyFilters());
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
-  // Mobile bottom sheet has 3 stops: 'collapsed' (~15%, just the handle),
-  // 'half' (~60%, venue list), 'full' (~90%). No effect on desktop.
-  const [sheetLevel, setSheetLevel] = useState('collapsed');
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false); // ☰ dropdown (mobile navbar)
+  // Mobile/tablet: the two views of ONE dataset. 'map' (default) or 'list'.
+  const [mobileTab, setMobileTab] = useState('map');
+  const [showFilters, setShowFilters] = useState(false); // "Mehr ↓": the full filter panel
+  // The bottom sheet now only carries a venue's details or a neighbourhood's venues
+  // (the plain list has its own tab). 3 stops: 'collapsed' (handle only), 'half', 'full'.
+  const [sheetLevel, setSheetLevel] = useState('half');
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false); // ☰ dropdown (mobile header)
+  const [highlightId, setHighlightId] = useState(null);       // venue emphasised on the map <-> list
+  const [viewCommand, setViewCommand] = useState(null);       // one-off "fly the map here"
   const touchStartY = useRef(null);
+  const nearby = useNearby();
+  const { request: requestNearby, clear: clearNearby } = nearby;
 
   // ─── Data loading ──────────────────────────────────────────────────────────
   // Snapshot = the things that mirror the whole database (used by the map + stats
@@ -204,44 +225,35 @@ function AppContent({ navigate }) {
 
   // ─── Neighbourhood selection (single source of truth) ──────────────────────
   // Every entry point — map click, stats-bar pill, filter dropdown — goes through
-  // here. `filters.neighbourhood` is kept in sync only so the SearchBar UI reflects
+  // here. `filters.neighbourhood` is kept in sync only so the filter UI reflects
   // the choice; it no longer drives the venue fetch.
   const selectNeighbourhood = useCallback((id) => {
     setActiveNeighbourhood(id || null);
     setFilters((f) => ({ ...f, neighbourhood: id || '' }));
-    if (id) setSheetLevel('half'); // tapping a neighbourhood slides the sheet up to 60%
+    if (id) setSheetLevel('half'); // a neighbourhood's venues open in the sheet at 60%
     setView((v) => (v === 'venue' ? 'map' : v));
   }, []);
 
-  // A global text search must always be reachable, even on mobile where the venue
-  // list lives in a collapsible bottom sheet that otherwise only opens when a
-  // neighbourhood polygon is tapped. Without this, typing a query with no
-  // neighbourhood selected updated `filteredVenues` correctly but the results were
-  // hidden behind the collapsed sheet — "search does nothing" from the user's POV.
-  const handleSearch = useCallback((val) => {
-    setSearchQuery(val);
-    if (val.trim()) setSheetLevel('half');
-  }, []);
+  // Typing filters the map and list live (debounced upstream); nothing else to do.
+  const handleSearch = useCallback((val) => { setSearchQuery(val); }, []);
 
-  // Enter still works as an immediate, undebounced trigger — search updates
-  // live as you type either way, this just lets an impatient/keyboard user
-  // skip the 300ms wait. Reads refs (not closed-over state) so it always
-  // fires with whatever's actually in the fields right now.
+  // Enter is an immediate, undebounced trigger. Reads refs (not closed-over state) so
+  // it always fires with whatever is in the field right now.
   const handleSearchNow = useCallback(() => {
     loadFiltered(filtersRef.current, searchRef.current);
   }, [loadFiltered]);
 
-  // The zero-results empty state's "Clear filters" action — deliberately
-  // leaves the search query alone (SearchBar owns that as local, uncontrolled
-  // state, so clearing it from outside the component isn't safe without a
-  // bigger controlled-input refactor); loosening filters while keeping the
-  // search term is usually what someone actually wants first anyway.
-  const clearFiltersOnly = useCallback(() => {
-    setFilters((f) => ({ ...f, type: '', brand: '', serve_type: '', min_price: '', max_price: '' }));
+  // "Reset": every filter AND the search text (the search field is controlled now, so
+  // it can be cleared from here), plus the focused neighbourhood.
+  const clearAll = useCallback(() => {
+    setFilters(emptyFilters());
+    setSearchQuery('');
     selectNeighbourhood(null);
   }, [selectNeighbourhood]);
 
-  const handleVenueClick = (venue) => { setSelectedVenue(venue); setView('venue'); setSheetLevel('full'); };
+  const handleVenueClick = useCallback((venue) => {
+    setSelectedVenue(venue); setView('venue'); setSheetLevel('half'); setHighlightId(venue.id);
+  }, []);
   const handleBack = () => { setView('map'); setSelectedVenue(null); };
 
   // Stats-bar cheapest/priciest tiles only carry a venue id — resolve it against
@@ -249,10 +261,28 @@ function AppContent({ navigate }) {
   const handleSelectVenueById = useCallback((id) => {
     const venue = allVenues.find((v) => v.id === id);
     if (venue) handleVenueClick(venue);
-  }, [allVenues]);
+  }, [allVenues, handleVenueClick]);
 
-  // Bottom sheet: tap the handle to step collapsed<->half; swipe up/down to move
-  // one stop at a time (collapsed -> half -> full and back).
+  // ─── "Günstiges Bier in der Nähe" ──────────────────────────────────────────
+  // Asks for the position; on success the venue set becomes "within 1 km of me,
+  // cheapest first" for BOTH the map and the list, and the map flies there. Nothing
+  // is faked: a refusal or failure leaves everything as it was and offers a retry.
+  const handleNearby = useCallback(async () => {
+    const coords = await requestNearby();
+    if (!coords) return;
+    setViewCommand({ id: Date.now(), lat: coords.lat, lng: coords.lng, zoom: NEARBY_ZOOM });
+    setSelectedVenue(null); setView('map'); selectNeighbourhood(null);
+    setMobileTab('list'); // the sorted results; "Karte" shows the same venues as pills
+  }, [requestNearby, selectNeighbourhood]);
+
+  const handleShowMunich = useCallback(() => {
+    clearNearby();
+    setViewCommand({ id: Date.now(), ...MUNICH_VIEW });
+    setMobileTab('map');
+  }, [clearNearby]);
+
+  // Bottom sheet (venue details / a neighbourhood's venues): tap the handle to step
+  // collapsed<->half; swipe up/down to move one stop at a time.
   const SHEET_STEPS = ['collapsed', 'half', 'full'];
   const stepSheet = (delta) => {
     setSheetLevel((level) => {
@@ -272,10 +302,21 @@ function AppContent({ navigate }) {
     else handleSheetTap();                // small movement = a tap
   };
 
+  // ─── What both views show ──────────────────────────────────────────────────
+  // ONE dataset for map and list: the filtered/searched venues — or, after "nearby",
+  // only those within 1 km, each with its distance. Cheapest per 0.5 L first; a venue
+  // whose serving size is unknown can't be compared, so it goes last.
+  const displayVenues = useMemo(() => {
+    if (nearby.status === 'ok') return nearbyVenues(filteredVenues, nearby.coords);
+    return [...filteredVenues].sort((a, b) => comparablePrice(a) - comparablePrice(b));
+  }, [filteredVenues, nearby.status, nearby.coords]);
+  const nearbyActive = nearby.status === 'ok';
+  const radiusLabel = `${NEARBY_RADIUS_M / 1000} km`;
+
   // Venues in the focused neighbourhood — always derived from the full DB set,
   // then narrowed by the active filters/search so the panel matches the map.
   const filteredIds = new Set(filteredVenues.map((v) => v.id));
-  const anyFilterActive = !!(filters.type || filters.brand || filters.serve_type || filters.min_price || filters.max_price || searchQuery);
+  const anyFilterActive = !!(countActiveFilters(filters) || searchQuery);
   const panelVenues = activeNeighbourhood
     ? allVenues
         .filter((v) => v.neighbourhood_id === activeNeighbourhood)
@@ -283,26 +324,53 @@ function AppContent({ navigate }) {
     : [];
   const activeNInfo = neighbourhoods.find((n) => n.id === activeNeighbourhood);
 
-  if (view === 'admin') return <AdminPage onBack={() => setView('map')} />;
+  // What the panel shows: a venue's details, a neighbourhood's venues, or the list.
+  const panelMode = view === 'venue' && selectedVenue ? 'detail' : activeNeighbourhood ? 'hood' : 'list';
+
+  const handleVenueFocus = useCallback((v) => setHighlightId(v.id), []);
+  const openReport = useCallback(() => setShowMissingBar(true), []);
+  const showListFromSearch = useCallback(() => setMobileTab('list'), []);
+  const closeFilters = useCallback(() => setShowFilters(false), []);
+
+  if (view === 'admin') {
+    return (
+      <Suspense fallback={<div className="loading" role="status">{t('loading')}</div>}>
+        <AdminPage onBack={() => setView('map')} />
+      </Suspense>
+    );
+  }
+
+  const noVenues = !loading && !loadError && displayVenues.length === 0;
+  const emptyVariant = nearbyActive ? 'nearby' : 'filters';
+  const emptyState = (
+    <EmptyState
+      variant={emptyVariant} radiusLabel={radiusLabel}
+      onReport={openReport} onShowMunich={handleShowMunich}
+      onReset={anyFilterActive ? clearAll : undefined}
+    />
+  );
 
   return (
-    <div className="app">
+    <div className="app" data-mtab={mobileTab} data-sheet={panelMode === 'list' ? 'closed' : 'open'} data-nearby={nearbyActive ? 'on' : 'off'}>
       <nav className="navbar">
         <div className="nav-left">
-          <div className="nav-brand" onClick={() => { setView('map'); selectNeighbourhood(null); setMobileMenuOpen(false); }}>
-            <span className="nav-logo">🍺</span>
-            <div>
-              {/* Site-wide H1 (brief Section 14) — the app is a single page with
-                  no per-route document, so the brand name is the one page-level
-                  heading; VenueDetail's own heading is an h2 under it. */}
+          <a
+            className="nav-brand" href="/"
+            onClick={(e) => { e.preventDefault(); setView('map'); selectNeighbourhood(null); setMobileMenuOpen(false); }}
+          >
+            {/* The existing Bierpreis mark, kept as is (not swapped for a generic icon). */}
+            <span className="nav-logo" aria-hidden="true">🍺</span>
+            <div className="nav-brand-text">
+              {/* Site-wide H1 (brief Section 14) — the app is a single page with no
+                  per-route document, so the brand name is the one page-level heading. */}
               <h1 className="nav-title">{t('nav.title')}</h1>
               <div className="nav-subtitle">{t('nav.subtitle')}</div>
             </div>
-          </div>
+          </a>
           <CitySelector />
         </div>
 
-        {/* Desktop actions — hidden on mobile in favour of the ☰ menu below */}
+        {/* Language toggle stays visible (small) on every size; Admin sits in ☰ on mobile */}
         <div className="nav-actions">
           <button className="lang-btn" onClick={() => i18n.changeLanguage(i18n.language === 'de' ? 'en' : 'de')}>
             {t('nav.language')}
@@ -310,7 +378,7 @@ function AppContent({ navigate }) {
           <button className="admin-link-btn" onClick={() => setView('admin')}>Admin</button>
         </div>
 
-        {/* Mobile hamburger — hidden on desktop */}
+        {/* Mobile/tablet menu — hidden on desktop */}
         <div className="nav-mobile-menu">
           <button
             className="hamburger-btn"
@@ -324,71 +392,157 @@ function AppContent({ navigate }) {
             <>
               <div className="mobile-menu-backdrop" onClick={() => setMobileMenuOpen(false)} />
               <div className="mobile-menu-dropdown">
-                <button onClick={() => { setView('admin'); setMobileMenuOpen(false); }}>
-                  🔐 Admin
-                </button>
-                <button onClick={() => { i18n.changeLanguage(i18n.language === 'de' ? 'en' : 'de'); setMobileMenuOpen(false); }}>
-                  🌐 {i18n.language === 'de' ? 'DE / EN' : 'EN / DE'}
-                </button>
+                <button onClick={() => { setView('admin'); setMobileMenuOpen(false); }}>🔐 Admin</button>
+                <a href="/impressum" onClick={(e) => { navigate(e, '/impressum'); setMobileMenuOpen(false); }}>{t('footer.impressum')}</a>
+                <a href="/datenschutz" onClick={(e) => { navigate(e, '/datenschutz'); setMobileMenuOpen(false); }}>{t('footer.datenschutz')}</a>
+                <a href="mailto:charoensuwan.s@gmail.com">{t('footer.kontakt')}</a>
               </div>
             </>
           )}
         </div>
       </nav>
 
-      <StatsBar
-        stats={stats}
-        neighbourhoods={neighbourhoods}
-        activeNeighbourhood={activeNeighbourhood}
-        onSelectNeighbourhood={selectNeighbourhood}
-        onSelectVenue={handleSelectVenueById}
-        onShowTrends={() => setShowTrends(true)}
-      />
+      {/* Desktop: full-width stats row under the header (unchanged). */}
+      <div className="stats-slot stats-slot--desktop">
+        <StatsBar
+          stats={stats} neighbourhoods={neighbourhoods} activeNeighbourhood={activeNeighbourhood}
+          onSelectNeighbourhood={selectNeighbourhood} onSelectVenue={handleSelectVenueById}
+          onShowTrends={() => setShowTrends(true)}
+        />
+      </div>
 
-      <div className="main-layout">
-        <div className={`sidebar sheet-${sheetLevel}`}>
-          <button
-            className="sheet-handle"
-            onClick={handleSheetTap}
-            onTouchStart={handleSheetTouchStart}
-            onTouchEnd={handleSheetTouchEnd}
-            aria-label={sheetLevel === 'collapsed' ? t('app.expandList') : t('app.collapseList')}
-          >
-            <span className="sheet-grip" />
-            <span className="sheet-handle-text">
-              {view === 'venue' && selectedVenue
-                ? selectedVenue.name
-                : activeNInfo
-                  ? (i18n.language === 'de' ? activeNInfo.name_de : activeNInfo.name_en)
-                  : t('app.venuesAndFilters')}
-            </span>
-          </button>
+      {/* Mobile: [intro] [search] [CTA] [map] [chips] — desktop re-arranges the SAME
+          elements into a left panel + map (CSS grid), so state exists exactly once. */}
+      <main className="pub">
+        <section className="pub-intro">
+          <h2 className="pub-intro-title">{t('home.introLine1')}<br />{t('home.introLine2')}</h2>
+        </section>
 
-          <SearchBar
-            neighbourhoods={neighbourhoods}
-            onSearch={handleSearch}
-            onSearchNow={handleSearchNow}
-            onFocus={() => setSheetLevel('half')}
-            onFilterChange={setFilters}
-            filters={filters}
-            onNeighbourhoodSelect={selectNeighbourhood}
+        <div className="pub-search">
+          <SearchInput
+            value={searchQuery} onChange={handleSearch} onSearchNow={handleSearchNow}
             resultCount={filteredVenues.length}
+            onShowList={isMobile && mobileTab === 'map' ? showListFromSearch : undefined}
           />
+        </div>
 
-          {view === 'venue' && selectedVenue ? (
+        <div className="pub-cta">
+          <NearbyCta status={nearby.status} onRequest={handleNearby} onShowMunich={handleShowMunich} />
+        </div>
+
+        <div className="map-container">
+          {/* Mounts as soon as neighbourhood polygons exist — decoupled from the full
+              `loading` flag so the map, the most prominent element, shows up as early
+              as possible; until then a skeleton holds its place (no spinner). */}
+          {neighbourhoods.length > 0 ? (
+            <MunichMap
+              neighbourhoods={neighbourhoods}
+              venues={displayVenues}
+              onNeighbourhoodClick={selectNeighbourhood}
+              onVenueClick={handleVenueClick}
+              onVenueFocus={handleVenueFocus}
+              activeId={activeNeighbourhood}
+              selectedVenueId={view === 'venue' ? selectedVenue?.id : null}
+              highlightId={highlightId}
+              highlight={searchQuery.trim().length > 0}
+              userLocation={nearbyActive ? nearby.coords : null}
+              viewCommand={viewCommand}
+            />
+          ) : (
+            <div className="map-skeleton" role="status">
+              <span className="sr-only">{t('loadingVenues')}</span>
+            </div>
+          )}
+          {noVenues && <div className="map-empty">{emptyState}</div>}
+          <button className="missing-bar-fab" onClick={openReport}>
+            <span className="missing-bar-fab-icon">🍺</span>
+            {t('missingBar.fab')}
+          </button>
+        </div>
+
+        <div className="pub-filters">
+          {nearbyActive && (
+            <div className="nearby-banner" role="status">
+              <span>{t('nearby.banner', { count: displayVenues.length, radius: radiusLabel })}</span>
+              <button type="button" className="nearby-banner-btn" onClick={handleShowMunich}>{t('nearby.showMunich')}</button>
+            </div>
+          )}
+          <FilterChips
+            filters={filters} onFilterChange={setFilters} neighbourhoods={neighbourhoods}
+            moreOpen={showFilters} onToggleMore={() => setShowFilters((o) => !o)}
+            onSoon={() => showToast('warning', `${t('chips.open')} — ${t('chips.soon')}`)}
+            onClearAll={clearAll}
+          />
+          {showFilters && (
+            <>
+              <div className="filter-backdrop" onClick={closeFilters} />
+              <div
+                id="filter-sheet" className="filter-sheet" role={isMobile ? 'dialog' : 'region'} aria-modal={isMobile || undefined}
+                aria-label={t('filterSheet.title')}
+                onKeyDown={(e) => { if (e.key === 'Escape') closeFilters(); }}
+              >
+                <div className="filter-sheet-head">
+                  <h3 className="filter-sheet-title">{t('filterSheet.title')}</h3>
+                  <button type="button" className="filter-sheet-close" onClick={closeFilters} autoFocus={isMobile}>{t('filterSheet.done')}</button>
+                </div>
+                <FilterPanel
+                  filters={filters} onFilterChange={setFilters} neighbourhoods={neighbourhoods}
+                  onNeighbourhoodSelect={selectNeighbourhood}
+                />
+                <button type="button" className="btn-amber filter-sheet-show" onClick={closeFilters}>
+                  {t('filterSheet.show', { count: displayVenues.length })}
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+
+        {/* Mobile list tab: the same stats/area pills, above the list (desktop has them
+            in the full-width row under the header). */}
+        <div className="stats-slot stats-slot--mobile">
+          <StatsBar
+            stats={stats} neighbourhoods={neighbourhoods} activeNeighbourhood={activeNeighbourhood}
+            onSelectNeighbourhood={selectNeighbourhood} onSelectVenue={handleSelectVenueById}
+            onShowTrends={() => setShowTrends(true)}
+          />
+        </div>
+
+        <section className={`pub-panel pub-panel--${panelMode} sheet-${sheetLevel}`}>
+          {panelMode !== 'list' && (
+            <button
+              className="sheet-handle"
+              onClick={handleSheetTap}
+              onTouchStart={handleSheetTouchStart}
+              onTouchEnd={handleSheetTouchEnd}
+              aria-label={sheetLevel === 'collapsed' ? t('app.expandList') : t('app.collapseList')}
+            >
+              <span className="sheet-grip" />
+              <span className="sheet-handle-text">
+                {panelMode === 'detail'
+                  ? selectedVenue.name
+                  : (i18n.language === 'de' ? activeNInfo?.name_de : activeNInfo?.name_en)}
+              </span>
+            </button>
+          )}
+
+          {panelMode === 'detail' ? (
             <div className="sidebar-content scrollable">
               <VenueDetail venue={selectedVenue} onBack={handleBack} />
             </div>
-          ) : activeNeighbourhood ? (
+          ) : panelMode === 'hood' ? (
             <VenuePanel
               neighbourhood={activeNInfo}
               venues={panelVenues}
               onVenueClick={handleVenueClick}
               onClose={() => selectNeighbourhood(null)}
-              onSubmitNew={() => setShowMissingBar(true)}
+              onSubmitNew={openReport}
             />
           ) : (
-            <div className="sidebar-hint">
+            <div className="pub-list">
+              <p className="pub-hint">{t('app.mapHint')}</p>
+              <div className="av-title">
+                {t('app.allVenues')}{` (${displayVenues.length})`}{searchQuery && ` — "${searchQuery}"`}
+              </div>
               {loadError ? (
                 <div className="load-error-state">
                   <div className="load-error-icon">⚠️</div>
@@ -396,102 +550,29 @@ function AppContent({ navigate }) {
                   <button className="load-error-retry" onClick={retryInitialLoad}>{t('retry')}</button>
                 </div>
               ) : loading ? (
-                <div className="loading-state">
-                  <div className="loading-spinner">🍺</div>
-                  <div>{t('loadingVenues')}</div>
-                  <div className="venue-skeleton-list" aria-hidden="true">
-                    {Array.from({ length: 6 }).map((_, i) => (
-                      <div key={i} className="venue-skeleton-item">
-                        <div className="skeleton-line skeleton-line-name" />
-                        <div className="skeleton-line skeleton-line-price" />
-                      </div>
-                    ))}
-                  </div>
-                </div>
+                <VenueListSkeleton />
+              ) : noVenues ? (
+                emptyState
               ) : (
-                <div className="hint-content">
-                  <div className="hint-icon">👆</div>
-                  <div className="hint-text">
-                    {t('app.mapHint')}
-                  </div>
-                  <div className="all-venues-section">
-                    <div className="av-title">
-                      {t('app.allVenues')}
-                      {` (${filteredVenues.length})`}
-                      {searchQuery && ` — "${searchQuery}"`}
-                    </div>
-                    <div className="av-list">
-                      {[...filteredVenues]
-                        // cheapest per 0.5 L first; a price with no known serving size can't be compared, so it goes last
-                        .sort((a, b) => (a.beers[0]?.normalized_500ml_price ?? Infinity) - (b.beers[0]?.normalized_500ml_price ?? Infinity))
-                        .map(v => (
-                          <div key={v.id} className="av-item" onClick={() => handleVenueClick(v)}>
-                            <span className="av-name">
-                              {v.name}
-                              {v.beers.length > 1 && (
-                                <span className="av-brands-count"> · 🍺 {t('venue.brandsCount', { count: v.beers.length })}</span>
-                              )}
-                            </span>
-                            <span className="av-right">
-                              <FreshnessLight beer={v.beers[0]} compact />
-                              <span className="av-price-wrap">
-                                <span className="av-price">{formatEuro(v.beers[0]?.size_05, i18n.language)}</span>
-                                <PriceSecondary beer={v.beers[0]} />
-                              </span>
-                            </span>
-                          </div>
-                        ))}
-                      {filteredVenues.length === 0 && (
-                        <div className="no-venues-block">
-                          <div className="no-venues">{t('search.noResults')}</div>
-                          {(filters.type || filters.brand || filters.serve_type || filters.neighbourhood || filters.min_price || filters.max_price) && (
-                            <button className="no-venues-clear-btn" onClick={clearFiltersOnly}>
-                              {t('search.clear')}
-                            </button>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
+                <VenueList venues={displayVenues} highlightId={highlightId} onVenueClick={handleVenueClick} onHover={setHighlightId} />
               )}
             </div>
           )}
-        </div>
+        </section>
+      </main>
 
-        <div className="map-container">
-          {/* Mounts as soon as neighbourhood polygons exist — decoupled from
-              the full `loading` flag (which also waits on venues + stats)
-              so the map, the single most prominent element on the page,
-              shows up as early as possible instead of behind a blank box
-              for the duration of the slowest of four parallel requests.
-              Venue pins simply pop in once filteredVenues arrives — MunichMap
-              already reacts to that prop changing after mount. */}
-          {neighbourhoods.length > 0 && (
-            <MunichMap
-              neighbourhoods={neighbourhoods}
-              venues={filteredVenues}
-              onNeighbourhoodClick={selectNeighbourhood}
-              onVenueClick={handleVenueClick}
-              activeId={activeNeighbourhood}
-              selectedVenueId={view === 'venue' ? selectedVenue?.id : null}
-              highlight={searchQuery.trim().length > 0}
-            />
-          )}
-          <button className="missing-bar-fab" onClick={() => setShowMissingBar(true)}>
-            <span className="missing-bar-fab-icon">🍺</span>
-            {t('missingBar.fab')}
-          </button>
-        </div>
-      </div>
+      <BottomNav tab={mobileTab} onTab={setMobileTab} onReport={openReport} />
+      <Footer navigate={navigate} />
 
       {showMissingBar && (
-        <MissingBarModal
-          allVenues={allVenues}
-          neighbourhoods={neighbourhoods}
-          onClose={() => setShowMissingBar(false)}
-          onCreated={loadSnapshot}
-        />
+        <Suspense fallback={null}>
+          <MissingBarModal
+            allVenues={allVenues}
+            neighbourhoods={neighbourhoods}
+            onClose={() => setShowMissingBar(false)}
+            onCreated={loadSnapshot}
+          />
+        </Suspense>
       )}
 
       {showTrends && (
@@ -499,8 +580,6 @@ function AppContent({ navigate }) {
           <PriceTrends neighbourhoods={neighbourhoods} onClose={() => setShowTrends(false)} />
         </Suspense>
       )}
-
-      <Footer navigate={navigate} />
     </div>
   );
 }

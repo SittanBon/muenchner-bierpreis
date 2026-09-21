@@ -1,8 +1,10 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { neighbourhoodGeoJSON } from '../data/neighbourhoodGeoJSON';
 import { formatEuro } from '../utils/price';
 import { describePrice } from '../utils/priceUtils';
+import { pillModel, pillText, TYPE_COLORS, DEFAULT_TYPE_COLOR } from '../utils/markerModel';
+import { freshnessText, getFreshness } from '../utils/freshness';
 
 // Price → colour scale (amber/brown tones — Bavarian feel)
 function priceToColor(price, min = 4.40, max = 6.30) {
@@ -30,40 +32,37 @@ function svgIcon(type) {
   return `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${paths}</svg>`;
 }
 
-// One colour per venue type, shared by the pin border and its icon. bar was
-// #e8a020 (the same light amber as the stats-bar/cluster accent) — on this
-// white-circle-bordered pin design that thin ring of light amber read as
-// near-invisible against the map's own light tan/cream tiles, so it's been
-// deepened to #d97706 (still clearly "amber", just dark enough to hold its
-// own against the map); every other type is unchanged.
-const TYPE_META = {
-  beer_garden: { color: '#2d7a2d' },
-  beer_hall: { color: '#7a4a06' },
-  bar: { color: '#d97706' },
-  restaurant: { color: '#5a3d1e' },
-};
-const DEFAULT_TYPE_META = { color: '#d97706' };
+// Venue-type colours live in utils/markerModel.js (the pill's left border). The
+// popup card still shows the type's Lucide icon in the same colour.
+const TYPE_META = Object.fromEntries(Object.entries(TYPE_COLORS).map(([k, color]) => [k, { color }]));
+const DEFAULT_TYPE_META = { color: DEFAULT_TYPE_COLOR };
 
-// A white circle with a coloured border and a centred Lucide icon in the
-// same colour — createVenueIcon returns a ready-to-use L.divIcon, no Leaflet state
-// involved, so it's a pure function of (venue, isSelected) and safe to call
-// for every marker on every rebuild. The icon itself is inline SVG (not a
-// raster image), so it's pixel-sharp at any DPI/zoom with no @2x asset
-// needed.
-function createVenueIcon(venue, isSelected, showLabel, iconSize, iconAnchor) {
-  const meta = TYPE_META[venue.type] || DEFAULT_TYPE_META;
+// PRICE-FIRST marker: a white pill whose text is the venue's ACTUAL headline price
+// ("€4.20", or "€3.50·0.33L" when the serving size isn't 0.5 L), with a left border
+// in the venue-type colour and a background tint for how fresh the price is.
+// Stale/unknown prices also carry a "!" / "?" so freshness is never colour alone.
+// The pill is centred on the venue's coordinates (zero-size icon box, CSS centres
+// it); the touch target is enlarged to 44px in CSS. Built from plain data
+// (utils/markerModel.js), so it is a pure function of (venue, language).
+function createPillIcon(venue, model, showLabel) {
   return window.L.divIcon({
-    className: 'venue-pin',
+    className: 'price-pill-anchor',
     html: `
-      <div class="venue-pin-wrap${isSelected ? ' selected' : ''}">
-        <div class="venue-pin-circle" style="--pin-color:${meta.color}">
-          ${svgIcon(venue.type)}
-        </div>
-        ${showLabel ? `<div class="venue-pin-label">${escapeHtml(venue.name)}</div>` : ''}
+      <div class="price-pill${model.hasPrice ? '' : ' no-price'}" style="--pp-type:${model.typeColor};--pp-bg:${model.tint}" data-freshness="${model.state}">
+        <span class="pp-text">${escapeHtml(pillText(model))}</span>${model.glyph ? `<span class="pp-glyph" aria-hidden="true">${model.glyph}</span>` : ''}
+        ${showLabel ? `<span class="price-pill-label">${escapeHtml(venue.name)}</span>` : ''}
       </div>
     `,
-    iconSize, iconAnchor,
+    iconSize: [0, 0],
+    iconAnchor: [0, 0],
   });
+}
+
+// The accessible name of a marker: everything the pill shows, in words.
+function pinLabel(venue, model, t) {
+  const beer = venue.beers?.[0];
+  const fresh = beer ? freshnessText(getFreshness(beer)) : null;
+  return [venue.name, model.hasPrice ? pillText(model) : null, fresh ? t(fresh.key, { count: fresh.count }) : null].filter(Boolean).join(', ');
 }
 
 function escapeHtml(s) {
@@ -71,11 +70,11 @@ function escapeHtml(s) {
     .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
-// Same 768px breakpoint the rest of the app's CSS already switches the
-// sidebar into a bottom sheet at — checked fresh on every pin click (not
-// cached in state) so it stays correct across a resize/rotate mid-session.
+// The same breakpoint the CSS switches to the single-column layout (bottom nav +
+// bottom sheet) at, i.e. everything below the 1024px desktop layout — checked fresh
+// on every pin click (not cached in state) so it stays correct across a resize/rotate.
 function isMobileViewport() {
-  return typeof window !== 'undefined' && window.matchMedia('(max-width: 768px)').matches;
+  return typeof window !== 'undefined' && window.matchMedia('(max-width: 1023px)').matches;
 }
 
 // The small popup card shown above a pin on desktop click. Built as a real
@@ -164,7 +163,11 @@ function buildVenuePopupContent(v, { t, i18n, onViewDetails }) {
 // against zoom 13, where 25m is ~2px) leave genuinely overlapping pins
 // un-clustered, silently stacked on top of each other with the topmost one
 // eating every click meant for the one underneath.
-const CLUSTER_PIXEL_RADIUS = 36; // roughly one pin's own width
+// Price pills are wider than tall, so two of them collide when their centres are
+// within a pill's WIDTH horizontally and HEIGHT vertically — a rectangle test, not
+// the old circle.
+const CLUSTER_W = 58; // px — about one pill ("€4,20 ?"), so pills only cluster when they truly overlap
+const CLUSTER_H = 30; // px
 
 function clusterVenuesByPixel(map, venues, zoom) {
   const pts = venues
@@ -180,7 +183,7 @@ function clusterVenuesByPixel(map, venues, zoom) {
       if (used[j]) continue;
       const dx = pts[i].p.x - pts[j].p.x;
       const dy = pts[i].p.y - pts[j].p.y;
-      if (Math.sqrt(dx * dx + dy * dy) < CLUSTER_PIXEL_RADIUS) {
+      if (Math.abs(dx) < CLUSTER_W && Math.abs(dy) < CLUSTER_H) {
         group.push(pts[j].v);
         used[j] = true;
       }
@@ -190,14 +193,53 @@ function clusterVenuesByPixel(map, venues, zoom) {
   return clusters;
 }
 
-export default function MunichMap({ neighbourhoods, venues, onNeighbourhoodClick, onVenueClick, activeId, selectedVenueId, highlight = false }) {
+export default function MunichMap({
+  neighbourhoods, venues, onNeighbourhoodClick, onVenueClick, onVenueFocus, activeId, selectedVenueId,
+  highlightId = null, highlight = false, userLocation = null, viewCommand = null,
+}) {
   const mapRef = useRef(null);
   const leafletMap = useRef(null);
   const layerRef = useRef(null);
   const markersLayerRef = useRef(null);
+  const userLayerRef = useRef(null);
   const tooltipRef = useRef(null);
   const { t, i18n } = useTranslation();
   const [hoveredId, setHoveredId] = useState(null);
+
+  // The marker layer must NOT be rebuilt just because a parent re-render handed us a
+  // new function identity (that used to re-create every marker on every App state
+  // change). Callbacks, `t` and the selection live in refs; only the venue set, the
+  // zoom, the language and the focused neighbourhood rebuild the markers, and a change
+  // of selection/hover only toggles a CSS class on the two pills involved.
+  const onVenueClickRef = useRef(onVenueClick);
+  const onVenueFocusRef = useRef(onVenueFocus);
+  const tRef = useRef(t);
+  const selectedRef = useRef(selectedVenueId);
+  const highlightRef = useRef(highlightId);
+  const popupVenueRef = useRef(null); // venue whose desktop popup is open
+  const pendingViewRef = useRef(null); // a fly-to that arrived while the map had no size
+  const venuesRef = useRef(venues);
+  const pinsRef = useRef(new Map());  // venue id -> Leaflet marker
+  useEffect(() => {
+    onVenueClickRef.current = onVenueClick;
+    onVenueFocusRef.current = onVenueFocus;
+    tRef.current = t;
+    venuesRef.current = venues;
+  });
+
+  // selected (open in the panel/popup) = stronger outline + larger + on top;
+  // hover (row hovered in the list) = a lighter emphasis.
+  const applyPinStates = useCallback(() => {
+    pinsRef.current.forEach((marker, id) => {
+      const pill = marker.getElement()?.querySelector('.price-pill');
+      if (!pill) return;
+      const selected = id === selectedRef.current || id === popupVenueRef.current;
+      const hover = !selected && id === highlightRef.current;
+      pill.classList.toggle('selected', selected);
+      pill.classList.toggle('is-hover', hover);
+      marker.setZIndexOffset(selected ? 1000 : hover ? 500 : 0);
+    });
+  }, []);
 
   useEffect(() => {
     if (leafletMap.current || !mapRef.current) return;
@@ -223,6 +265,32 @@ export default function MunichMap({ neighbourhoods, venues, onNeighbourhoodClick
     const attr = document.querySelector('.leaflet-control-attribution');
     if (attr) attr.style.cssText = 'font-size:9px;background:rgba(255,255,255,0.7);padding:2px 4px;';
 
+    // The map's box changes without a window resize when the Karte/Liste tab flips,
+    // the bottom sheet moves or a banner appears above it — keep Leaflet's size in sync.
+    const resizeObserver = typeof ResizeObserver !== 'undefined'
+      ? new ResizeObserver(() => {
+          const m = leafletMap.current;
+          if (!m) return;
+          m.invalidateSize();
+          const size = m.getSize();
+          if (pendingViewRef.current && size.x > 0 && size.y > 0) {
+            const { lat, lng, zoom } = pendingViewRef.current;
+            pendingViewRef.current = null;
+            m.setView([lat, lng], zoom);
+          }
+        })
+      : null;
+    resizeObserver?.observe(mapRef.current);
+
+    return () => {
+      resizeObserver?.disconnect();
+      leafletMap.current?.remove();
+      leafletMap.current = null;
+      layerRef.current = null;
+      markersLayerRef.current = null;
+      userLayerRef.current = null;
+      pinsRef.current = new Map();
+    };
   }, []);
 
   // Rebuild the GeoJSON layer whenever the (already filtered/searched) venue set,
@@ -341,57 +409,47 @@ export default function MunichMap({ neighbourhoods, venues, onNeighbourhoodClick
 
   }, [neighbourhoods, venues, activeId, highlight, i18n.language]);
 
-  // Venue pins — one colour-coded, type-icon marker per venue with GPS
-  // coordinates (pins that overlap on screen at the current zoom collapse
-  // into a single numbered cluster pin instead of silently stacking, which
-  // would leave everything but the topmost one unclickable). Rebuilt
-  // whenever the (already filtered/searched) venue set, the active
-  // neighbourhood, the selected venue, or the map's own zoom changes — kept
-  // in its own layer/effect from the neighbourhood polygons so a search that
-  // narrows venues doesn't redraw the whole GeoJSON layer. Clicking a pin
-  // never touches the map's view/zoom — only the sidebar/bottom-sheet
-  // reacts (via onVenueClick); clicking a CLUSTER does zoom in, since that's
-  // what actually separates its pins back out.
+  // Venue markers — one price pill per venue with GPS coordinates (pills that would
+  // overlap on screen at the current zoom collapse into one numbered cluster instead
+  // of silently stacking, which would leave everything but the topmost unclickable).
+  // Kept in its own layer/effect from the neighbourhood polygons so a search that
+  // narrows venues doesn't redraw the whole GeoJSON layer. Tapping a pill never moves
+  // the map; tapping a CLUSTER zooms in, since that is what separates its pills.
   //
-  // Desktop click opens a small popup card above the pin (built fresh as a
-  // one-off L.popup — never marker.bindPopup — so there's no automatic
-  // click→openPopup wiring left registered on the marker to fight with the
-  // mobile branch below). The popup-open "selected" ring is toggled directly
-  // on that marker's own DOM node via the popup's 'remove' event rather than
-  // through React state, so opening/closing a popup never triggers a full
-  // marker-layer rebuild (which would destroy the very popup just opened).
-  // selectedVenueId (the venue open in the sidebar/bottom sheet) still drives
-  // isSelected the normal way, through the effect's own dependency below.
+  // Desktop click opens a small popup card above the pill (a one-off L.popup, never
+  // marker.bindPopup, so no automatic click→openPopup wiring is left to fight with the
+  // mobile branch). Mobile skips the popup and goes straight to the bottom sheet.
+  // Keyboard: every marker is focusable and Enter activates it (Leaflet turns Enter
+  // into a click); the aria-label spells out name, price and freshness.
   useEffect(() => {
     if (!leafletMap.current) return;
     const L = window.L;
     const map = leafletMap.current;
+    const lang = i18n.language;
+    const hoverCapable = typeof window.matchMedia === 'function' && window.matchMedia('(hover: hover)').matches;
 
-    // A 44x44 icon box is the actual click/touch target on every screen size
-    // (comfortably clears the 44x44 mobile minimum) — the visible circle
-    // inside is styled smaller (36px desktop / 42px mobile) and centred
-    // within that box entirely via CSS, so the anchor point never shifts
-    // between breakpoints.
-    const iconSize = [44, 44];
-    const iconAnchor = [22, 22];
+    // A 44x44 icon box is the touch target of a CLUSTER; a pill's own 44px-tall touch
+    // target is done in CSS around its (centred) zero-size anchor.
+    const clusterIconSize = [44, 44];
+    const clusterIconAnchor = [22, 22];
 
     function buildMarkers() {
+      const tt = tRef.current;
       if (markersLayerRef.current) markersLayerRef.current.remove();
+      pinsRef.current = new Map();
 
       const markers = clusterVenuesByPixel(map, venues, map.getZoom()).map((group) => {
         if (group.length > 1) {
-          const lat = group.reduce((s, v) => s + v.lat, 0) / group.length;
-          const lng = group.reduce((s, v) => s + v.lng, 0) / group.length;
+          const lat = group.reduce((sum, v) => sum + v.lat, 0) / group.length;
+          const lng = group.reduce((sum, v) => sum + v.lng, 0) / group.length;
           const icon = L.divIcon({
             className: 'venue-pin',
             html: `<div class="venue-cluster-wrap"><div class="venue-cluster-circle">${group.length}</div></div>`,
-            iconSize, iconAnchor,
+            iconSize: clusterIconSize, iconAnchor: clusterIconAnchor,
           });
-          const marker = L.marker([lat, lng], { icon, keyboard: false });
-          marker.bindTooltip(
-            `${group.length} ${t('map.venues')}`,
-            { direction: 'top', offset: [0, -18] }
-          );
+          const marker = L.marker([lat, lng], { icon, keyboard: true });
+          marker.on('add', () => marker.getElement()?.setAttribute('aria-label', `${group.length} ${tt('map.venues')}`));
+          if (hoverCapable) marker.bindTooltip(`${group.length} ${tt('map.venues')}`, { direction: 'top', offset: [0, -18] });
           marker.on('click', () => {
             map.setView([lat, lng], Math.min(19, map.getZoom() + 3));
           });
@@ -399,69 +457,124 @@ export default function MunichMap({ neighbourhoods, venues, onNeighbourhoodClick
         }
 
         const v = group[0];
-        const isSelected = selectedVenueId != null && v.id === selectedVenueId;
         const showLabel = activeId != null && v.neighbourhood_id === activeId;
+        const model = pillModel(v, lang);
+        const marker = L.marker([v.lat, v.lng], { icon: createPillIcon(v, model, showLabel), keyboard: true });
+        const label = pinLabel(v, model, tt);
+        marker.on('add', () => marker.getElement()?.setAttribute('aria-label', label));
+        pinsRef.current.set(v.id, marker);
 
-        const icon = createVenueIcon(v, isSelected, showLabel, iconSize, iconAnchor);
-        const marker = L.marker([v.lat, v.lng], { icon, keyboard: false });
-
-        const cheapest = v.beers?.[0];
-        if (cheapest) {
-          const tp = describePrice(cheapest, i18n.language);
-          const sizeNote = tp.isReferenceSize ? '' : ` (${tp.sizeUnknown ? t('price.sizeUnknown') : tp.volumeLabel})`;
-          marker.bindTooltip(
-            `${escapeHtml(v.name)} · ${tp.actual}${escapeHtml(sizeNote)}`,
-            { direction: 'top', offset: [0, -18] }
-          );
+        if (hoverCapable && v.beers?.[0]) {
+          const tp = describePrice(v.beers[0], lang);
+          const sizeNote = tp.isReferenceSize ? '' : ` (${tp.sizeUnknown ? tt('price.sizeUnknown') : tp.volumeLabel})`;
+          marker.bindTooltip(`${escapeHtml(v.name)} · ${tp.actual}${escapeHtml(sizeNote)}`, { direction: 'top', offset: [0, -22] });
         }
 
         marker.on('click', () => {
+          onVenueFocusRef.current?.(v); // keep the list row in step with the marker
           if (isMobileViewport()) {
-            // Spec: skip the popup entirely on mobile, straight to the
-            // bottom sheet (identical to this app's behaviour before pins
-            // had a popup at all).
-            onVenueClick && onVenueClick(v);
+            onVenueClickRef.current?.(v); // straight to the bottom sheet
             return;
           }
 
           const content = buildVenuePopupContent(v, {
-            t, i18n,
+            t: tt, i18n,
             onViewDetails: () => {
               map.closePopup();
-              onVenueClick && onVenueClick(v);
+              onVenueClickRef.current?.(v);
             },
           });
           const popup = L.popup({
-            closeButton: false, // spec: dismiss only by clicking elsewhere on the map
+            closeButton: false, // dismiss only by clicking elsewhere on the map
             offset: [0, -20],
             className: 'venue-popup',
             maxWidth: 240,
             autoPan: true,
           }).setLatLng([v.lat, v.lng]).setContent(content);
 
-          // openOn() goes through the map's normal popup bookkeeping — the
-          // same auto-close-previous / close-on-map-click behaviour a
-          // marker.bindPopup() would get, without ever binding one.
           popup.openOn(map);
-
-          const pinWrap = marker.getElement()?.querySelector('.venue-pin-wrap');
-          if (pinWrap) {
-            pinWrap.classList.add('selected');
-            popup.on('remove', () => pinWrap.classList.remove('selected'));
-          }
+          popupVenueRef.current = v.id;
+          applyPinStates();
+          popup.on('remove', () => {
+            if (popupVenueRef.current === v.id) popupVenueRef.current = null;
+            applyPinStates();
+          });
         });
         return marker;
       });
 
       markersLayerRef.current = L.layerGroup(markers).addTo(map);
+      applyPinStates();
     }
 
     buildMarkers();
     // Re-cluster on zoom — the same set of venues can be one overlapping
-    // clump at city zoom and fully separated pins a few zoom levels in.
+    // clump at city zoom and fully separated pills a few zoom levels in.
     map.on('zoomend', buildMarkers);
     return () => { map.off('zoomend', buildMarkers); };
-  }, [venues, onVenueClick, i18n, i18n.language, activeId, selectedVenueId, t]);
+  }, [venues, i18n, i18n.language, activeId, applyPinStates]);
+
+  // Selection / list-hover changes only toggle classes — no marker is rebuilt.
+  useEffect(() => {
+    selectedRef.current = selectedVenueId;
+    highlightRef.current = highlightId;
+    applyPinStates();
+  }, [selectedVenueId, highlightId, applyPinStates]);
+
+  // On mobile the bottom sheet covers the lower part of the map: when a venue is
+  // opened, pan so its pill sits in the middle of the map area that stays VISIBLE above
+  // the sheet (the selected marker must never end up hidden behind it).
+  useEffect(() => {
+    const map = leafletMap.current;
+    if (!map || selectedVenueId == null || !isMobileViewport()) return undefined;
+    const timer = setTimeout(() => {
+      const v = venuesRef.current.find((x) => x.id === selectedVenueId);
+      const sheet = document.querySelector('.pub-panel--detail');
+      if (!map || !v || v.lat == null || !sheet || !mapRef.current) return;
+      map.invalidateSize();
+      const box = mapRef.current.getBoundingClientRect();
+      const visibleH = sheet.getBoundingClientRect().top - box.top;
+      if (visibleH < 80) return;
+      const pt = map.latLngToContainerPoint([v.lat, v.lng]);
+      const reduce = typeof window.matchMedia === 'function' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      map.panBy([pt.x - box.width / 2, pt.y - visibleH / 2], { animate: !reduce });
+    }, 450); // after the sheet's slide-in has settled
+    return () => clearTimeout(timer);
+  }, [selectedVenueId]);
+
+  // The user's position ("Günstiges Bier in der Nähe"): a dot plus a soft accuracy
+  // circle — only when the browser really gave us coordinates.
+  useEffect(() => {
+    const map = leafletMap.current;
+    if (!map) return;
+    const L = window.L;
+    if (userLayerRef.current) { userLayerRef.current.remove(); userLayerRef.current = null; }
+    if (!userLocation) return;
+    const parts = [];
+    if (userLocation.accuracy && userLocation.accuracy < 1000) {
+      parts.push(L.circle([userLocation.lat, userLocation.lng], { radius: userLocation.accuracy, className: 'user-accuracy', interactive: false }));
+    }
+    const icon = L.divIcon({ className: 'user-dot-anchor', html: '<div class="user-dot"></div>', iconSize: [0, 0], iconAnchor: [0, 0] });
+    const dot = L.marker([userLocation.lat, userLocation.lng], { icon, interactive: false, keyboard: false, zIndexOffset: 2000 });
+    dot.on('add', () => dot.getElement()?.setAttribute('aria-label', tRef.current('nearby.you')));
+    parts.push(dot);
+    userLayerRef.current = L.layerGroup(parts).addTo(map);
+  }, [userLocation]);
+
+  // "Fly to me" / "show Munich": the app hands over a one-off command object.
+  useEffect(() => {
+    const map = leafletMap.current;
+    if (!map || !viewCommand) return;
+    const { lat, lng, zoom } = viewCommand;
+    // A map with no size (its container is hidden) can't compute a view — Leaflet
+    // would throw "Invalid LatLng (NaN, NaN)". Queue it; the resize observer applies it.
+    map.invalidateSize();
+    const size = map.getSize();
+    if (!size.x || !size.y) { pendingViewRef.current = viewCommand; return; }
+    const reduceMotion = typeof window.matchMedia === 'function' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (reduceMotion) map.setView([lat, lng], zoom);
+    else map.flyTo([lat, lng], zoom, { duration: 0.8 });
+  }, [viewCommand]);
 
   return (
     <div style={{ position: 'relative', width: '100%', height: '100%' }}>

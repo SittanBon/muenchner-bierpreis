@@ -83,6 +83,52 @@ A price's age comes ONLY from two columns on `beers`:
 - The DB migration takes a `VACUUM INTO` backup (`<db>.pre-phase1-<ts>.bak`,
   gitignored) once, before adding the columns — restore it to roll back.
 
+## Public UI layout (P0 Phase 3)
+One DOM, two layouts (`.pub` in `index.css`, "PHASE 3" block at the end):
+- **Mobile + tablet (<1024px)**: header (56px + safe-area top) → intro → search
+  (54px) → amber CTA (58px) → map (fills the rest, ≈45–55vh) → filter chips →
+  fixed bottom nav (56px + safe-area bottom). Tabs `Karte` / `Liste` are two views
+  of ONE dataset (`displayVenues` in App.jsx); the map stays laid out but
+  invisible on the Liste tab (a `display:none` map made Leaflet's flyTo throw
+  `Invalid LatLng (NaN, NaN)`). `viewport-fit=cover` in index.html is what makes
+  `env(safe-area-inset-*)` work on iOS.
+- **Desktop (≥1024px)**: CSS grid — stats row, then a 400px left panel (intro,
+  search, CTA, chips, list/detail) and the map. No bottom nav / sheet there.
+- **Bottom sheet** (`.pub-panel--detail|--hood`) is only for a venue's details or a
+  neighbourhood's venues (default stop "half"); the intro/search/CTA step aside
+  while it is open and the map pans so the selected pill stays visible above it.
+- **Price-first markers** (`MunichMap.jsx`, model in `utils/markerModel.js`): a pill
+  with the ACTUAL headline price ("€4.20", or "€3.50·0.33L" when the size isn't
+  0.5 L, "·?" when unknown), left border = venue type, tint = freshness
+  (FRESH #fff / AGING #fffbeb / STALE #fff5f5 / UNKNOWN #f5f5f5) plus a "!" / "?"
+  glyph so freshness is never colour alone; aria-label spells everything out. The
+  marker layer is rebuilt only when the venue set, zoom or language changes —
+  selection/hover just toggle a class (callbacks live in refs). Clusters keep the
+  amber circle; overlap is a pill-sized rectangle test.
+- **"Günstiges Bier in der Nähe"** (`hooks/useNearby.js`, `utils/geo.js`): there was NO
+  prior geolocation code. The position is used only in the browser: venues within
+  1 km, cheapest per 0.5 L first, each with a real distance (never shown when
+  unknown). Denied/unavailable/timeout → "Standort konnte nicht ermittelt werden."
+  + [Erneut versuchen] [München anzeigen]. Nothing is faked.
+- **Filter chips** (`utils/quickFilters.js`, `FilterChips.jsx`): ≤€4 → max_price
+  4.00, ≤€5 → 5.00, Biergarten, Wirtshaus (beer_hall), Vom Fass (tap) all write into
+  the same `filters` object as the full panel; "Mehr ↓" opens that panel (bottom
+  sheet on mobile, inline on desktop). "Jetzt geöffnet" is shown disabled ("Demnächst")
+  because there is no reliable opening-hours data.
+- **Skeletons, not spinners** for the map and the list; `AdminPage`,
+  `MissingBarModal` and the venue price-history chart (`recharts`) are lazy chunks
+  (first-load JS 806 kB → 415 kB).
+- Header on mobile: language toggle visible (small), Admin + Impressum /
+  Datenschutz / Kontakt in the ☰ menu (the footer strip is desktop-only).
+- Accessibility: every public control is ≥44px (chips are 44px boxes with a 36px
+  painted pill; pills have a 44px hit area), visible `:focus-visible` rings, markers are
+  keyboard-focusable, `prefers-reduced-motion` switches transitions/animations off.
+- **Known follow-ups**: (1) the CTA / active chips use white on #e8a020 as
+  specified — only 2.2:1 contrast (fails WCAG AA); `--cta-fg` / `--cta-bg` in
+  `:root` make the fix one line (dark brown #3d2200 on #e8a020 = 6.6:1).
+  (2) "+ Preis melden" opens the existing "Missing a bar" modal — Phase 7 builds the
+  pick-a-venue flow. (3) No analytics exist, so no events were added.
+
 ## Shared constants & consistency rules (READ BEFORE ADDING A FORM OR LABEL)
 Each of these has ONE source; components import it and never re-type it. Tests
 fail if a copy drifts.
@@ -206,10 +252,13 @@ git add -A && git commit -m "msg" && git push origin main
 Railway auto-deploys from main branch.
 
 ## Design
-- Fonts: Playfair Display + Source Sans 3
+- Fonts (self-hosted in frontend/public/fonts): DM Sans (headings; the header
+  tagline uses its italic file) + Inter (body)
 - Colours: amber/brown Bavarian palette
-- Brand: "Bierpreis — Faires Bier für Alle"
-- Mobile: bottom sheet, cluster pins, 44px targets
+- Brand: "BIERPREIS" + the tagline "Faires Bier für Alle." — the tagline is part
+  of the brand, always visible in the header, and shown in German in BOTH
+  languages. The 🍺 mark is the existing logo; don't swap it.
+- Mobile-first (390×844 is the design target): see "Public UI layout (P0 Phase 3)".
 
 ## Global Rules (ALWAYS follow)
 1. Check duplicates before adding any venue
@@ -274,9 +323,15 @@ Railway auto-deploys from main branch.
 - ✅ Phase 2 — admin foundation (see "Admin data-quality tooling" above): data
   quality dashboard, price editor, one-click verify + Telegram, price history
   viewer, admin search, enriched submission queue
-- ⬜ 3 public core UI · 4 map (price-first markers) · 5 venue experience ·
-  6 discovery (chips/list/bottom nav) · 7 contribution ("Preis falsch?") ·
-  8 desktop · 9 QA
+- ✅ Phase 3 — public mobile-first redesign (see "Public UI layout" above). The
+  prompt for this phase also covered parts of the spec's phases 4, 6 and 8, so
+  these are DONE: price-first markers + selected/freshness states + clusters,
+  filter chips, list view, bottom navigation, desktop sidebar + map/list sync.
+- ⬜ Still open from the spec: 4 price COLOUR scale + centralised thresholds and
+  "Diesen Bereich durchsuchen" · 5 venue bottom sheet content (ROUTE/DETAILS,
+  distance, normalised price line) · 6 list sorting (Nähe/Preis/Aktualität) ·
+  7 contribution ("Preis falsch?", pick-a-venue report flow) · 9 QA on real
+  iOS/Android devices
 - Known remaining data-trust debt: seed-invented `reports` counts (the "N reports"
   badge) are still in the data. Every price shows "Datum unbekannt" until
   verified, re-reported or bulk-verified. The fabricated Price Trends

@@ -16,7 +16,7 @@ export const de = {
   translation: {
     nav: {
       title: "Bierpreis",
-      subtitle: "Faires Bier für Alle",
+      subtitle: "Faires Bier für Alle.",
       language: "EN"
     },
     citySelector: {
@@ -40,12 +40,14 @@ export const de = {
       dontKnow: "Weiß nicht"
     },
     search: {
-      placeholder: "Lokal, Viertel, Straße, Marke oder Typ suchen...",
+      placeholder: "Bar, Biergarten oder Ort suchen ...",
       filters: "Filter",
       clear: "Alle zurücksetzen",
       results: "Ergebnisse",
       resultsFor: "{{count}} Ergebnisse für „{{query}}“",
-      noResults: "Keine Lokale gefunden"
+      noResults: "Keine Lokale gefunden",
+      clearInput: "Suche löschen",
+      showAsList: "Als Liste anzeigen"
     },
     filters: {
       type: "Art des Lokals",
@@ -153,6 +155,50 @@ export const de = {
       venuesAndFilters: "Lokale & Filter",
       mapHint: "Klicke auf ein Viertel auf der Karte, um die Bierlokale zu sehen.",
       allVenues: "Alle Lokale",
+    },
+    home: {
+      introLine1: "Bierpreise in München",
+      introLine2: "finden & fair vergleichen.",
+    },
+    nearby: {
+      cta: "Günstiges Bier in der Nähe",
+      locating: "Standort wird ermittelt …",
+      error: "Standort konnte nicht ermittelt werden.",
+      retry: "Erneut versuchen",
+      showMunich: "München anzeigen",
+      banner_one: "In deiner Nähe · bis {{radius}} · {{count}} Lokal, günstigstes zuerst",
+      banner_other: "In deiner Nähe · bis {{radius}} · {{count}} Lokale, günstigstes zuerst",
+      none: "Keine Bierpreise im Umkreis von {{radius}}.",
+      you: "Dein Standort",
+    },
+    chips: {
+      label: "Schnellfilter",
+      max4: "≤ €4",
+      max5: "≤ €5",
+      garden: "Biergarten",
+      hall: "Wirtshaus",
+      tap: "Vom Fass",
+      open: "Jetzt geöffnet",
+      soon: "Demnächst",
+      more: "Mehr",
+      remove: "Filter entfernen: {{name}}",
+      reset: "Zurücksetzen",
+    },
+    bottomNav: {
+      label: "Hauptnavigation",
+      map: "Karte",
+      list: "Liste",
+      report: "Preis melden",
+    },
+    empty: {
+      title: "Hier fehlen uns noch Bierpreise 🍺",
+      sub: "Kennst du einen?",
+      report: "+ Preis melden",
+    },
+    filterSheet: {
+      title: "Filter",
+      done: "Fertig",
+      show: "{{count}} Lokale anzeigen",
     },
     brandPicker: {
       clear: "Leeren",
@@ -526,7 +572,7 @@ export const en = {
   translation: {
     nav: {
       title: "Bierpreis",
-      subtitle: "Fair Beer for Everyone",
+      subtitle: "Faires Bier für Alle.",
       language: "DE"
     },
     citySelector: {
@@ -550,12 +596,14 @@ export const en = {
       dontKnow: "Don't know"
     },
     search: {
-      placeholder: "Search venue, area, street, brand or type...",
+      placeholder: "Search bar, beer garden or location ...",
       filters: "Filters",
       clear: "Clear all",
       results: "Results",
       resultsFor: "{{count}} results for \"{{query}}\"",
-      noResults: "No venues found"
+      noResults: "No venues found",
+      clearInput: "Clear search",
+      showAsList: "Show as list"
     },
     filters: {
       type: "Venue type",
@@ -658,6 +706,50 @@ export const en = {
       venuesAndFilters: "Venues & filters",
       mapHint: "Click on a neighbourhood on the map to see its beer venues.",
       allVenues: "All venues",
+    },
+    home: {
+      introLine1: "Beer prices in Munich,",
+      introLine2: "find & compare them fairly.",
+    },
+    nearby: {
+      cta: "Cheap beer nearby",
+      locating: "Finding your location …",
+      error: "Location could not be determined.",
+      retry: "Try again",
+      showMunich: "Show Munich",
+      banner_one: "Near you · within {{radius}} · {{count}} venue, cheapest first",
+      banner_other: "Near you · within {{radius}} · {{count}} venues, cheapest first",
+      none: "No beer prices within {{radius}}.",
+      you: "Your location",
+    },
+    chips: {
+      label: "Quick filters",
+      max4: "≤ €4",
+      max5: "≤ €5",
+      garden: "Beer garden",
+      hall: "Inn",
+      tap: "On tap",
+      open: "Open now",
+      soon: "Coming soon",
+      more: "More",
+      remove: "Remove filter: {{name}}",
+      reset: "Reset",
+    },
+    bottomNav: {
+      label: "Main navigation",
+      map: "Map",
+      list: "List",
+      report: "Report price",
+    },
+    empty: {
+      title: "No beer prices here yet 🍺",
+      sub: "Do you know one?",
+      report: "+ Report price",
+    },
+    filterSheet: {
+      title: "Filters",
+      done: "Done",
+      show: "Show {{count}} venues",
     },
     brandPicker: {
       clear: "Clear",
