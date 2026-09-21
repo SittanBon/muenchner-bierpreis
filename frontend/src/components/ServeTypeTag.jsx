@@ -7,7 +7,9 @@ const EMOJI = { tap: '🍺', bottle: '🍾', can: '🥫' };
 // blank box" unknown-info convention) and the sidebar venue card ('badge' —
 // a tiny pill, unknown still shown, just quieter, since it's real information
 // about the data itself, not decoration to skip when there's nothing to say).
-export default function ServeTypeTag({ serveType, variant = 'detail' }) {
+// hideUnknown: render NOTHING when the serve type isn't known (the venue sheet /
+// list never say "Zapfart unbekannt" — an unknown is simply left out there).
+export default function ServeTypeTag({ serveType, variant = 'detail', hideUnknown = false }) {
   const { t } = useTranslation();
   const known = serveType && serveType !== 'unknown' && EMOJI[serveType];
 
@@ -19,6 +21,7 @@ export default function ServeTypeTag({ serveType, variant = 'detail' }) {
     );
   }
 
+  if (!known && hideUnknown) return null;
   if (!known) {
     return <span className="serve-type-unknown">{t('serveType.unknownFull')}</span>;
   }

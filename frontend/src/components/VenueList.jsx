@@ -2,27 +2,28 @@ import { memo, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import FreshnessLight from './FreshnessLight';
 import PriceSecondary from './PriceSecondary';
-import { formatPrice, describePrice } from '../utils/priceUtils';
+import { formatPrice } from '../utils/priceUtils';
 import { formatDistance } from '../utils/geo';
 
-// One row = one real <button> (the whole row is the tap target): venue name, the
-// headline beer + its serving size, the price (largest thing in the row), and the
-// freshness WITH its text label. A distance is shown only when the venue carries a
-// real `distance_m` (i.e. the user shared their location) — never a made-up one.
+// One card = one real <button> (the whole card is the tap target, ≥64px tall):
+//   left  — venue name, "type · neighbourhood", the headline beer, its freshness (dot + TEXT)
+//   right — the ACTUAL price (largest thing on the card), its serving size, the per-0.5 L
+//           comparison (only when the size is known and isn't 0.5 L), and the distance.
+// The distance appears only when the venue carries a real `distance_m` (the user shared
+// their location) — never a made-up one. An unknown serving size says "Größe unbekannt".
 const VenueRow = memo(function VenueRow({ venue, active, onClick, onHover }) {
   const { t, i18n } = useTranslation();
   const lang = i18n.language;
   const ref = useRef(null);
   const beer = venue.beers?.[0];
-  const p = beer ? describePrice(beer, lang) : null;
   const distance = venue.distance_m != null ? formatDistance(venue.distance_m, lang) : null;
+  const area = lang === 'de' ? venue.neighbourhood_name_de : venue.neighbourhood_name_en;
+  const where = [t(`filters.types.${venue.type}`), area].filter(Boolean).join(' · ');
 
-  // A marker tapped on the map scrolls its row into view (map <-> list stay in step).
+  // A marker tapped on the map scrolls its card into view (map <-> list stay in step).
   useEffect(() => {
     if (active && ref.current?.scrollIntoView) ref.current.scrollIntoView({ block: 'nearest' });
   }, [active]);
-
-  const sub = [beer?.brand, p && (p.sizeUnknown ? t('price.sizeUnknown') : p.volumeLabel), distance].filter(Boolean).join(' · ');
 
   return (
     <li>
@@ -37,12 +38,14 @@ const VenueRow = memo(function VenueRow({ venue, active, onClick, onHover }) {
             {venue.name}
             {venue.beers.length > 1 && <span className="vl-more"> · 🍺 {t('venue.brandsCount', { count: venue.beers.length })}</span>}
           </span>
-          {sub && <span className="vl-sub">{sub}</span>}
+          {where && <span className="vl-where">{where}</span>}
+          {beer?.brand && <span className="vl-brand">🍻 {beer.brand}</span>}
           {beer && <FreshnessLight beer={beer} />}
         </span>
         <span className="vl-price">
           <span className="vl-price-main">{beer && beer.size_05 > 0 ? formatPrice(beer.size_05, lang) : '—'}</span>
-          {beer && <PriceSecondary beer={beer} />}
+          {beer && <PriceSecondary beer={beer} showReferenceSize />}
+          {distance && <span className="vl-distance">📍 {distance}</span>}
         </span>
       </button>
     </li>

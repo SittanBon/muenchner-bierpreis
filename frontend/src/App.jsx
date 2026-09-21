@@ -28,9 +28,11 @@ import { fetchNeighbourhoods, fetchVenues, fetchStats } from './hooks/useApi';
 import { useNearby } from './hooks/useNearby';
 import { useToast } from './hooks/useToast';
 import { useIsMobileLayout } from './hooks/useMediaQuery';
+import { useSheetDrag } from './hooks/useSheetDrag';
 import { createSequencedLoader } from './utils/sequencedLoader';
 import { emptyFilters, countActiveFilters } from './utils/quickFilters';
 import { nearbyVenues, comparablePrice, NEARBY_RADIUS_M } from './utils/geo';
+import { formatPrice } from './utils/priceUtils';
 
 const MUNICH_VIEW = { lat: 48.145, lng: 11.578, zoom: 13 };
 const NEARBY_ZOOM = 15; // ~1 km around the user fits a phone-width map
@@ -122,7 +124,6 @@ function AppContent({ navigate }) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false); // ☰ dropdown (mobile header)
   const [highlightId, setHighlightId] = useState(null);       // venue emphasised on the map <-> list
   const [viewCommand, setViewCommand] = useState(null);       // one-off "fly the map here"
-  const touchStartY = useRef(null);
   const nearby = useNearby();
   const { request: requestNearby, clear: clearNearby } = nearby;
 
@@ -281,27 +282,6 @@ function AppContent({ navigate }) {
     setMobileTab('map');
   }, [clearNearby]);
 
-  // Bottom sheet (venue details / a neighbourhood's venues): tap the handle to step
-  // collapsed<->half; swipe up/down to move one stop at a time.
-  const SHEET_STEPS = ['collapsed', 'half', 'full'];
-  const stepSheet = (delta) => {
-    setSheetLevel((level) => {
-      const i = SHEET_STEPS.indexOf(level);
-      const next = Math.min(SHEET_STEPS.length - 1, Math.max(0, i + delta));
-      return SHEET_STEPS[next];
-    });
-  };
-  const handleSheetTap = () => setSheetLevel((level) => (level === 'collapsed' ? 'half' : 'collapsed'));
-  const handleSheetTouchStart = (e) => { touchStartY.current = e.touches[0].clientY; };
-  const handleSheetTouchEnd = (e) => {
-    if (touchStartY.current == null) return;
-    const deltaY = e.changedTouches[0].clientY - touchStartY.current;
-    touchStartY.current = null;
-    if (deltaY < -40) stepSheet(1);       // swipe up -> expand one stop
-    else if (deltaY > 40) stepSheet(-1);  // swipe down -> collapse one stop
-    else handleSheetTap();                // small movement = a tap
-  };
-
   // ─── What both views show ──────────────────────────────────────────────────
   // ONE dataset for map and list: the filtered/searched venues — or, after "nearby",
   // only those within 1 km, each with its distance. Cheapest per 0.5 L first; a venue
@@ -328,6 +308,21 @@ function AppContent({ navigate }) {
   const panelMode = view === 'venue' && selectedVenue ? 'detail' : activeNeighbourhood ? 'hood' : 'list';
 
   const handleVenueFocus = useCallback((v) => setHighlightId(v.id), []);
+  // Leaving the sheet: a venue closes back to the map, a neighbourhood deselects.
+  const dismissSheet = useCallback(() => {
+    if (panelMode === 'detail') { setView('map'); setSelectedVenue(null); }
+    else selectNeighbourhood(null);
+  }, [panelMode, selectNeighbourhood]);
+  const { sheetRef, handleProps } = useSheetDrag({ level: sheetLevel, onLevel: setSheetLevel, onDismiss: dismissSheet });
+
+  // Escape closes the sheet / detail (mobile and desktop).
+  useEffect(() => {
+    if (panelMode === 'list') return undefined;
+    const onKey = (e) => { if (e.key === 'Escape') dismissSheet(); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [panelMode, dismissSheet]);
+
   const openReport = useCallback(() => setShowMissingBar(true), []);
   const showListFromSearch = useCallback(() => setMobileTab('list'), []);
   const closeFilters = useCallback(() => setShowFilters(false), []);
@@ -507,27 +502,45 @@ function AppContent({ navigate }) {
           />
         </div>
 
-        <section className={`pub-panel pub-panel--${panelMode} sheet-${sheetLevel}`}>
+        {/* Tap outside the sheet (on the map above it) to dismiss — only while it is up
+            at half/full height; the collapsed peek leaves the map fully usable. */}
+        {isMobile && panelMode !== 'list' && sheetLevel !== 'collapsed' && (
+          <div className="sheet-backdrop" onClick={dismissSheet} aria-hidden="true" />
+        )}
+
+        <section
+          ref={sheetRef}
+          className={`pub-panel pub-panel--${panelMode} sheet-${sheetLevel}`}
+          aria-label={panelMode === 'detail' ? selectedVenue.name : undefined}
+        >
           {panelMode !== 'list' && (
             <button
-              className="sheet-handle"
-              onClick={handleSheetTap}
-              onTouchStart={handleSheetTouchStart}
-              onTouchEnd={handleSheetTouchEnd}
+              className="sheet-handle" {...handleProps}
               aria-label={sheetLevel === 'collapsed' ? t('app.expandList') : t('app.collapseList')}
             >
               <span className="sheet-grip" />
-              <span className="sheet-handle-text">
-                {panelMode === 'detail'
-                  ? selectedVenue.name
-                  : (i18n.language === 'de' ? activeNInfo?.name_de : activeNInfo?.name_en)}
+              {/* The collapsed peek (~120px): just the name and the price. */}
+              <span className="sheet-peek">
+                {panelMode === 'detail' ? (
+                  <>
+                    <span className="sheet-peek-name">{selectedVenue.name}</span>
+                    <span className="sheet-peek-price">
+                      {selectedVenue.beers?.[0]?.size_05 > 0 ? formatPrice(selectedVenue.beers[0].size_05, i18n.language) : '—'}
+                    </span>
+                  </>
+                ) : (
+                  <>
+                    <span className="sheet-peek-name">{i18n.language === 'de' ? activeNInfo?.name_de : activeNInfo?.name_en}</span>
+                    <span className="sheet-peek-price sheet-peek-count">{panelVenues.length}</span>
+                  </>
+                )}
               </span>
             </button>
           )}
 
           {panelMode === 'detail' ? (
             <div className="sidebar-content scrollable">
-              <VenueDetail venue={selectedVenue} onBack={handleBack} />
+              <VenueDetail venue={selectedVenue} onBack={handleBack} userLocation={nearbyActive ? nearby.coords : null} />
             </div>
           ) : panelMode === 'hood' ? (
             <VenuePanel

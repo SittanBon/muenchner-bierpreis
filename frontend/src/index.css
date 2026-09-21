@@ -1077,9 +1077,17 @@ body{font-family:var(--font-body);background:var(--cream);color:var(--text-prima
 .bn-plus{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;background:#e8a020;color:#fff}
 
 /* ── Bottom sheet (venue details / a neighbourhood's venues) ──────────────── */
-.sheet-handle{display:flex;position:relative;align-items:center;width:100%;height:52px;flex-shrink:0;padding:0 18px;background:var(--amber-900);color:var(--amber-100);border:none;cursor:pointer;border-radius:18px 18px 0 0;font-family:var(--font-body);touch-action:none}
-.sheet-grip{position:absolute;top:7px;left:50%;transform:translateX(-50%);width:38px;height:4px;border-radius:2px;background:rgba(255,255,255,.4)}
-.sheet-handle-text{font-weight:600;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--amber-100)}
+.sheet-handle{display:flex;flex-direction:column;position:relative;align-items:stretch;justify-content:flex-start;width:100%;height:28px;flex-shrink:0;padding:0;background:var(--cream);border:none;cursor:grab;border-radius:18px 18px 0 0;font-family:var(--font-body);touch-action:none;text-align:left}
+.sheet-handle:active{cursor:grabbing}
+/* The drag indicator */
+.sheet-grip{display:block;flex-shrink:0;align-self:center;margin-top:10px;width:40px;height:5px;border-radius:3px;background:#b9ad98}
+/* Collapsed peek (~120px in all): the venue's name and price only */
+.sheet-peek{display:none}
+.sheet-collapsed .sheet-handle{height:120px}
+.sheet-collapsed .sheet-peek{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 20px 0}
+.sheet-peek-name{font-family:var(--font-heading);font-weight:700;font-size:20px;line-height:1.2;color:var(--text-primary);overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.sheet-peek-price{font-family:var(--font-heading);font-weight:700;font-size:26px;color:var(--amber-800);flex-shrink:0}
+.sheet-peek-count{font-size:18px;color:var(--text-secondary)}
 .pub-panel .sidebar-content.scrollable,.pub-panel .venue-panel{flex:1;min-height:0;overflow-y:auto}
 
 /* Karte / Liste — two views of one dataset */
@@ -1098,16 +1106,21 @@ body{font-family:var(--font-body);background:var(--cream);color:var(--text-prima
 /* ── Mobile / tablet only ─────────────────────────────────────────────────── */
 @media (max-width:1023px){
   .pub{padding-bottom:calc(var(--bn-h) + var(--safe-bottom))}
+  /* The sheet's BOTTOM stays pinned just above the bottom nav; a stop changes its HEIGHT.
+     (Translating it down instead slid it over the nav and pushed the end of its content
+     off-screen, out of reach.) full = everything between header and nav; half = 54% of
+     that; collapsed = a 120px peek. useSheetDrag animates the same `height`. */
+  :root{--sheet-full:calc(100dvh - var(--header-h) - var(--safe-top) - var(--bn-h) - var(--safe-bottom) - 8px)}
   .pub-panel--detail,.pub-panel--hood{
     position:fixed;left:0;right:0;z-index:1150;
     bottom:calc(var(--bn-h) + var(--safe-bottom));
-    height:calc(100dvh - var(--header-h) - var(--safe-top) - var(--bn-h) - var(--safe-bottom) - 8px);
+    height:var(--sheet-full);overflow:hidden;
     border-radius:18px 18px 0 0;border-top:1px solid var(--border-md);box-shadow:0 -8px 32px rgba(107,76,30,.22);
-    transition:transform .35s cubic-bezier(.2,.8,.2,1);
+    transition:height .3s cubic-bezier(.2,.8,.2,1);
   }
-  .pub-panel--detail.sheet-collapsed,.pub-panel--hood.sheet-collapsed{transform:translateY(calc(100% - 52px))}
-  .pub-panel--detail.sheet-half,.pub-panel--hood.sheet-half{transform:translateY(42%)}
-  .pub-panel--detail.sheet-full,.pub-panel--hood.sheet-full{transform:translateY(0)}
+  .pub-panel--detail.sheet-collapsed,.pub-panel--hood.sheet-collapsed{height:120px}
+  .pub-panel--detail.sheet-half,.pub-panel--hood.sheet-half{height:calc(var(--sheet-full) * .54)}
+  .pub-panel--detail.sheet-full,.pub-panel--hood.sheet-full{height:var(--sheet-full)}
 
   /* Header: brand + city + language + ☰ */
   .nav-left{gap:6px;min-width:0;overflow:hidden}
@@ -1146,7 +1159,6 @@ body{font-family:var(--font-body);background:var(--cream);color:var(--text-prima
   /* While a venue / neighbourhood sheet is open the intro, search and CTA step aside so the
      map (with the selected pill) stays visible above the sheet. */
   [data-sheet=open] .pub-intro,[data-sheet=open] .pub-search,[data-sheet=open] .pub-cta{display:none}
-  .pub-panel--detail.sheet-half,.pub-panel--hood.sheet-half{transform:translateY(46%)}
   /* Munich-wide stats mean nothing above a "within 1 km" list */
   [data-nearby=on] .stats-slot--mobile{display:none!important}
 }
@@ -1203,3 +1215,64 @@ body{font-family:var(--font-body);background:var(--cream);color:var(--text-prima
 }
 
 @media (max-width:359px){.search-field-input{font-size:15px}.nearby-cta{font-size:14px;letter-spacing:.03em}}
+
+/* ═════════════════════════════════════════════════════════════════════════════
+   PHASE 4 — venue experience (bottom sheet, venue detail, list card)
+   ═════════════════════════════════════════════════════════════════════════════ */
+/* Tap-outside layer: covers the map area above the sheet (not the header or bottom nav). */
+.sheet-backdrop{display:none}
+@media (max-width:1023px){
+  .sheet-backdrop{display:block;position:fixed;left:0;right:0;top:calc(var(--header-h) + var(--safe-top));bottom:calc(var(--bn-h) + var(--safe-bottom));z-index:1140;background:rgba(26,9,0,.12)}
+  .pub-panel--detail,.pub-panel--hood{animation:sheet-in .35s cubic-bezier(.2,.8,.2,1)}
+  .pub-panel--detail .sidebar-content.scrollable{overscroll-behavior:contain}
+}
+@keyframes sheet-in{from{transform:translateY(40px);opacity:0}}
+
+/* Venue detail (sheet on mobile, left panel on desktop) */
+.venue-detail{padding:4px 20px 28px}
+.back-btn{min-height:44px;padding:0 4px 0 0;font-size:15px;font-weight:600;color:var(--amber-800)}
+.vd-name{font-family:var(--font-heading);font-size:20px;font-weight:700;line-height:1.2}
+.vd-neighbourhood{font-size:12.5px}
+.vdp-size{display:block;margin-top:6px;font-size:14px;font-weight:600;color:var(--amber-200)}
+.vdp-size.price-size-unknown{font-size:12px;font-weight:400;font-style:italic;color:var(--amber-300);opacity:.9}
+.vdp-normalized{font-size:12px;margin-top:4px}
+.vd-info-grid{gap:12px;margin:2px 0 16px}
+.vd-info-item{align-items:center}
+.vd-info-value{font-size:14px}
+.vd-actions{gap:10px;flex-wrap:wrap}
+.action-btn{display:flex;align-items:center;justify-content:center;min-height:48px;padding:0 12px;text-decoration:none;font-size:14px;font-weight:600;flex:1 1 140px}
+.action-btn.reviews{background:#fff;border:1.5px solid var(--border-md);color:var(--amber-900)}
+.action-btn.reviews:hover{background:var(--amber-50)}
+
+/* Other beers */
+.ob-row{align-items:flex-start;gap:12px;padding:10px 12px;margin-bottom:8px;border-radius:10px}
+.ob-info{flex-direction:column;align-items:flex-start;gap:3px}
+.ob-line{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.ob-brand{font-size:14px;font-weight:600;white-space:normal}
+.ob-size{font-size:12.5px;color:var(--text-secondary)}
+.ob-size.price-size-unknown{font-size:11.5px;color:var(--text-muted)}
+.ob-price-wrap{align-items:flex-end;flex-shrink:0}
+.ob-price{font-family:var(--font-heading);font-size:18px}
+
+/* + Preis melden — bottom of the sheet: full-width amber outline */
+.vd-report-btn{display:flex;align-items:center;justify-content:center;width:100%;min-height:52px;padding:0 16px;background:#fff;border:2px solid var(--cta-bg);border-radius:14px;color:var(--amber-900);font-family:var(--font-heading);font-size:16px;font-weight:700;letter-spacing:.02em}
+.vd-report-btn:hover{background:var(--amber-50)}
+
+/* List card */
+.vl-where{font-size:12px;color:var(--text-muted)}
+.vl-brand{font-size:13px;color:var(--text-secondary)}
+.vl-price{gap:1px}
+.vl-distance{margin-top:4px;font-size:12px;font-weight:600;color:var(--text-secondary);white-space:nowrap}
+
+/* Desktop: details live in the left panel — a plain scrolling panel, no drag handle */
+@media (min-width:1024px){
+  .pub-panel--detail,.pub-panel--hood{animation:none}
+  .venue-detail{padding:8px 20px 28px}
+}
+
+/* The serve type inside the dark price block (was dark text on dark brown) */
+.vdp-brand .serve-type-tag{color:var(--amber-200);font-size:13px}
+/* Desktop: while a venue is open the left panel gives it the room — intro, CTA and chips step aside */
+@media (min-width:1024px){
+  [data-sheet=open] .pub-intro,[data-sheet=open] .pub-cta,[data-sheet=open] .pub-filters{display:none}
+}

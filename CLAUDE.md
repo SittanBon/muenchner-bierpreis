@@ -94,9 +94,15 @@ One DOM, two layouts (`.pub` in `index.css`, "PHASE 3" block at the end):
   `env(safe-area-inset-*)` work on iOS.
 - **Desktop (≥1024px)**: CSS grid — stats row, then a 400px left panel (intro,
   search, CTA, chips, list/detail) and the map. No bottom nav / sheet there.
-- **Bottom sheet** (`.pub-panel--detail|--hood`) is only for a venue's details or a
-  neighbourhood's venues (default stop "half"); the intro/search/CTA step aside
-  while it is open and the map pans so the selected pill stays visible above it.
+- **Bottom sheet** (`.pub-panel--detail|--hood`, gestures in `hooks/useSheetDrag.js`,
+  pure physics in `utils/sheetGesture.js`): only for a venue's details or a
+  neighbourhood's venues. Its BOTTOM is pinned just above the bottom nav and each stop
+  changes its HEIGHT (never translate it — that slid it over the nav and pushed the end
+  of the content off-screen): collapsed = 120px peek (name + price), half = 54%, full.
+  The handle follows the finger (pointer events); a flick moves one stop; swipe down at
+  the peek / drag past it dismisses; a tap cycles collapsed→half→full→half; tapping the
+  map above it (backdrop, half/full only) or Escape dismisses. The intro/search/CTA step
+  aside while it is open and the map pans so the selected pill stays visible above it.
 - **Price-first markers** (`MunichMap.jsx`, model in `utils/markerModel.js`): a pill
   with the ACTUAL headline price ("€4.20", or "€3.50·0.33L" when the size isn't
   0.5 L, "·?" when unknown), left border = venue type, tint = freshness
@@ -128,6 +134,28 @@ One DOM, two layouts (`.pub` in `index.css`, "PHASE 3" block at the end):
   `:root` make the fix one line (dark brown #3d2200 on #e8a020 = 6.6:1).
   (2) "+ Preis melden" opens the existing "Missing a bar" modal — Phase 7 builds the
   pick-a-venue flow. (3) No analytics exist, so no events were added.
+
+## Venue experience (P0 Phase 4)
+`VenueDetail.jsx` is the ONE detail view (mobile sheet and desktop left panel). Order:
+name · type + neighbourhood · price block (ACTUAL price large; size line "0,50L · Halbe";
+"ca. €5,30 / 0,50L" only when the size is known and ≠ 0.5 L; freshness with text;
+brand + serve type) · distance · opening hours · address · Route + Google Maps reviews ·
+other beers · price history · disclaimer · "+ Preis melden" (last, full-width amber outline,
+opens the unchanged 4-topic ReportForm). Rules live in `utils/venueView.js` (unit-tested):
+- **Never invent**: distance only with a real user position (`nearby.coords`) and venue
+  coordinates; opening hours are shown ONLY as the stored text, no open/closed claim and no
+  "hours unknown" line; serve type omitted when unknown (`ServeTypeTag hideUnknown`); an
+  unknown `serving_volume_ml` reads "Größe unbekannt" (0.5 L is never assumed); freshness
+  from `verified_at`/`price_observed_at` only, else "Datum unbekannt" (`updated` is ignored).
+- **Every additional beer** shows brand, size (or "Größe unbekannt"), actual price, serve type
+  (if known), its comparison price (if size known and ≠ 0.5 L) and its OWN freshness text.
+- **List card** (`VenueList.jsx`): name (DM Sans 600) · "type · neighbourhood" · brand ·
+  freshness text+dot on the left; price (DM Sans 700, 20px) · size · comparison · "📍 distance"
+  on the right; the whole card is one ≥64px button.
+- Google Maps: "Route" = `maps/dir/?api=1&destination=<name address>` (the address is only
+  appended when we have one — the old link could contain the text "undefined"); "⭐ Bewertungen
+  auf Google Maps" = the place search link. (There was NO reviews link before this phase.)
+- Desktop: while a venue is open the intro/CTA/chips step aside so the panel has room.
 
 ## Shared constants & consistency rules (READ BEFORE ADDING A FORM OR LABEL)
 Each of these has ONE source; components import it and never re-type it. Tests
@@ -327,11 +355,13 @@ Railway auto-deploys from main branch.
   prompt for this phase also covered parts of the spec's phases 4, 6 and 8, so
   these are DONE: price-first markers + selected/freshness states + clusters,
   filter chips, list view, bottom navigation, desktop sidebar + map/list sync.
-- ⬜ Still open from the spec: 4 price COLOUR scale + centralised thresholds and
-  "Diesen Bereich durchsuchen" · 5 venue bottom sheet content (ROUTE/DETAILS,
-  distance, normalised price line) · 6 list sorting (Nähe/Preis/Aktualität) ·
-  7 contribution ("Preis falsch?", pick-a-venue report flow) · 9 QA on real
-  iOS/Android devices
+- ✅ Phase 4 (the prompt's numbering; spec phase 5) — venue experience: draggable
+  bottom sheet, honest data display, multiple beers, list card, desktop panel
+  (see "Venue experience" above).
+- ⬜ Still open from the spec: price COLOUR scale + centralised thresholds and
+  "Diesen Bereich durchsuchen" · list sorting (Nähe/Preis/Aktualität) ·
+  contribution ("Preis falsch?" pre-filled correction, pick-a-venue report flow) ·
+  QA on real iOS/Android devices
 - Known remaining data-trust debt: seed-invented `reports` counts (the "N reports"
   badge) are still in the data. Every price shows "Datum unbekannt" until
   verified, re-reported or bulk-verified. The fabricated Price Trends

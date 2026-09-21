@@ -31,7 +31,7 @@ export const de = {
       genericError: "Etwas ist schiefgelaufen. Bitte erneut versuchen."
     },
     serveType: {
-      tap: "vom Fass",
+      tap: "Vom Fass",
       bottle: "Flasche",
       can: "Dose",
       unknown: "Unbekannt",
@@ -84,6 +84,8 @@ export const de = {
       address: "Adresse",
       hours: "Öffnungszeiten",
       directions: "Route",
+      reviews: "⭐ Bewertungen auf Google Maps",
+      distanceAway: "{{distance}} entfernt",
       otherBeers: "Weitere Biere hier",
       noHistory: "Noch keine Preisgeschichte für dieses Lokal.",
       brandsCount: "{{count}} Marken",
@@ -91,7 +93,6 @@ export const de = {
       current: "aktuell",
       disclaimer: "Preise sind community-gemeldete Schätzungen. Bitte vor dem Besuch vor Ort prüfen.",
       aboutLabel: "Über diesen Ort",
-      hoursUnknown: "Öffnungszeiten unbekannt",
       confidence: {
         low: "Wenig Daten",
         medium: "Einige Meldungen",
@@ -117,7 +118,6 @@ export const de = {
     },
     // Actual menu price is primary; the 0.5 L figure is only a comparison.
     price: {
-      forSize: "{{size}} Helles",
       sizeUnknown: "Größe unbekannt",
       approxPer05: `ca. {{price}} / ${REF_DE}`
     },
@@ -206,7 +206,7 @@ export const de = {
       noResults: "Keine Treffer für \"{{query}}\" — als neue Marke übernehmen"
     },
     report: {
-      button: "Preisänderung melden",
+      button: "+ Preis melden",
       title: "Was möchtest du melden?",
       back: "Zurück",
       topics: {
@@ -489,7 +489,7 @@ export const de = {
     sortBy: "Sortieren nach",
     sortPrice: "Preis",
     sortName: "Name",
-    backToMap: "Zurück zur Karte",
+    backToMap: "← Zurück",
     loading: "Wird geladen...",
     loadingVenues: "München-Lokale werden geladen…",
     loadError: "Daten konnten nicht geladen werden.",
@@ -640,6 +640,8 @@ export const en = {
       address: "Address",
       hours: "Opening hours",
       directions: "Directions",
+      reviews: "⭐ Reviews on Google Maps",
+      distanceAway: "{{distance}} away",
       otherBeers: "Other beers here",
       noHistory: "No price history for this venue yet.",
       brandsCount: "{{count}} brands",
@@ -647,7 +649,6 @@ export const en = {
       current: "current",
       disclaimer: "Prices are community-reported estimates. Please verify prices on site before visiting.",
       aboutLabel: "About this place",
-      hoursUnknown: "Opening hours unknown",
       confidence: {
         low: "Few reports",
         medium: "Some reports",
@@ -668,7 +669,6 @@ export const en = {
       observedOn: "Price reported on {{date}}"
     },
     price: {
-      forSize: "{{size}} Helles",
       sizeUnknown: "Size unknown",
       approxPer05: `approx. {{price}} / ${REF_EN}`
     },
@@ -757,7 +757,7 @@ export const en = {
       noResults: "No results for \"{{query}}\" — use as a new brand"
     },
     report: {
-      button: "Report a price change",
+      button: "+ Report price",
       title: "What would you like to report?",
       back: "Back",
       topics: {
@@ -1040,7 +1040,7 @@ export const en = {
     sortBy: "Sort by",
     sortPrice: "Price",
     sortName: "Name",
-    backToMap: "Back to map",
+    backToMap: "← Back",
     loading: "Loading...",
     loadingVenues: "Loading Munich venues…",
     loadError: "Couldn't load data.",
