@@ -22,6 +22,7 @@ import { ToastProvider } from './hooks/ToastProvider';
 const PriceTrends = lazy(() => import('./components/PriceTrends'));
 const AdminPage = lazy(() => import('./components/AdminPage'));
 const MissingBarModal = lazy(() => import('./components/MissingBarModal'));
+const ReportForm = lazy(() => import('./components/ReportForm'));
 import Footer from './components/Footer';
 import Impressum from './pages/Impressum';
 import Datenschutz from './pages/Datenschutz';
@@ -115,6 +116,8 @@ function AppContent({ navigate }) {
   const [selectedVenue, setSelectedVenue] = useState(null);
   const [view, setView] = useState('map');
   const [showMissingBar, setShowMissingBar] = useState(false);
+  const [missingQuery, setMissingQuery] = useState('');       // venue name typed in the report picker
+  const [report, setReport] = useState(null);                 // the report flow: { venue, topic } or null
   const [showTrends, setShowTrends] = useState(false);
   const [filters, setFilters] = useState(emptyFilters());
   const [searchQuery, setSearchQuery] = useState('');
@@ -272,7 +275,7 @@ function AppContent({ navigate }) {
   // Karte / Liste. Coming to the list, bring the venue that is highlighted on the map into view.
   const handleTab = useCallback((tab) => {
     setMobileTab(tab);
-    if (tab === 'list') setTimeout(() => document.querySelector('.vl-row.is-active')?.scrollIntoView({ block: 'center' }), 80);
+    if (tab === 'list') setTimeout(() => document.querySelector('.vl-item.is-active')?.scrollIntoView({ block: 'center' }), 80);
   }, []);
 
   const handleVenueClick = useCallback((venue) => {
@@ -362,7 +365,18 @@ function AppContent({ navigate }) {
     return () => window.removeEventListener('keydown', onKey);
   }, [panelMode, dismissSheet]);
 
-  const openReport = useCallback(() => setShowMissingBar(true), []);
+  // Two different things people can contribute:
+  //  * a price / info report about a venue we HAVE  -> the report flow (pick a venue first when
+  //    none is given: bottom nav, empty state); "Preis falsch?" and the sheet's report button
+  //    start it WITH the venue (and, for a correction, the topic) already chosen;
+  //  * a venue we DON'T have                        -> the "Missing a bar?" modal.
+  const openReport = useCallback(() => setReport({ venue: null, topic: null }), []);
+  const openReportFor = useCallback((venue, topic) => setReport({ venue, topic: topic || null }), []);
+  const closeReport = useCallback(() => setReport(null), []);
+  const openMissingBar = useCallback(() => { setMissingQuery(''); setShowMissingBar(true); }, []);
+  const newVenueFromReport = useCallback((query) => { setReport(null); setMissingQuery(query || ''); setShowMissingBar(true); }, []);
+  // "Zum Lokal →" in the duplicate check: leave the modal and open the venue we already have.
+  const openExistingVenue = useCallback((venue) => { setShowMissingBar(false); handleVenueClick(venue); }, [handleVenueClick]);
   const showListFromSearch = useCallback(() => setMobileTab('list'), []);
   const closeFilters = useCallback(() => setShowFilters(false), []);
 
@@ -492,7 +506,7 @@ function AppContent({ navigate }) {
           {pendingBounds && (
             <button type="button" className="search-area-btn" onClick={applyArea}>{t('map.searchArea')}</button>
           )}
-          <button className="missing-bar-fab" onClick={openReport}>
+          <button className="missing-bar-fab" onClick={openMissingBar}>
             <span className="missing-bar-fab-icon">🍺</span>
             {t('missingBar.fab')}
           </button>
@@ -587,7 +601,7 @@ function AppContent({ navigate }) {
 
           {panelMode === 'detail' ? (
             <div className="sidebar-content scrollable">
-              <VenueDetail venue={selectedVenue} onBack={handleBack} userLocation={nearbyActive ? nearby.coords : null} />
+              <VenueDetail venue={selectedVenue} onBack={handleBack} onReport={openReportFor} userLocation={nearbyActive ? nearby.coords : null} />
             </div>
           ) : panelMode === 'hood' ? (
             <VenuePanel
@@ -595,7 +609,7 @@ function AppContent({ navigate }) {
               venues={panelVenues}
               onVenueClick={handleVenueClick}
               onClose={() => selectNeighbourhood(null)}
-              onSubmitNew={openReport}
+              onSubmitNew={openMissingBar}
             />
           ) : (
             <div className="pub-list">
@@ -615,7 +629,7 @@ function AppContent({ navigate }) {
               ) : noVenues ? (
                 emptyState
               ) : (
-                <VenueList venues={listVenues} highlightId={highlightId} onVenueClick={handleVenueClick} onHover={setHighlightId} />
+                <VenueList venues={listVenues} highlightId={highlightId} onVenueClick={handleVenueClick} onHover={setHighlightId} onFixPrice={openReportFor} />
               )}
             </div>
           )}
@@ -631,7 +645,18 @@ function AppContent({ navigate }) {
             allVenues={allVenues}
             neighbourhoods={neighbourhoods}
             onClose={() => setShowMissingBar(false)}
+            onOpenVenue={openExistingVenue}
+            initialQuery={missingQuery}
             onCreated={loadSnapshot}
+          />
+        </Suspense>
+      )}
+
+      {report && (
+        <Suspense fallback={null}>
+          <ReportForm
+            venues={allVenues} venue={report.venue} initialTopic={report.topic}
+            onClose={closeReport} onNewVenue={newVenueFromReport}
           />
         </Suspense>
       )}

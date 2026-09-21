@@ -68,6 +68,12 @@ const {
   NOTES_MAX_LENGTH,
 } = require('./backend/utils/priceUtils');
 
+// Free text a visitor sends with a report (the note, or a proposed description) is capped —
+// the forms stop at 300 characters and the API enforces the same limit.
+const REPORT_NOTE_MAX = 300;
+// "Andere falsche Info" can name WHICH field is wrong; the admin sees it as a note prefix.
+const WRONG_FIELD_LABELS = { name: 'Name', address: 'Adresse', hours: 'Öffnungszeiten', brand: 'Biermarke', other: 'Andere' };
+
 const UPLOADS_DIR = path.join(__dirname, 'backend', 'uploads');
 fs.mkdirSync(UPLOADS_DIR, { recursive: true });
 const upload = multer({
@@ -239,11 +245,27 @@ app.post('/api/submissions', (req, res) => {
     visit_date,
     submitter_name,
     note,
+    wrong_field,
   } = req.body || {};
 
   const VALID_TYPES = ['price_change', 'new_beer', 'closed', 'other_info', 'suggest_description'];
   if (!VALID_TYPES.includes(report_type)) {
     return res.status(400).json({ error: 'Invalid report_type' });
+  }
+  if (note !== undefined && note !== null && typeof note !== 'string') {
+    return res.status(400).json({ error: 'Invalid note' });
+  }
+  if (typeof note === 'string' && note.length > REPORT_NOTE_MAX) {
+    return res.status(400).json({ error: `Note is too long (max ${REPORT_NOTE_MAX} characters)` });
+  }
+  // Which field is wrong — only meaningful for "other incorrect info". Validated against the
+  // known list and folded into the note so the admin queue needs no new column.
+  let composedNote = note || '';
+  if (wrong_field !== undefined && wrong_field !== null && wrong_field !== '') {
+    if (report_type !== 'other_info' || !Object.prototype.hasOwnProperty.call(WRONG_FIELD_LABELS, wrong_field)) {
+      return res.status(400).json({ error: 'Invalid wrong_field' });
+    }
+    composedNote = `[Falsches Feld: ${WRONG_FIELD_LABELS[wrong_field]}] ${composedNote}`.trim();
   }
 
   let numPrice = null;
@@ -316,7 +338,7 @@ app.post('/api/submissions', (req, res) => {
       ? normalizeServeType(serve_type) : null,
     visit_date: resolvedVisitDate,
     submitter_name: submitter_name || 'Anonym',
-    note: note || '',
+    note: composedNote,
     status: 'pending',
     is_outlier: isOutlier ? 1 : 0,
     created_at: new Date().toISOString(),
@@ -432,6 +454,10 @@ app.post('/api/submissions/new-venue', upload.single('photo'), (req, res) => {
   if (!isValidSize(newVenueSize)) {
     if (req.file) fs.unlink(req.file.path, () => {});
     return res.status(400).json({ error: 'Invalid size' });
+  }
+  if (typeof note === 'string' && note.length > REPORT_NOTE_MAX) {
+    if (req.file) fs.unlink(req.file.path, () => {});
+    return res.status(400).json({ error: `Note is too long (max ${REPORT_NOTE_MAX} characters)` });
   }
   let newVenueVisitDate = todayISO();
   if (visit_date !== undefined && visit_date !== null && visit_date !== '') {

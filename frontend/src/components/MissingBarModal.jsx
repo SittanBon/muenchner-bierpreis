@@ -8,8 +8,12 @@ import { parsePrice, formatEuro, pricePlaceholder } from '../utils/price';
 import { todayISO } from '../utils/freshness';
 import { DEFAULT_SERVING_ML, servingSizeByMl, servingLabel, wireSizeFromMl } from '../constants/servingSizes';
 import ServingSizeSelect from './ServingSizeSelect';
+import ServeTypeSelect from './ServeTypeSelect';
+import { serveTypeText } from '../constants/serveTypes';
 import { VENUE_TYPES } from '../constants/venueTypes';
 import { neighbourhoodName } from '../utils/neighbourhoods';
+import { normalizeText } from '../utils/adminSearch';
+import { formatPrice } from '../utils/priceUtils';
 
 const MAX_BEERS = 5;
 function emptyBeer() { return { brand: '', serve_type: 'unknown', size_05: '', size_mass: '', size_ml: DEFAULT_SERVING_ML }; }
@@ -26,11 +30,11 @@ function emptyForm() {
   };
 }
 
-export default function MissingBarModal({ allVenues, neighbourhoods = [], onClose, onCreated }) {
+export default function MissingBarModal({ allVenues, neighbourhoods = [], onClose, onCreated, onOpenVenue, initialQuery = '' }) {
   const { t, i18n } = useTranslation();
   const showToast = useToast();
   const [step, setStep] = useState(1);
-  const [query, setQuery] = useState('');
+  const [query, setQuery] = useState(initialQuery);
   const [searching, setSearching] = useState(false);
   const [searchError, setSearchError] = useState('');
   const [results, setResults] = useState(null);
@@ -47,12 +51,12 @@ export default function MissingBarModal({ allVenues, neighbourhoods = [], onClos
   const addBeerRow = () => setForm((f) => (f.beers.length >= MAX_BEERS ? f : { ...f, beers: [...f.beers, emptyBeer()] }));
   const removeBeerRow = (i) => setForm((f) => ({ ...f, beers: f.beers.filter((_, idx) => idx !== i) }));
 
-  // Live local match against the existing database — cheap client-side filter,
-  // no rate limit to worry about, so this runs on every keystroke.
+  // Live match against the venues we already have — a cheap client-side filter (no rate limit),
+  // so it runs on every keystroke. Case and accents are ignored ("cafe" finds "Café Kosmos").
   const dbMatches = useMemo(() => {
-    const q = query.trim().toLowerCase();
+    const q = normalizeText(query.trim());
     if (q.length < 3) return [];
-    return (allVenues || []).filter((v) => v.name.toLowerCase().includes(q)).slice(0, 4);
+    return (allVenues || []).filter((v) => normalizeText(v.name).includes(q)).slice(0, 3);
   }, [allVenues, query]);
 
   const runSearch = async () => {
@@ -149,7 +153,6 @@ export default function MissingBarModal({ allVenues, neighbourhoods = [], onClos
     try {
       await submitNewVenue(fd);
       setSuccess(true);
-      showToast('success', t('toast.missingVenueSuccess'));
       onCreated?.();
     } catch (err) {
       setSubmitError(err.message);
@@ -171,6 +174,8 @@ export default function MissingBarModal({ allVenues, neighbourhoods = [], onClos
           <div className="missing-bar-success">
             <div className="mb-success-icon">🍺</div>
             <p>{t('missingBar.success')}</p>
+            {/* the location we received — the same pin preview as on the confirm step */}
+            <MiniMapPreview lat={form.lat ? parseFloat(form.lat) : null} lng={form.lng ? parseFloat(form.lng) : null} />
             <button className="sf-submit" onClick={onClose}>{t('admin.venues.close')}</button>
           </div>
         ) : (
@@ -203,13 +208,25 @@ export default function MissingBarModal({ allVenues, neighbourhoods = [], onClos
                 </div>
 
                 {dbMatches.length > 0 && (
-                  <div className="mb-db-warning">
-                    ⚠️ {t('missingBar.mightExist')}
-                    <ul>
-                      {dbMatches.map((v) => (
-                        <li key={v.id}>{t('missingBar.didYouMean', { name: v.name })}</li>
-                      ))}
-                    </ul>
+                  <div className="mb-exists" role="alert">
+                    <div className="mb-exists-title">⚠️ {t('missingBar.existsTitle')}</div>
+                    {dbMatches.map((v) => {
+                      const beer = v.beers?.[0];
+                      const area = i18n.language === 'de' ? v.neighbourhood_name_de : v.neighbourhood_name_en;
+                      return (
+                        <div key={v.id} className="mb-exists-card">
+                          <div className="mb-exists-main">
+                            <div className="mb-exists-name">{v.name}</div>
+                            <div className="mb-exists-sub">{[t(`filters.types.${v.type}`), area].filter(Boolean).join(' · ')}</div>
+                          </div>
+                          {beer && beer.size_05 > 0 && <div className="mb-exists-price">{formatPrice(beer.size_05, i18n.language)}</div>}
+                          {onOpenVenue && (
+                            <button type="button" className="mb-goto" onClick={() => onOpenVenue(v)}>{t('missingBar.goToVenue')}</button>
+                          )}
+                        </div>
+                      );
+                    })}
+                    <button type="button" className="mb-add-anyway" onClick={addManually}>{t('missingBar.addAnyway')}</button>
                   </div>
                 )}
 
@@ -274,12 +291,7 @@ export default function MissingBarModal({ allVenues, neighbourhoods = [], onClos
                     </div>
                     <div className="sf-field">
                       <label>{t('serveType.question')}</label>
-                      <select value={b.serve_type} onChange={(e) => setBeerField(i, 'serve_type', e.target.value)}>
-                        <option value="tap">🍺 {t('serveType.tap')}</option>
-                        <option value="bottle">🍾 {t('serveType.bottle')}</option>
-                        <option value="can">🥫 {t('serveType.can')}</option>
-                        <option value="unknown">❓ {t('serveType.dontKnow')}</option>
-                      </select>
+                      <ServeTypeSelect value={b.serve_type} onChange={(v) => setBeerField(i, 'serve_type', v)} />
                     </div>
                     <div className="sf-row">
                       <div className="sf-field half">
@@ -368,7 +380,7 @@ export default function MissingBarModal({ allVenues, neighbourhoods = [], onClos
                     return (
                       <div key={i} className="mb-summary-row">
                         🍺 {b.brand} — {formatEuro(p05, i18n.language)} ({servingLabel(b.size_ml, i18n.language)}){pMass != null ? ` / ${formatEuro(pMass, i18n.language)} (${massName})` : ''}
-                        {' · '}{b.serve_type === 'unknown' ? t('serveType.unknownFull') : t(`serveType.${b.serve_type}`)}
+                        {serveTypeText(b.serve_type, i18n.language) && <> · {serveTypeText(b.serve_type, i18n.language)}</>}
                       </div>
                     );
                   })}

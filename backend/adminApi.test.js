@@ -498,3 +498,77 @@ describe('venue types', () => {
     assert.equal((await get('/api/admin/submissions?status=pending')).body.length, pendingBefore);
   });
 });
+
+// ─── Report notes: length cap and "which field is wrong" ─────────────────────
+describe('report notes (Phase 6)', () => {
+  let venue;
+  before(async () => { venue = (await get('/api/venues', { auth: '' })).body.find((v) => v.beers.length); });
+  const send = (over) => post('/api/submissions', { report_type: 'other_info', venue_id: venue.id, note: 'Adresse stimmt nicht', ...over }, { auth: '' });
+  const queueNote = async (id) => (await get('/api/admin/submissions?status=pending')).body.find((s) => s.id === id)?.note;
+
+  test('a note of exactly 300 characters is accepted; 301 is a 400 — for every report type that carries one', async () => {
+    assert.equal((await send({ note: 'x'.repeat(300) })).status, 201);
+    for (const report_type of ['other_info', 'suggest_description']) {
+      assert.equal((await send({ report_type, note: 'x'.repeat(301) })).status, 400, report_type);
+    }
+    const p = { report_type: 'price_change', beer_brand: venue.beers[0].brand, price: 4.5, size: '0.5L' };
+    assert.equal((await send({ ...p, note: 'x'.repeat(301) })).status, 400, 'price_change');
+    assert.equal((await send({ report_type: 'closed', note: 'y'.repeat(301) })).status, 400, 'closed');
+  });
+
+  test('a non-string note is refused (it used to throw on .trim())', async () => {
+    for (const note of [42, {}, ['a']]) assert.equal((await send({ note })).status, 400, JSON.stringify(note));
+  });
+
+  test('"closed" needs no note at all (one-tap confirm)', async () => {
+    assert.equal((await send({ report_type: 'closed', note: undefined })).status, 201);
+  });
+
+  test('wrong_field is validated and shown to the admin as a note prefix', async () => {
+    const r = await send({ wrong_field: 'hours', note: 'Sonntags geschlossen' });
+    assert.equal(r.status, 201, JSON.stringify(r.body));
+    assert.equal(await queueNote(r.body.id), '[Falsches Feld: Öffnungszeiten] Sonntags geschlossen');
+    for (const [k, label] of Object.entries({ name: 'Name', address: 'Adresse', brand: 'Biermarke', other: 'Andere' })) {
+      const x = await send({ wrong_field: k, note: 'n' });
+      assert.equal(await queueNote(x.body.id), `[Falsches Feld: ${label}] n`, k);
+    }
+  });
+
+  test('an empty wrong_field is ignored; an unknown one, or one on another report type, is a 400', async () => {
+    const ok = await send({ wrong_field: '', note: 'nur Text' });
+    assert.equal(ok.status, 201);
+    assert.equal(await queueNote(ok.body.id), 'nur Text');
+    assert.equal((await send({ wrong_field: 'password' })).status, 400);
+    assert.equal((await send({ wrong_field: '__proto__' })).status, 400);
+    assert.equal((await send({ report_type: 'closed', wrong_field: 'name' })).status, 400);
+  });
+
+  test('the "Missing a bar?" note is capped at 300 too, and nothing is stored when refused', async () => {
+    const hood = (await get('/api/venues', { auth: '' })).body[0].neighbourhood_id;
+    const before = (await get('/api/admin/submissions?status=pending')).body.length;
+    const body = { name: 'Zu lange Notiz', type: 'bar', neighbourhood_id: hood, beer_brand: 'Augustiner', size_05: 4.5, note: 'z'.repeat(301) };
+    assert.equal((await post('/api/submissions/new-venue', body, { auth: '' })).status, 400);
+    assert.equal((await get('/api/admin/submissions?status=pending')).body.length, before);
+    assert.equal((await post('/api/submissions/new-venue', { ...body, note: 'z'.repeat(300) }, { auth: '' })).status, 201);
+  });
+});
+
+// ─── The report form's limits are the API's limits ──────────────────────────
+describe('report form limits agree with the API', () => {
+  test('note length, price bounds and the wrong-field choices are exactly what the form uses', async () => {
+    const { pathToFileURL } = require('url');
+    const o = await import(pathToFileURL(path.join(ROOT, 'frontend', 'src', 'constants', 'reportOptions.js')).href);
+    const venue = (await get('/api/venues', { auth: '' })).body.find((v) => v.beers.length);
+    const brand = venue.beers[0].brand;
+    const send = (over) => post('/api/submissions', { report_type: 'other_info', venue_id: venue.id, note: 'x', ...over }, { auth: '' });
+    const price = (p) => post('/api/submissions', { report_type: 'price_change', venue_id: venue.id, beer_brand: brand, size: '0.5L', price: p }, { auth: '' });
+
+    assert.equal((await send({ note: 'x'.repeat(o.NOTE_MAX) })).status, 201, 'exactly NOTE_MAX is accepted');
+    assert.equal((await send({ note: 'x'.repeat(o.NOTE_MAX + 1) })).status, 400, 'one more is refused');
+    for (const f of o.WRONG_FIELDS) assert.equal((await send({ wrong_field: f })).status, 201, `wrong_field ${f}`);
+    assert.equal((await price(o.PRICE_MIN)).status, 201, 'PRICE_MIN accepted');
+    assert.equal((await price(o.PRICE_MAX)).status, 201, 'PRICE_MAX accepted');
+    assert.equal((await price(o.PRICE_MIN - 0.01)).status, 400, 'below PRICE_MIN refused');
+    assert.equal((await price(o.PRICE_MAX + 0.01)).status, 400, 'above PRICE_MAX refused');
+  });
+});

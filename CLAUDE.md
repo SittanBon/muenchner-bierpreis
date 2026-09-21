@@ -191,6 +191,37 @@ opens the unchanged 4-topic ReportForm). Rules live in `utils/venueView.js` (uni
   level with its name and range (always on desktop, behind a "Preisniveau" toggle on mobile).
   The thresholds are the ones requested for current Munich data — revisit them as data changes.
 
+## Contribution (P0 Phase 6)
+- **Report flow** (`ReportForm.jsx`, rules in `utils/reportFlow.js`, unit-tested): one modal (bottom
+  sheet on phones) for EVERY report entry. (venue picker →) **1** four large cards (💶 Preis hat sich
+  geändert · 🍺 Anderes Bier verfügbar · 🔒 Lokal dauerhaft geschlossen · ℹ️ Andere falsche Info;
+  "Beschreibung vorschlagen" stays as a small link) → **2** details → **3** confirmation. Entries:
+  bottom-nav "+ Preis melden" and the empty state open it WITHOUT a venue (picker first; "Lokal nicht
+  dabei?" leads to the Missing-bar modal); the venue sheet's "+ Preis melden" and both
+  "Preis falsch? → Korrigieren" links open it WITH the venue.
+- **Details**: price topics = brand, serving size (SERVING_SIZES), new price (4,80 / 4.80), optional
+  serve type, "Wann hast du diesen Preis gesehen?" (defaults to today in Munich, never future), name /
+  Anonym. Closed = "Bist du sicher?" + one confirm, sent anonymously, no other fields. Other info =
+  optional "which field" (name/address/hours/brand/other → stored as a `[Falsches Feld: …]` note
+  prefix) + text ≤ 300 chars. The API enforces the same limits (`constants/reportOptions.js` is read
+  by a backend test): notes ≤ 300 (all report types and "Missing a bar?"), price €1–30.
+- **"Preis falsch?"** pre-fills: venue, topic "Preis hat sich geändert", the brand ONLY if the venue
+  lists exactly one, the serving size of that beer (several brands: the headline beer's; picking a
+  listed brand switches it). An UNKNOWN size stays empty and must be chosen — 0.5 L is never assumed.
+  The list card is a `li` holding the row button AND a separate correction button (a card cannot be a
+  button that contains a button).
+- **Confirmation**: animated green check, "Danke für deine Meldung! 🍺", a summary of what was sent,
+  "Schließen", auto-closes after 3 s; never shows an id, status or queue information. The text
+  merges the two requested wordings ("within 48 hours" and "as soon as possible"). Escape closes the
+  sheet unless focus is in a form field (it belongs to the field there).
+- **"Missing a bar?"**: the live duplicate check (accent/case-insensitive, ≥3 chars) shows the existing
+  venue as a card with "Zum Lokal →" (opens it) and "Trotzdem hinzufügen"; the success screen shows a
+  map preview with a visible pin (the pin marker had NO style before — previews showed no pin).
+- **Serve types**: `constants/serveTypes.js` (tap / bottle / can with DE + EN labels and icons;
+  "unknown" is deliberately not in it — unknown is omitted where a type is displayed and is the
+  "Weiß nicht" option in forms). One `<ServeTypeSelect>` everywhere; a backend test checks parity and
+  scans the source for hardcoded serve-type emoji/labels. EN "Tap" is now "On Tap".
+
 ## Shared constants & consistency rules (READ BEFORE ADDING A FORM OR LABEL)
 Each of these has ONE source; components import it and never re-type it. Tests
 fail if a copy drifts.
@@ -395,8 +426,11 @@ Railway auto-deploys from main branch.
 - ✅ Phase 5 (the prompt's numbering; spec phases 4/6) — discovery: list header + sorting,
   map/list sync, "Diesen Bereich durchsuchen", filter badge/reset/persistence, honest
   "Jetzt geöffnet", data-driven price-level colours + legend (see "Discovery" above).
-- ⬜ Still open from the spec: contribution ("Preis falsch?" pre-filled correction, pick-a-venue
-  report flow) · QA on real iOS/Android devices
+- ✅ Phase 6 — contribution: stepped report flow with venue picker, "Preis falsch?" pre-filled
+  corrections, confirmation screen, duplicate check + map preview for "Missing a bar?", serve-type
+  constant (see "Contribution" above).
+- ⬜ Still open from the spec: QA on real iOS/Android devices · a photo upload for price reports
+  (spec: optional) · analytics events (no analytics exists)
 - Known remaining data-trust debt: seed-invented `reports` counts (the "N reports"
   badge) are still in the data. Every price shows "Datum unbekannt" until
   verified, re-reported or bulk-verified. The fabricated Price Trends

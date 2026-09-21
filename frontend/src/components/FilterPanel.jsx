@@ -1,14 +1,9 @@
 import { useTranslation } from 'react-i18next';
 import { BRAND_GROUPS } from '../constants/brands';
 import { VENUE_TYPES } from '../constants/venueTypes';
+import { SERVE_TYPES, UNKNOWN_SERVE_TYPE, serveTypeText } from '../constants/serveTypes';
 import { neighbourhoodName } from '../utils/neighbourhoods';
 
-const SERVE_TYPES = [
-  { id: 'tap', icon: '🍺' },
-  { id: 'bottle', icon: '🍾' },
-  { id: 'can', icon: '🥫' },
-  { id: 'unknown', icon: '❓' },
-];
 // "Other / Andere" and "Craft Beer (lokal)" are free-text catch-alls for
 // reporting a brand — they never match an actual venue's data, so they're
 // meaningless as filter options here.
@@ -49,7 +44,8 @@ export default function FilterPanel({ filters, onFilterChange, neighbourhoods, o
         <label className="filter-label" htmlFor="f-serve">{t('filters.serveType')}</label>
         <select id="f-serve" value={filters.serve_type || '__all__'} onChange={(e) => setFilter('serve_type', e.target.value)}>
           <option value="__all__">{t('filters.all')}</option>
-          {SERVE_TYPES.map((s) => <option key={s.id} value={s.id}>{s.icon} {t(`serveType.${s.id}`)}</option>)}
+          {SERVE_TYPES.map((s) => <option key={s.value} value={s.value}>{serveTypeText(s.value, i18n.language)}</option>)}
+          <option value={UNKNOWN_SERVE_TYPE}>❓ {t('serveType.unknown')}</option>
         </select>
       </div>
 

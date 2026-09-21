@@ -11,7 +11,7 @@ import { formatDistance } from '../utils/geo';
 //           comparison (only when the size is known and isn't 0.5 L), and the distance.
 // The distance appears only when the venue carries a real `distance_m` (the user shared
 // their location) — never a made-up one. An unknown serving size says "Größe unbekannt".
-const VenueRow = memo(function VenueRow({ venue, active, onClick, onHover }) {
+const VenueRow = memo(function VenueRow({ venue, active, onClick, onHover, onFixPrice }) {
   const { t, i18n } = useTranslation();
   const lang = i18n.language;
   const ref = useRef(null);
@@ -20,15 +20,15 @@ const VenueRow = memo(function VenueRow({ venue, active, onClick, onHover }) {
   const area = lang === 'de' ? venue.neighbourhood_name_de : venue.neighbourhood_name_en;
   const where = [t(`filters.types.${venue.type}`), area].filter(Boolean).join(' · ');
 
-  // A marker tapped on the map scrolls its card into view (map <-> list stay in step).
+  // A marker tapped on the map scrolls its WHOLE card (row + correction link) into view (map <-> list stay in step).
   useEffect(() => {
     if (active && ref.current?.scrollIntoView) ref.current.scrollIntoView({ block: 'nearest' });
   }, [active]);
 
   return (
-    <li>
+    <li ref={ref} className={`vl-item${active ? ' is-active' : ''}`}>
       <button
-        ref={ref} type="button" className={`vl-row${active ? ' is-active' : ''}`}
+        type="button" className="vl-row"
         onClick={() => onClick(venue)}
         onMouseEnter={() => onHover?.(venue.id)} onMouseLeave={() => onHover?.(null)}
         onFocus={() => onHover?.(venue.id)} onBlur={() => onHover?.(null)}
@@ -48,17 +48,24 @@ const VenueRow = memo(function VenueRow({ venue, active, onClick, onHover }) {
           {distance && <span className="vl-distance">📍 {distance}</span>}
         </span>
       </button>
+      {/* A separate control (a card cannot be a button that contains a button): the subtle
+          "Preis falsch? → Korrigieren" — opens the report flow pre-filled for this venue. */}
+      {beer && onFixPrice && (
+        <button type="button" className="wrong-price-link vl-fix" onClick={() => onFixPrice(venue, 'price_change')}>
+          {t('report.wrongPrice')}
+        </button>
+      )}
     </li>
   );
 });
 
 // The venue list: same dataset, filters and search as the map (App passes the very
 // same array), already sorted by the caller.
-export default function VenueList({ venues, highlightId, onVenueClick, onHover }) {
+export default function VenueList({ venues, highlightId, onVenueClick, onHover, onFixPrice }) {
   return (
     <ul className="vl-list">
       {venues.map((v) => (
-        <VenueRow key={v.id} venue={v} active={v.id === highlightId} onClick={onVenueClick} onHover={onHover} />
+        <VenueRow key={v.id} venue={v} active={v.id === highlightId} onClick={onVenueClick} onHover={onHover} onFixPrice={onFixPrice} />
       ))}
     </ul>
   );

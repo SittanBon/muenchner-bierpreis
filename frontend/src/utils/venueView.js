@@ -7,6 +7,7 @@
 import { distanceMeters, formatDistance } from './geo';
 import { servingSizeByMl } from '../constants/servingSizes';
 import { formatVolume, isValidVolume } from './priceUtils';
+import { isKnownServeType } from '../constants/serveTypes';
 
 const finite = (n) => typeof n === 'number' && Number.isFinite(n);
 
@@ -37,7 +38,7 @@ export function hoursText(venue) {
 
 // The serve type worth showing: 'tap' | 'bottle' | 'can', or null when unknown.
 export function knownServeType(beer) {
-  return ['tap', 'bottle', 'can'].includes(beer?.serve_type) ? beer.serve_type : null;
+  return isKnownServeType(beer?.serve_type) ? beer.serve_type : null;
 }
 
 // Google Maps links. Directions opens turn-by-turn to the venue; reviews opens the

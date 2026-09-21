@@ -13,12 +13,11 @@ import { venueMatchesQuery } from '../utils/adminSearch';
 import { flagSeverity } from '../utils/dataQualityFlags';
 import { DEFAULT_SERVING_ML, servingLabel } from '../constants/servingSizes';
 import ServingSizeSelect from './ServingSizeSelect';
+import SharedServeTypeSelect from './ServeTypeSelect';
 import FreshnessLight from './FreshnessLight';
 import { VENUE_TYPES } from '../constants/venueTypes';
 import { neighbourhoodName } from '../utils/neighbourhoods';
 
-const SERVE_TYPES = ['tap', 'bottle', 'can', 'unknown'];
-const SERVE_EMOJI = { tap: '🍺', bottle: '🍾', can: '🥫', unknown: '❓' };
 
 function emptyBeer() { return { brand: '', size_05: '', size_mass: '', serve_type: 'unknown', serving_volume_ml: String(DEFAULT_SERVING_ML) }; }
 
@@ -55,14 +54,7 @@ function BeerPriceInputs({ value, onField }) {
 }
 
 function ServeTypeSelect({ value, onChange, id }) {
-  const { t } = useTranslation();
-  return (
-    <select id={id} className="vm-serve-select" value={value || 'unknown'} onChange={(e) => onChange(e.target.value)}>
-      {SERVE_TYPES.map((s) => (
-        <option key={s} value={s}>{SERVE_EMOJI[s]} {t(`serveType.${s}`)}</option>
-      ))}
-    </select>
-  );
+  return <SharedServeTypeSelect id={id} className="vm-serve-select" value={value} onChange={onChange} unknownKey="serveType.unknown" />;
 }
 
 function detailsFromVenue(venue) {

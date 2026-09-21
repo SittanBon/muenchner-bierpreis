@@ -7,10 +7,9 @@ import { todayISO } from '../utils/freshness';
 import { useToast } from '../hooks/useToast';
 import FreshnessLight from './FreshnessLight';
 import ServingSizeSelect from './ServingSizeSelect';
+import ServeTypeSelect from './ServeTypeSelect';
 import PriceHistoryTable from './PriceHistoryTable';
 
-const SERVE_TYPES = ['tap', 'bottle', 'can', 'unknown'];
-const SERVE_EMOJI = { tap: '🍺', bottle: '🍾', can: '🥫', unknown: '❓' };
 
 // The admin price editor for ONE beer at a venue.
 //
@@ -153,9 +152,7 @@ export default function BeerPriceEditor({
 
         <div className="pe-field">
           <label htmlFor={`${id}-serve`}>{t('serveType.question')}</label>
-          <select id={`${id}-serve`} className="vm-serve-select" value={serve} onChange={(e) => setServe(e.target.value)}>
-            {SERVE_TYPES.map((s) => <option key={s} value={s}>{SERVE_EMOJI[s]} {t(`serveType.${s}`)}</option>)}
-          </select>
+          <ServeTypeSelect id={`${id}-serve`} className="vm-serve-select" value={serve} onChange={setServe} unknownKey="serveType.unknown" />
         </div>
       </div>
 

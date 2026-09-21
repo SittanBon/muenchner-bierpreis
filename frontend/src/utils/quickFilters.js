@@ -11,12 +11,14 @@
 // A venue whose hours are missing/unreadable is never shown as open. It is only offered
 // when at least one venue has readable hours (App decides) — otherwise it stays "Demnächst".
 
+import { SERVE_TAP } from '../constants/serveTypes';
+
 export const QUICK_FILTERS = [
   { id: 'max4', patch: { max_price: '4.00' }, isActive: (f) => Number.parseFloat(f.max_price) === 4 },
   { id: 'max5', patch: { max_price: '5.00' }, isActive: (f) => Number.parseFloat(f.max_price) === 5 },
   { id: 'garden', patch: { type: 'beer_garden' }, isActive: (f) => f.type === 'beer_garden' },
   { id: 'hall', patch: { type: 'beer_hall' }, isActive: (f) => f.type === 'beer_hall' },
-  { id: 'tap', patch: { serve_type: 'tap' }, isActive: (f) => f.serve_type === 'tap' },
+  { id: 'tap', patch: { serve_type: SERVE_TAP }, isActive: (f) => f.serve_type === SERVE_TAP },
 ];
 // Not in QUICK_FILTERS (it has its own availability rule and chip) but part of `filters`.
 export const OPEN_NOW_CHIP = { id: 'open', patch: { open_now: true }, isActive: (f) => !!f.open_now };
@@ -44,7 +46,7 @@ export function extraActiveFilters(filters) {
   if (filters.brand) extras.push({ id: 'brand', clear: { brand: '' }, value: filters.brand });
   if (filters.neighbourhood) extras.push({ id: 'neighbourhood', clear: { neighbourhood: '' }, value: filters.neighbourhood });
   if (filters.type && !quickTypes.includes(filters.type)) extras.push({ id: 'type', clear: { type: '' }, value: filters.type });
-  if (filters.serve_type && filters.serve_type !== 'tap') extras.push({ id: 'serve_type', clear: { serve_type: '' }, value: filters.serve_type });
+  if (filters.serve_type && filters.serve_type !== SERVE_TAP) extras.push({ id: 'serve_type', clear: { serve_type: '' }, value: filters.serve_type });
   if (filters.min_price) extras.push({ id: 'min_price', clear: { min_price: '' }, value: filters.min_price });
   const max = Number.parseFloat(filters.max_price);
   if (filters.max_price && max !== 4 && max !== 5) extras.push({ id: 'max_price', clear: { max_price: '' }, value: filters.max_price });

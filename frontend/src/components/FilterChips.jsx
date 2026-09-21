@@ -2,6 +2,7 @@ import { useTranslation } from 'react-i18next';
 import { ChevronDown, X } from 'lucide-react';
 import { QUICK_FILTERS, OPEN_NOW_CHIP, toggleQuickFilter, extraActiveFilters } from '../utils/quickFilters';
 import { neighbourhoodName } from '../utils/neighbourhoods';
+import { serveTypeLabel } from '../constants/serveTypes';
 
 // One horizontally scrolling row of filter chips (no wrapping, no visible scrollbar):
 //   [≤ €4] [≤ €5] [Biergarten] [Wirtshaus] [Vom Fass] [Jetzt geöffnet ·soon] (extras) [Mehr ↓]
@@ -26,7 +27,7 @@ export default function FilterChips({
       case 'brand': return e.value;
       case 'neighbourhood': return neighbourhoodName(neighbourhoods.find((n) => n.id === e.value), i18n.language);
       case 'type': return t(`filters.types.${e.value}`);
-      case 'serve_type': return t(`serveType.${e.value}`);
+      case 'serve_type': return serveTypeLabel(e.value, i18n.language) || t('serveType.unknown');
       case 'min_price': return `${t('filters.priceMin')} ${e.value}`;
       case 'max_price': return `${t('filters.priceMax')} ${e.value}`;
       default: return e.value;
@@ -43,7 +44,7 @@ export default function FilterChips({
             key={q.id} type="button" className={`chip-btn${active ? ' is-active' : ''}`} aria-pressed={active}
             onClick={() => onFilterChange(toggleQuickFilter(filters, q.id))}
           >
-            {t(`chips.${q.id}`)}
+            {q.id === 'tap' ? serveTypeLabel(q.patch.serve_type, i18n.language) : t(`chips.${q.id}`)}
           </button>
         );
       })}

@@ -15,7 +15,7 @@ export default function MiniMapPreview({ lat, lng, className = 'mini-map-preview
       dragging: false, scrollWheelZoom: false, doubleClickZoom: false, attributionControl: false,
     });
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { subdomains: 'abc', maxZoom: 19 }).addTo(mapRef.current);
-    const icon = L.divIcon({ className: 'venue-pin', html: '<span class="venue-pin-dot"></span>', iconSize: [14, 14], iconAnchor: [7, 7] });
+    const icon = L.divIcon({ className: 'venue-pin', html: '<span class="venue-pin-dot"></span>', iconSize: [22, 22], iconAnchor: [11, 11] });
     L.marker([lat, lng], { icon }).addTo(mapRef.current);
     return () => { mapRef.current?.remove(); mapRef.current = null; };
   }, [lat, lng]);

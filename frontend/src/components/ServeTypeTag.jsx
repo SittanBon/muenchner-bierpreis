@@ -1,6 +1,5 @@
 import { useTranslation } from 'react-i18next';
-
-const EMOJI = { tap: '🍺', bottle: '🍾', can: '🥫' };
+import { serveTypeText, isKnownServeType } from '../constants/serveTypes';
 
 // Two places use this: the venue detail page ('detail' — a small text tag,
 // unknown rendered as small/muted/italic per the "never hide, never leave a
@@ -10,13 +9,14 @@ const EMOJI = { tap: '🍺', bottle: '🍾', can: '🥫' };
 // hideUnknown: render NOTHING when the serve type isn't known (the venue sheet /
 // list never say "Zapfart unbekannt" — an unknown is simply left out there).
 export default function ServeTypeTag({ serveType, variant = 'detail', hideUnknown = false }) {
-  const { t } = useTranslation();
-  const known = serveType && serveType !== 'unknown' && EMOJI[serveType];
+  const { t, i18n } = useTranslation();
+  const known = isKnownServeType(serveType);
+  const text = serveTypeText(serveType, i18n.language);
 
   if (variant === 'badge') {
     return (
       <span className={`serve-badge ${known ? '' : 'serve-badge-unknown'}`}>
-        {known ? `${EMOJI[serveType]} ${t(`serveType.${serveType}`)}` : '❓'}
+        {known ? text : '❓'}
       </span>
     );
   }
@@ -25,5 +25,5 @@ export default function ServeTypeTag({ serveType, variant = 'detail', hideUnknow
   if (!known) {
     return <span className="serve-type-unknown">{t('serveType.unknownFull')}</span>;
   }
-  return <span className="serve-type-tag">{EMOJI[serveType]} {t(`serveType.${serveType}`)}</span>;
+  return <span className="serve-type-tag">{text}</span>;
 }

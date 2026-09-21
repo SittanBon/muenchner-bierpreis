@@ -1,7 +1,6 @@
-import { useState, useEffect, useMemo, useRef, Suspense, lazy } from 'react';
+import { useState, useEffect, useMemo, Suspense, lazy } from 'react';
 import { useTranslation } from 'react-i18next';
 import { fetchVenue } from '../hooks/useApi';
-import ReportForm from './ReportForm';
 import FreshnessLight from './FreshnessLight';
 import ServeTypeTag from './ServeTypeTag';
 import VenueTypeIcon from './VenueTypeIcon';
@@ -28,14 +27,11 @@ function SizeLine({ beer, className = '' }) {
 // address · directions + reviews · other beers · price history · report button.
 // Anything we do not actually know (distance, hours, serve type) is left out — never
 // replaced by a placeholder claim.
-export default function VenueDetail({ venue: initialVenue, onBack, userLocation = null }) {
+export default function VenueDetail({ venue: initialVenue, onBack, onReport, userLocation = null }) {
   const { t, i18n } = useTranslation();
   const lang = i18n.language;
   const [venue, setVenue] = useState(initialVenue);
-  const [showReport, setShowReport] = useState(false);
-  const [submitSuccess, setSubmitSuccess] = useState(false);
   const [loading, setLoading] = useState(false);
-  const reportRef = useRef(null);
 
   useEffect(() => {
     setLoading(true);
@@ -58,17 +54,6 @@ export default function VenueDetail({ venue: initialVenue, onBack, userLocation 
   const distance = distanceText(userLocation, venue, lang);
   const hours = hoursText(venue);
   const area = lang === 'de' ? venue.neighbourhood_name_de : venue.neighbourhood_name_en;
-
-  const handleSubmitSuccess = () => {
-    setShowReport(false);
-    setSubmitSuccess(true);
-    setTimeout(() => setSubmitSuccess(false), 4000);
-  };
-  const openReport = () => {
-    setShowReport(true);
-    // The button lives at the bottom of a long scrolling sheet — bring the form into view.
-    setTimeout(() => reportRef.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' }), 50);
-  };
 
   return (
     <div className="venue-detail">
@@ -112,6 +97,14 @@ export default function VenueDetail({ venue: initialVenue, onBack, userLocation 
             <div className="vdp-freshness"><FreshnessLight beer={headline} /></div>
           </div>
         </div>
+      )}
+
+      {/* The lowest-friction correction: opens the report flow on "price has changed", with this
+          venue selected and its brand / serving size filled in. */}
+      {headline && onReport && (
+        <button type="button" className="wrong-price-link" onClick={() => onReport(venue, 'price_change')}>
+          {t('report.wrongPrice')}
+        </button>
       )}
 
       {/* Facts — each row only when it is real. */}
@@ -189,8 +182,6 @@ export default function VenueDetail({ venue: initialVenue, onBack, userLocation 
         </div>
       )}
 
-      {submitSuccess && <div className="submit-success">{t('submission.success')}</div>}
-
       {/* Price history — separate coloured line per brand + days-at-price */}
       {!loading && (
         <div className="price-history">
@@ -203,20 +194,11 @@ export default function VenueDetail({ venue: initialVenue, onBack, userLocation 
 
       <p className="vd-disclaimer">{t('venue.disclaimer')}</p>
 
-      {/* The unified report entry point (price changed / different beer / permanently
-          closed / other incorrect info), at the bottom of the sheet. */}
-      <div ref={reportRef}>
-        {showReport ? (
-          <ReportForm
-            venueId={venue.id}
-            venueName={venue.name}
-            onSuccess={handleSubmitSuccess}
-            onCancel={() => setShowReport(false)}
-          />
-        ) : (
-          <button className="vd-report-btn" onClick={openReport}>{t('report.button')}</button>
-        )}
-      </div>
+      {/* The unified report entry point (price changed / different beer / permanently closed /
+          other incorrect info), at the bottom of the sheet — it opens the report flow. */}
+      {onReport && (
+        <button className="vd-report-btn" onClick={() => onReport(venue, null)}>{t('report.button')}</button>
+      )}
     </div>
   );
 }
