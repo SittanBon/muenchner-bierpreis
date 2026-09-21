@@ -90,7 +90,7 @@ export default function BrandHistoryChart({ history, beers }) {
         ))}
       </div>
       <ResponsiveContainer width="100%" height={220}>
-        <LineChart data={chartData} margin={{ top: 8, right: 12, left: 0, bottom: 4 }}>
+        <LineChart data={chartData} margin={{ top: 8, right: 12, left: 0, bottom: 4 }} title={t('priceHistory')}>
           <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
           <XAxis dataKey="date" tick={{ fontSize: 11, fill: 'var(--text-secondary)' }} axisLine={{ stroke: 'var(--border-md)' }} tickLine={false} />
           <YAxis

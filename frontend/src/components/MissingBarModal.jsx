@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { searchNominatim, submitNewVenue } from '../hooks/useApi';
 import { useToast } from '../hooks/useToast';
@@ -9,6 +9,7 @@ import { todayISO } from '../utils/freshness';
 import { DEFAULT_SERVING_ML, servingSizeByMl, servingLabel, wireSizeFromMl } from '../constants/servingSizes';
 import ServingSizeSelect from './ServingSizeSelect';
 import ServeTypeSelect from './ServeTypeSelect';
+import { useFocusTrap } from '../hooks/useFocusTrap';
 import { serveTypeText } from '../constants/serveTypes';
 import { VENUE_TYPES } from '../constants/venueTypes';
 import { neighbourhoodName } from '../utils/neighbourhoods';
@@ -43,6 +44,9 @@ export default function MissingBarModal({ allVenues, neighbourhoods = [], onClos
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState('');
   const [success, setSuccess] = useState(false);
+
+  const cardRef = useRef(null);
+  useFocusTrap(cardRef, { open: true, onEscape: onClose });
 
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
   const setBeerField = (i, k, v) => setForm((f) => ({
@@ -169,7 +173,10 @@ export default function MissingBarModal({ allVenues, neighbourhoods = [], onClos
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-card missing-bar-card" onClick={(e) => e.stopPropagation()}>
+      <div
+        ref={cardRef} tabIndex={-1} role="dialog" aria-modal="true" aria-label={t('missingBar.title')}
+        className="modal-card missing-bar-card" onClick={(e) => e.stopPropagation()}
+      >
         {success ? (
           <div className="missing-bar-success">
             <div className="mb-success-icon">🍺</div>
@@ -182,7 +189,7 @@ export default function MissingBarModal({ allVenues, neighbourhoods = [], onClos
           <>
             <div className="missing-bar-header">
               <div className="missing-bar-title">🍺 {t('missingBar.title')}</div>
-              <button className="panel-close" onClick={onClose}>✕</button>
+              <button className="panel-close" onClick={onClose} aria-label={t('report.close')}>✕</button>
             </div>
             <div className="missing-bar-steps">
               {[1, 2, 3].map((s) => (
@@ -201,7 +208,7 @@ export default function MissingBarModal({ allVenues, neighbourhoods = [], onClos
                       onChange={(e) => setQuery(e.target.value)}
                       onKeyDown={(e) => e.key === 'Enter' && runSearch()}
                     />
-                    <button className="mb-search-btn" onClick={runSearch} disabled={searching || !query.trim()}>
+                    <button className="mb-search-btn" onClick={runSearch} disabled={searching || !query.trim()} aria-label={t('missingBar.searchButton')}>
                       {searching ? '...' : '🔍'}
                     </button>
                   </div>

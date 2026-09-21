@@ -119,8 +119,8 @@ One DOM, two layouts (`.pub` in `index.css`, "PHASE 3" block at the end):
 - **Filter chips** (`utils/quickFilters.js`, `FilterChips.jsx`): ≤€4 → max_price
   4.00, ≤€5 → 5.00, Biergarten, Wirtshaus (beer_hall), Vom Fass (tap) all write into
   the same `filters` object as the full panel; "Mehr ↓" opens that panel (bottom
-  sheet on mobile, inline on desktop). "Jetzt geöffnet" is shown disabled ("Demnächst")
-  because there is no reliable opening-hours data.
+  sheet on mobile, inline on desktop). "Jetzt geöffnet" is a real filter only
+  where stored hours are readable, else disabled "Demnächst" (see "Discovery").
 - **Skeletons, not spinners** for the map and the list; `AdminPage`,
   `MissingBarModal` and the venue price-history chart (`recharts`) are lazy chunks
   (first-load JS 806 kB → 415 kB).
@@ -132,8 +132,7 @@ One DOM, two layouts (`.pub` in `index.css`, "PHASE 3" block at the end):
 - **Known follow-ups**: (1) the CTA / active chips use white on #e8a020 as
   specified — only 2.2:1 contrast (fails WCAG AA); `--cta-fg` / `--cta-bg` in
   `:root` make the fix one line (dark brown #3d2200 on #e8a020 = 6.6:1).
-  (2) "+ Preis melden" opens the existing "Missing a bar" modal — Phase 7 builds the
-  pick-a-venue flow. (3) No analytics exist, so no events were added.
+  (2) No analytics exist, so no events were added.
 
 ## Venue experience (P0 Phase 4)
 `VenueDetail.jsx` is the ONE detail view (mobile sheet and desktop left panel). Order:
@@ -221,6 +220,39 @@ opens the unchanged 4-topic ReportForm). Rules live in `utils/venueView.js` (uni
   "unknown" is deliberately not in it — unknown is omitted where a type is displayed and is the
   "Weiß nicht" option in forms). One `<ServeTypeSelect>` everywhere; a backend test checks parity and
   scans the source for hardcoded serve-type emoji/labels. EN "Tap" is now "On Tap".
+
+## Desktop polish, accessibility & performance (P0 Phase 7)
+The "PHASE 7" block at the end of `index.css` and `useFocusTrap.js` / `clusterVenues.js`.
+- **Desktop (≥1024px)**: stats bar is ONE compact row (52px; hidden on mobile/tablet, the
+  Price Trends pill lives in the ☰ menu there), 400px left panel, map starts at x=400 with no
+  gap, search full width, CTA panel-wide 48px, list scrolls on its own, price pills 32px.
+  A list card or a marker highlights the other side; a venue inside a cluster has no pill, so
+  `separatingZoom` zooms until it stands alone, then centres (desktop) or pans into the area
+  above the sheet (mobile).
+- **Tablet (768–1023px)** = the mobile layout (full-width map, bottom sheet, bottom nav, chips,
+  no left panel, stats hidden). Only ≥1024px gets the sidebar.
+- **Safe areas**: `--safe-*` CSS variables (from `env(safe-area-inset-*)`) feed the header, bottom
+  nav, sheet and landscape padding; `.map-container` min-height subtracts them so the chips never
+  slide under the nav. Chrome cannot emulate insets over CDP — tests override the variables.
+- **Dialogs**: sheet is `role="dialog"` (`aria-modal` only once expanded), MissingBar / Report /
+  Trends / city selector / filter sheet are dialogs too; all use `hooks/useFocusTrap.js`
+  (trap + Escape + focus returns to the trigger). Close buttons say "Schließen"/"Close".
+- **Spoken prices** (`priceAria`, `normalizedAria` in `utils/venueView.js`): "4,20 Euro für
+  0,5 Liter", "ca. 5,30 Euro pro 0,5 Liter"; visual prices are `role="img"` + that label.
+  Markers announce name + price + freshness in words; clusters "N venues in this area".
+- **Gotchas**: Leaflet does NOT turn Enter into a click on markers without a popup —
+  `activateOnKey` in `MunichMap.jsx` does it (Enter + Space). The focus ring is `:where()` (zero
+  specificity) and needs `!important` to beat older `outline:none` rules. `.vl-item` uses
+  `content-visibility:auto` (containment draws focus rings INSIDE the card).
+  `prefers-reduced-motion`: sheet/chips/skeleton instant, map zoom/fade/pan animation off.
+- **Performance** (measured, not assumed): markers are rebuilt only for venue set / zoom /
+  language / active id — the same DOM nodes survive menu, tab, sort, filter-sheet and selection;
+  clustering shows 181 venues as ~26 elements at city zoom; hovering a list card re-renders 1
+  of 181 rows, changing the sort 0; 300 ms search debounce = 1 request for 10 keystrokes; no
+  images besides map tiles, fonts self-hosted. The list is NOT virtualised: 181 cards is fine with
+  `content-visibility:auto` — revisit if a city passes ~500 venues.
+- **Bundles** (vite build): index 422.76 kB (130.5 kB gz), LineChart 341.95 kB (lazy, only when a
+  chart opens), AdminPage 50 kB (lazy), CSS 88.9 kB. Nothing above 500 kB.
 
 ## Shared constants & consistency rules (READ BEFORE ADDING A FORM OR LABEL)
 Each of these has ONE source; components import it and never re-type it. Tests
@@ -429,8 +461,20 @@ Railway auto-deploys from main branch.
 - ✅ Phase 6 — contribution: stepped report flow with venue picker, "Preis falsch?" pre-filled
   corrections, confirmation screen, duplicate check + map preview for "Missing a bar?", serve-type
   constant (see "Contribution" above).
-- ⬜ Still open from the spec: QA on real iOS/Android devices · a photo upload for price reports
-  (spec: optional) · analytics events (no analytics exists)
+- ✅ Phase 7 — desktop polish + QA: compact desktop stats row, 48px CTA / 32px pills, tablet =
+  mobile layout, safe-area verification, keyboard + screen-reader pass (dialogs, focus traps,
+  spoken prices, marker keyboard activation), reduced motion, performance measurements, QA at
+  320/390/768/1024/1440 and a read-only production data-integrity check (see "Desktop polish,
+  accessibility & performance").
+- **P0 COMPLETE** (phases 0–7).
+- **NOT built in P0** (deliberately out of scope or optional in the spec):
+  - photo upload for price reports (spec: optional)
+  - analytics / event tracking (none exists — no events fire anywhere)
+  - multi-city: Berlin/Hamburg/Wien are still "coming soon" in the city selector
+  - real iOS/Android device QA (everything above was verified in headless Chrome with emulated
+    viewports/touch; the safe-area insets were emulated by overriding the CSS variables)
+  - "Jetzt geöffnet" is honest-but-limited: 162/181 venues carry opening_hours text, and the parser
+    treats anything it can't read as UNKNOWN (never open, never closed)
 - Known remaining data-trust debt: seed-invented `reports` counts (the "N reports"
   badge) are still in the data. Every price shows "Datum unbekannt" until
   verified, re-reported or bulk-verified. The fabricated Price Trends

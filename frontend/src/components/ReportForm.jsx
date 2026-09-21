@@ -16,6 +16,7 @@ import ServingSizeSelect from './ServingSizeSelect';
 import ServeTypeSelect from './ServeTypeSelect';
 import BrandCombobox from './BrandCombobox';
 import VenuePicker from './VenuePicker';
+import { useFocusTrap } from '../hooks/useFocusTrap';
 
 const AUTO_CLOSE_MS = 3000;
 
@@ -72,16 +73,16 @@ export default function ReportForm({ venues, venue: initialVenue = null, initial
 
   // Escape closes the sheet — but NOT while focus is in a form field: there Escape belongs to the
   // field (closing the brand dropdown, clearing a search) and must never throw away what was typed.
-  // Focus moves into the dialog when it opens.
   useEffect(() => {
     const onKey = (e) => {
       if (e.key !== 'Escape' || e.target?.closest?.('input, textarea, select')) return;
       onClose();
     };
     window.addEventListener('keydown', onKey);
-    rootRef.current?.focus();
     return () => window.removeEventListener('keydown', onKey);
   }, [onClose]);
+  // Focus moves into the dialog, Tab stays inside it, and focus goes back to the opener on close.
+  useFocusTrap(rootRef, { open: true });
 
   const chooseTopic = (key) => {
     sizeTouched.current = false;

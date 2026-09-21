@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { sizeLine, distanceText, hoursText, knownServeType, mapsLinks } from './venueView';
+import { sizeLine, distanceText, hoursText, knownServeType, mapsLinks, spokenVolume, priceAria, normalizedAria } from './venueView';
 
 describe('sizeLine — serving size, only when known', () => {
   it('shows the label and the local name', () => {
@@ -58,5 +58,34 @@ describe('mapsLinks', () => {
     const l = mapsLinks({ name: 'Bar', address: null });
     expect(l.directions).toBe('https://www.google.com/maps/dir/?api=1&destination=Bar');
     expect(JSON.stringify(l)).not.toMatch(/undefined|null/);
+  });
+});
+
+describe('spoken prices (screen readers)', () => {
+  it('a 0.5 L price reads "4,20 Euro für 0,5 Liter" / "4.20 euros for 0.5 litres"', () => {
+    const b = { size_05: 4.2, serving_volume_ml: 500 };
+    expect(priceAria(b, 'de')).toBe('4,20 Euro für 0,5 Liter');
+    expect(priceAria(b, 'en')).toBe('4.20 euros for 0.5 litres');
+  });
+  it('other sizes are spoken in litres', () => {
+    expect(priceAria({ size_05: 3.5, serving_volume_ml: 330 }, 'de')).toBe('3,50 Euro für 0,33 Liter');
+    expect(priceAria({ size_05: 9.2, serving_volume_ml: 1000 }, 'de')).toBe('9,20 Euro für 1 Liter');
+    expect(priceAria({ size_05: 9.2, serving_volume_ml: 1000 }, 'en')).toBe('9.20 euros for 1 litre');
+    expect(spokenVolume(400, 'de')).toBe('0,4 Liter');
+    expect(spokenVolume(250, 'en')).toBe('0.25 litres');
+  });
+  it('an unknown size is SAID to be unknown — never read as 0.5 L', () => {
+    expect(priceAria({ size_05: 4.5, serving_volume_ml: null }, 'de')).toBe('4,50 Euro, Größe unbekannt');
+    expect(priceAria({ size_05: 4.5 }, 'en')).toBe('4.50 euros, size unknown');
+    expect(spokenVolume(null, 'de')).toBeNull();
+    expect(spokenVolume(123, 'de')).toBeNull();
+  });
+  it('no price, no sentence', () => {
+    for (const b of [null, undefined, {}, { size_05: null }, { size_05: 0 }]) expect(priceAria(b, 'de')).toBeNull();
+  });
+  it('the comparison price: "ca. 5,30 Euro pro 0,5 Liter" — only when there is one', () => {
+    expect(normalizedAria({ normalized_500ml_price: 5.3 }, 'de')).toBe('ca. 5,30 Euro pro 0,5 Liter');
+    expect(normalizedAria({ normalized_500ml_price: 5.3 }, 'en')).toBe('approx. 5.30 euros per 0.5 litres');
+    for (const b of [null, {}, { normalized_500ml_price: null }, { normalized_500ml_price: 0 }]) expect(normalizedAria(b, 'de')).toBeNull();
   });
 });

@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { useFocusTrap } from '../hooks/useFocusTrap';
 import { useTranslation } from 'react-i18next';
 import {
   ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip,
@@ -195,6 +196,9 @@ export default function PriceTrends({ neighbourhoods, onClose }) {
     });
   }, [trends, viewMode, months, de]);
 
+  const cardRef = useRef(null);
+  useFocusTrap(cardRef, { open: true, onEscape: onClose });
+
   const toggle = (key) => {
     setVisible((v) => {
       const next = new Set(v);
@@ -205,13 +209,16 @@ export default function PriceTrends({ neighbourhoods, onClose }) {
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-card trends-card" onClick={(e) => e.stopPropagation()}>
+      <div
+        ref={cardRef} tabIndex={-1} role="dialog" aria-modal="true" aria-label={t('trends.title')}
+        className="modal-card trends-card" onClick={(e) => e.stopPropagation()}
+      >
         <div className="trends-header">
           <div>
             <div className="trends-title">📊 {t('trends.title')}</div>
             <div className="trends-subtitle">{t('trends.subtitle')}</div>
           </div>
-          <button className="panel-close" onClick={onClose}>✕</button>
+          <button className="panel-close" onClick={onClose} aria-label={t('report.close')}>✕</button>
         </div>
 
         {/* View-mode switch — a different question from the legend toggles
@@ -261,7 +268,7 @@ export default function PriceTrends({ neighbourhoods, onClose }) {
           )}
           {!error && trends && chartData.length > 0 && (
             <ResponsiveContainer width="100%" height={360}>
-              <LineChart data={chartData} margin={{ top: 8, right: 16, left: 0, bottom: 4 }}>
+              <LineChart data={chartData} margin={{ top: 8, right: 16, left: 0, bottom: 4 }} title={t('trends.title')}>
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
                 <XAxis dataKey="monthLabel" tick={{ fontSize: 12, fill: 'var(--text-secondary)' }} axisLine={{ stroke: 'var(--border-md)' }} tickLine={false} />
                 <YAxis

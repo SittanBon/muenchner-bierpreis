@@ -60,7 +60,7 @@ export default function VenuePanel({ neighbourhood, venues, onVenueClick, onClos
             Ø {formatEuro(neighbourhood?.avg_price, i18n.language)} · {venues.length} {t('map.venues')}
           </div>
         </div>
-        <button className="panel-close" onClick={onClose}>✕</button>
+        <button className="panel-close" onClick={onClose} aria-label={t('report.close')}>✕</button>
       </div>
 
       {/* Sort */}

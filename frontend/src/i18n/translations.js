@@ -20,6 +20,7 @@ export const de = {
       language: "EN"
     },
     citySelector: {
+      label: "Stadt wählen: {{city}}",
       comingSoon: "Demnächst",
       comingSoonTooltip: "Demnächst! Hilf uns, nach {{city}} zu expandieren."
     },
@@ -68,6 +69,7 @@ export const de = {
         title: `Preisniveau (Ø pro ${REF_DE})`,
         toggle: "Preisniveau"
       },
+      clusterLabel: "{{count}} Lokale in diesem Bereich",
       searchArea: "Diesen Bereich durchsuchen"
     },
     venue: {
@@ -143,6 +145,7 @@ export const de = {
     app: {
       openMenu: "Menü öffnen",
       closeMenu: "Menü schließen",
+      venueDetails: "Lokaldetails",
       expandList: "Liste aufklappen",
       collapseList: "Liste einklappen",
       venuesAndFilters: "Lokale & Filter",
@@ -274,6 +277,7 @@ export const de = {
       fab: "Fehlt ein Lokal?",
       title: "Fehlt ein Lokal?",
       searchLabel: "Zuerst suchen",
+      searchButton: "Suchen",
       searchPlaceholder: "Name des Lokals...",
       searchError: "Suche fehlgeschlagen. Bitte versuche es erneut.",
       noResults: "Keine Treffer gefunden.",
@@ -621,6 +625,7 @@ export const en = {
       language: "DE"
     },
     citySelector: {
+      label: "Choose city: {{city}}",
       comingSoon: "Coming soon",
       comingSoonTooltip: "Coming soon! Help us expand to {{city}}."
     },
@@ -669,6 +674,7 @@ export const en = {
         title: `Price level (avg per ${REF_EN})`,
         toggle: "Price level"
       },
+      clusterLabel: "{{count}} venues in this area",
       searchArea: "Search this area"
     },
     venue: {
@@ -739,6 +745,7 @@ export const en = {
     app: {
       openMenu: "Open menu",
       closeMenu: "Close menu",
+      venueDetails: "Venue details",
       expandList: "Expand list",
       collapseList: "Collapse list",
       venuesAndFilters: "Venues & filters",
@@ -870,6 +877,7 @@ export const en = {
       fab: "Missing a bar?",
       title: "Missing a bar?",
       searchLabel: "Search first",
+      searchButton: "Search",
       searchPlaceholder: "Venue name...",
       searchError: "Search failed. Please try again.",
       noResults: "No matches found.",

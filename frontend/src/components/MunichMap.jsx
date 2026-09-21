@@ -5,8 +5,10 @@ import { formatEuro } from '../utils/price';
 import { describePrice } from '../utils/priceUtils';
 import { pillModel, pillText, TYPE_COLORS, DEFAULT_TYPE_COLOR } from '../utils/markerModel';
 import { freshnessText, getFreshness } from '../utils/freshness';
+import { priceAria } from '../utils/venueView';
 import { priceLevel, levelLabel } from '../constants/priceLevels';
 import MapLegend from './MapLegend';
+import { clusterVenuesByPixel, separatingZoom, PILL_SIZE_MOBILE, PILL_SIZE_DESKTOP } from '../utils/clusterVenues';
 
 // Lucide icon path data (24x24 viewBox, stroke-based) copied verbatim from
 // lucide-icons/lucide's own SVG source rather than approximated by hand, so
@@ -51,10 +53,11 @@ function createPillIcon(venue, model, showLabel) {
 }
 
 // The accessible name of a marker: everything the pill shows, in words.
-function pinLabel(venue, model, t) {
+function pinLabel(venue, model, t, lang) {
   const beer = venue.beers?.[0];
   const fresh = beer ? freshnessText(getFreshness(beer)) : null;
-  return [venue.name, model.hasPrice ? pillText(model) : null, fresh ? t(fresh.key, { count: fresh.count }) : null].filter(Boolean).join(', ');
+  // name, the price as a sentence ("4,20 Euro für 0,5 Liter" — or "…, Größe unbekannt"), freshness in words
+  return [venue.name, model.hasPrice ? priceAria(beer, lang) : null, fresh ? t(fresh.key, { count: fresh.count }) : null].filter(Boolean).join(', ');
 }
 
 function escapeHtml(s) {
@@ -155,35 +158,21 @@ function buildVenuePopupContent(v, { t, i18n, onViewDetails }) {
 // against zoom 13, where 25m is ~2px) leave genuinely overlapping pins
 // un-clustered, silently stacked on top of each other with the topmost one
 // eating every click meant for the one underneath.
-// Price pills are wider than tall, so two of them collide when their centres are
-// within a pill's WIDTH horizontally and HEIGHT vertically — a rectangle test, not
-// the old circle.
-const CLUSTER_W = 58; // px — about one pill ("€4,20 ?"), so pills only cluster when they truly overlap
-const CLUSTER_H = 30; // px
-
-function clusterVenuesByPixel(map, venues, zoom) {
-  const pts = venues
-    .filter((v) => v.lat != null && v.lng != null)
-    .map((v) => ({ v, p: map.project([v.lat, v.lng], zoom) }));
-  const used = new Array(pts.length).fill(false);
-  const clusters = [];
-  for (let i = 0; i < pts.length; i++) {
-    if (used[i]) continue;
-    const group = [pts[i].v];
-    used[i] = true;
-    for (let j = i + 1; j < pts.length; j++) {
-      if (used[j]) continue;
-      const dx = pts[i].p.x - pts[j].p.x;
-      const dy = pts[i].p.y - pts[j].p.y;
-      if (Math.abs(dx) < CLUSTER_W && Math.abs(dy) < CLUSTER_H) {
-        group.push(pts[j].v);
-        used[j] = true;
-      }
-    }
-    clusters.push(group);
-  }
-  return clusters;
+const prefersReducedMotion = () => typeof window.matchMedia === 'function' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+// Leaflet makes a marker focusable (keyboard:true) but does NOT turn Enter into a click — its keyboard
+// support only opens a bound popup, and ours have none. So Enter and Space activate a marker here,
+// exactly like a tap: they fire the marker's own 'click' handler.
+function activateOnKey(marker) {
+  marker.on('keydown', (e) => {
+    const k = e.originalEvent;
+    if (!k || (k.key !== 'Enter' && k.key !== ' ')) return;
+    k.preventDefault(); // Space must not scroll the page
+    marker.fire('click', { originalEvent: k });
+  });
 }
+const isDesktopViewport = () => typeof window !== 'undefined' && window.matchMedia('(min-width: 1024px)').matches;
+// Desktop pills are 32px tall (mobile 28px), so they collide a little sooner.
+const pillSize = () => (isDesktopViewport() ? PILL_SIZE_DESKTOP : PILL_SIZE_MOBILE);
 
 export default function MunichMap({
   neighbourhoods, venues, onNeighbourhoodClick, onVenueClick, onVenueFocus, activeId, selectedVenueId,
@@ -246,7 +235,9 @@ export default function MunichMap({
       center: [48.145, 11.578],
       zoom: 13,
       zoomControl: false,
-      attributionControl: true
+      attributionControl: true,
+      // prefers-reduced-motion: no zoom/fade/marker animation at all
+      ...(prefersReducedMotion() ? { zoomAnimation: false, fadeAnimation: false, markerZoomAnimation: false } : {}),
     });
 
     L.control.zoom({ position: 'bottomright' }).addTo(leafletMap.current);
@@ -460,7 +451,7 @@ export default function MunichMap({
       if (markersLayerRef.current) markersLayerRef.current.remove();
       pinsRef.current = new Map();
 
-      const markers = clusterVenuesByPixel(map, venues, map.getZoom()).map((group) => {
+      const markers = clusterVenuesByPixel((ll, z) => map.project(ll, z), venues, map.getZoom(), pillSize()).map((group) => {
         if (group.length > 1) {
           const lat = group.reduce((sum, v) => sum + v.lat, 0) / group.length;
           const lng = group.reduce((sum, v) => sum + v.lng, 0) / group.length;
@@ -470,7 +461,8 @@ export default function MunichMap({
             iconSize: clusterIconSize, iconAnchor: clusterIconAnchor,
           });
           const marker = L.marker([lat, lng], { icon, keyboard: true });
-          marker.on('add', () => marker.getElement()?.setAttribute('aria-label', `${group.length} ${tt('map.venues')}`));
+          activateOnKey(marker);
+          marker.on('add', () => marker.getElement()?.setAttribute('aria-label', tt('map.clusterLabel', { count: group.length })));
           if (hoverCapable) marker.bindTooltip(`${group.length} ${tt('map.venues')}`, { direction: 'top', offset: [0, -18] });
           marker.on('click', () => {
             map.setView([lat, lng], Math.min(19, map.getZoom() + 3));
@@ -482,7 +474,8 @@ export default function MunichMap({
         const showLabel = activeId != null && v.neighbourhood_id === activeId;
         const model = pillModel(v, lang);
         const marker = L.marker([v.lat, v.lng], { icon: createPillIcon(v, model, showLabel), keyboard: true });
-        const label = pinLabel(v, model, tt);
+        activateOnKey(marker);
+        const label = pinLabel(v, model, tt, lang);
         marker.on('add', () => marker.getElement()?.setAttribute('aria-label', label));
         pinsRef.current.set(v.id, marker);
 
@@ -543,22 +536,34 @@ export default function MunichMap({
     applyPinStates();
   }, [selectedVenueId, highlightId, applyPinStates]);
 
-  // On mobile the bottom sheet covers the lower part of the map: when a venue is
-  // opened, pan so its pill sits in the middle of the map area that stays VISIBLE above
-  // the sheet (the selected marker must never end up hidden behind it).
+  // A venue is picked (a list card, a stats tile, a marker's "details"): bring it into view AND make
+  // sure its own pill exists to be highlighted — a venue inside a cluster has none. So zoom in just far
+  // enough for it to stand alone (never zooming out), then
+  //  * desktop: the map centres on it;
+  //  * mobile: once the bottom sheet has settled, pan it into the middle of the map area that stays
+  //    VISIBLE above the sheet (the selected marker must never end up hidden behind it).
   useEffect(() => {
     const map = leafletMap.current;
-    if (!map || selectedVenueId == null || !isMobileViewport()) return undefined;
+    if (!map || selectedVenueId == null) return undefined;
+    const v = venuesRef.current.find((x) => x.id === selectedVenueId);
+    if (!v || v.lat == null || v.lng == null) return undefined;
+    const reduce = prefersReducedMotion();
+    programmaticUntil.current = Date.now() + 2500; // our own move — not a user pan
+    const zoom = separatingZoom(v, venuesRef.current, (ll, z) => map.project(ll, z), map.getZoom(), { size: pillSize() });
+
+    if (!isMobileViewport()) {
+      map.setView([v.lat, v.lng], zoom, { animate: !reduce });
+      return undefined;
+    }
+    if (zoom !== map.getZoom()) map.setView([v.lat, v.lng], zoom, { animate: false });
     const timer = setTimeout(() => {
-      const v = venuesRef.current.find((x) => x.id === selectedVenueId);
       const sheet = document.querySelector('.pub-panel--detail');
-      if (!map || !v || v.lat == null || !sheet || !mapRef.current) return;
+      if (!map || !sheet || !mapRef.current) return;
       map.invalidateSize();
       const box = mapRef.current.getBoundingClientRect();
       const visibleH = sheet.getBoundingClientRect().top - box.top;
       if (visibleH < 80) return;
       const pt = map.latLngToContainerPoint([v.lat, v.lng]);
-      const reduce = typeof window.matchMedia === 'function' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
       programmaticUntil.current = Date.now() + 2500;
       map.panBy([pt.x - box.width / 2, pt.y - visibleH / 2], { animate: !reduce });
     }, 450); // after the sheet's slide-in has settled
@@ -595,8 +600,7 @@ export default function MunichMap({
     const size = map.getSize();
     if (!size.x || !size.y) { pendingViewRef.current = viewCommand; return; }
     programmaticUntil.current = Date.now() + 2500; // our own move — not a user pan
-    const reduceMotion = typeof window.matchMedia === 'function' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    if (reduceMotion) map.setView([lat, lng], zoom);
+    if (prefersReducedMotion()) map.setView([lat, lng], zoom);
     else map.flyTo([lat, lng], zoom, { duration: 0.8 });
   }, [viewCommand]);
 

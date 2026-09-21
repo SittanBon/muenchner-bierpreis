@@ -36,6 +36,7 @@ export default function CitySelector() {
         onClick={() => setOpen((o) => !o)}
         aria-haspopup="listbox"
         aria-expanded={open}
+        aria-label={t('citySelector.label', { city: cityName(current) })}
       >
         <span className="city-flag">{FLAGS[current.country_code] || '🏙️'}</span>
         <span className="city-name">{cityName(current)}</span>

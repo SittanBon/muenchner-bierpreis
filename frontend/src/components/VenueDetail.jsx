@@ -6,7 +6,7 @@ import ServeTypeTag from './ServeTypeTag';
 import VenueTypeIcon from './VenueTypeIcon';
 import { formatEuro } from '../utils/price';
 import { describePrice } from '../utils/priceUtils';
-import { sizeLine, distanceText, hoursText, knownServeType, mapsLinks } from '../utils/venueView';
+import { sizeLine, distanceText, hoursText, knownServeType, mapsLinks, priceAria, normalizedAria } from '../utils/venueView';
 
 // recharts is heavy — the chart loads on demand (see BrandHistoryChart.jsx).
 const BrandHistoryChart = lazy(() => import('./BrandHistoryChart'));
@@ -77,10 +77,11 @@ export default function VenueDetail({ venue: initialVenue, onBack, onReport, use
       {headline && (
         <div className="vd-price-block">
           <div className="vdp-main">
-            <div className="vdp-amount">{headlinePrice.actual}</div>
+            {/* role="img" + aria-label: read as a sentence ("4,20 Euro für 0,5 Liter"), not "€4,20" */}
+            <div className="vdp-amount" role="img" aria-label={priceAria(headline, lang) || undefined}>{headlinePrice.actual}</div>
             <SizeLine beer={headline} className="vdp-size" />
             {headlinePrice.normalized && (
-              <div className="vdp-normalized">{t('price.approxPer05', { price: headlinePrice.normalized })}</div>
+              <div className="vdp-normalized" role="img" aria-label={normalizedAria(headline, lang) || undefined}>{t('price.approxPer05', { price: headlinePrice.normalized })}</div>
             )}
           </div>
           {headline.size_mass && (
@@ -173,8 +174,8 @@ export default function VenueDetail({ venue: initialVenue, onBack, onReport, use
                   <FreshnessLight beer={b} />
                 </div>
                 <span className="ob-price-wrap">
-                  <span className="ob-price">{p.actual}</span>
-                  {p.normalized && <span className="price-approx">{t('price.approxPer05', { price: p.normalized })}</span>}
+                  <span className="ob-price" role="img" aria-label={priceAria(b, lang) || undefined}>{p.actual}</span>
+                  {p.normalized && <span className="price-approx" role="img" aria-label={normalizedAria(b, lang) || undefined}>{t('price.approxPer05', { price: p.normalized })}</span>}
                 </span>
               </div>
             );

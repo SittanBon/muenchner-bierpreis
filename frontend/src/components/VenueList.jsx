@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import FreshnessLight from './FreshnessLight';
 import PriceSecondary from './PriceSecondary';
 import { formatPrice } from '../utils/priceUtils';
+import { priceAria } from '../utils/venueView';
 import { formatDistance } from '../utils/geo';
 
 // One card = one real <button> (the whole card is the tap target, ≥64px tall):
@@ -43,7 +44,7 @@ const VenueRow = memo(function VenueRow({ venue, active, onClick, onHover, onFix
           {beer && <FreshnessLight beer={beer} />}
         </span>
         <span className="vl-price">
-          <span className="vl-price-main">{beer && beer.size_05 > 0 ? formatPrice(beer.size_05, lang) : '—'}</span>
+          <span className="vl-price-main" role="img" aria-label={priceAria(beer, lang) || undefined}>{beer && beer.size_05 > 0 ? formatPrice(beer.size_05, lang) : '—'}</span>
           {beer && <PriceSecondary beer={beer} showReferenceSize />}
           {distance && <span className="vl-distance">📍 {distance}</span>}
         </span>

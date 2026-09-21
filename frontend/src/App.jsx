@@ -32,12 +32,14 @@ import { useToast } from './hooks/useToast';
 import { useIsMobileLayout } from './hooks/useMediaQuery';
 import { useSheetDrag } from './hooks/useSheetDrag';
 import { useNow } from './hooks/useNow';
+import { useFocusTrap } from './hooks/useFocusTrap';
 import { createSequencedLoader } from './utils/sequencedLoader';
 import { emptyFilters, countActiveFilters } from './utils/quickFilters';
 import { nearbyVenues, inBounds, NEARBY_RADIUS_M } from './utils/geo';
 import { sortVenues, DEFAULT_SORT } from './utils/sortVenues';
 import { isOpenNow } from './utils/openingHours';
 import { formatPrice } from './utils/priceUtils';
+import { priceAria } from './utils/venueView';
 
 const MUNICH_VIEW = { lat: 48.145, lng: 11.578, zoom: 13 };
 const NEARBY_ZOOM = 15; // ~1 km around the user fits a phone-width map
@@ -357,13 +359,24 @@ function AppContent({ navigate }) {
   }, [panelMode, selectNeighbourhood]);
   const { sheetRef, handleProps } = useSheetDrag({ level: sheetLevel, onLevel: setSheetLevel, onDismiss: dismissSheet });
 
-  // Escape closes the sheet / detail (mobile and desktop).
+  // Escape closes the sheet / detail (mobile and desktop) — unless something stacked on top of it
+  // (the report flow, "Missing a bar?", the filter sheet) is open: Escape belongs to that then.
+  const modalOpen = !!report || showMissingBar || showFilters || showTrends;
   useEffect(() => {
-    if (panelMode === 'list') return undefined;
+    if (panelMode === 'list' || modalOpen) return undefined;
     const onKey = (e) => { if (e.key === 'Escape') dismissSheet(); };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [panelMode, dismissSheet]);
+  }, [panelMode, dismissSheet, modalOpen]);
+
+  // The mobile sheet is a dialog: focus moves in when it opens, Tab stays inside it (except in the
+  // collapsed peek, which leaves the map usable) and focus returns to the trigger on close.
+  const sheetIsDialog = isMobile && panelMode !== 'list';
+  useFocusTrap(sheetRef, {
+    open: sheetIsDialog,
+    trap: sheetIsDialog && sheetLevel !== 'collapsed' && !modalOpen,
+    fallback: () => document.querySelector('.vl-item.is-active .vl-row') || document.querySelector('.leaflet-container'),
+  });
 
   // Two different things people can contribute:
   //  * a price / info report about a venue we HAVE  -> the report flow (pick a venue first when
@@ -379,6 +392,9 @@ function AppContent({ navigate }) {
   const openExistingVenue = useCallback((venue) => { setShowMissingBar(false); handleVenueClick(venue); }, [handleVenueClick]);
   const showListFromSearch = useCallback(() => setMobileTab('list'), []);
   const closeFilters = useCallback(() => setShowFilters(false), []);
+  // The filter sheet is a dialog on phones: focus moves in, Tab stays inside, focus returns to "Mehr".
+  const filterSheetRef = useRef(null);
+  useFocusTrap(filterSheetRef, { open: showFilters && isMobile, onEscape: closeFilters });
 
   if (view === 'admin') {
     return (
@@ -440,6 +456,9 @@ function AppContent({ navigate }) {
             <>
               <div className="mobile-menu-backdrop" onClick={() => setMobileMenuOpen(false)} />
               <div className="mobile-menu-dropdown">
+                {/* The stats bar (and its Trends pill) is desktop-only now, so the price-trends
+                    chart stays reachable from here on phones and tablets. */}
+                <button onClick={() => { setShowTrends(true); setMobileMenuOpen(false); }}>📊 {t('trends.pillLabel')}</button>
                 <button onClick={() => { setView('admin'); setMobileMenuOpen(false); }}>🔐 Admin</button>
                 <a href="/impressum" onClick={(e) => { navigate(e, '/impressum'); setMobileMenuOpen(false); }}>{t('footer.impressum')}</a>
                 <a href="/datenschutz" onClick={(e) => { navigate(e, '/datenschutz'); setMobileMenuOpen(false); }}>{t('footer.datenschutz')}</a>
@@ -530,6 +549,7 @@ function AppContent({ navigate }) {
             <>
               <div className="filter-backdrop" onClick={closeFilters} />
               <div
+                ref={filterSheetRef} tabIndex={-1}
                 id="filter-sheet" className="filter-sheet" role={isMobile ? 'dialog' : 'region'} aria-modal={isMobile || undefined}
                 aria-label={t('filterSheet.title')}
                 onKeyDown={(e) => { if (e.key === 'Escape') closeFilters(); }}
@@ -553,16 +573,6 @@ function AppContent({ navigate }) {
           )}
         </div>
 
-        {/* Mobile list tab: the same stats/area pills, above the list (desktop has them
-            in the full-width row under the header). */}
-        <div className="stats-slot stats-slot--mobile">
-          <StatsBar
-            stats={stats} neighbourhoods={neighbourhoods} activeNeighbourhood={activeNeighbourhood}
-            onSelectNeighbourhood={selectNeighbourhood} onSelectVenue={handleSelectVenueById}
-            onShowTrends={() => setShowTrends(true)}
-          />
-        </div>
-
         {/* Tap outside the sheet (on the map above it) to dismiss — only while it is up
             at half/full height; the collapsed peek leaves the map fully usable. */}
         {isMobile && panelMode !== 'list' && sheetLevel !== 'collapsed' && (
@@ -572,7 +582,12 @@ function AppContent({ navigate }) {
         <section
           ref={sheetRef}
           className={`pub-panel pub-panel--${panelMode} sheet-${sheetLevel}`}
-          aria-label={panelMode === 'detail' ? selectedVenue.name : undefined}
+          {...(panelMode !== 'list' ? {
+            role: sheetIsDialog ? 'dialog' : 'region',
+            'aria-modal': sheetIsDialog && sheetLevel !== 'collapsed' ? 'true' : undefined,
+            'aria-label': panelMode === 'detail' ? t('app.venueDetails') : (i18n.language === 'de' ? activeNInfo?.name_de : activeNInfo?.name_en),
+            tabIndex: -1,
+          } : {})}
         >
           {panelMode !== 'list' && (
             <button
@@ -585,7 +600,7 @@ function AppContent({ navigate }) {
                 {panelMode === 'detail' ? (
                   <>
                     <span className="sheet-peek-name">{selectedVenue.name}</span>
-                    <span className="sheet-peek-price">
+                    <span className="sheet-peek-price" role="img" aria-label={priceAria(selectedVenue.beers?.[0], i18n.language) || undefined}>
                       {selectedVenue.beers?.[0]?.size_05 > 0 ? formatPrice(selectedVenue.beers[0].size_05, i18n.language) : '—'}
                     </span>
                   </>

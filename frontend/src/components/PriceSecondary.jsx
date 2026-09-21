@@ -1,5 +1,6 @@
 import { useTranslation } from 'react-i18next';
 import { describePrice } from '../utils/priceUtils';
+import { normalizedAria } from '../utils/venueView';
 
 // The small, muted lines that sit with an ACTUAL menu price: the serving size,
 // and — only when the size is known and isn't already 0.5 L — the per-0.5 L
@@ -16,7 +17,7 @@ export default function PriceSecondary({ beer, showReferenceSize = false }) {
       {p.sizeUnknown
         ? <span className="price-size-unknown">{t('price.sizeUnknown')}</span>
         : <span>{p.volumeLabel}</span>}
-      {p.normalized && <span> · {t('price.approxPer05', { price: p.normalized })}</span>}
+      {p.normalized && <span role="img" aria-label={normalizedAria(beer, i18n.language) || undefined}> · {t('price.approxPer05', { price: p.normalized })}</span>}
     </div>
   );
 }

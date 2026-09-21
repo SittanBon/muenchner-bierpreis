@@ -51,3 +51,35 @@ export function mapsLinks(venue) {
     reviews: `https://www.google.com/maps/search/?api=1&query=${q}`,
   };
 }
+
+// ── Spoken prices (for screen readers) ──────────────────────────────────────────────────────
+// The visible "€4,20 · 0,50L" is terse; these read as a sentence. A serving size is spoken as
+// litres ("0,5 Liter"), and an unknown size is SAID to be unknown — never assumed to be 0.5 L.
+const trimZeros = (n) => String(n).replace(/\.0+$/, '').replace(/(\.\d*?)0+$/, '$1');
+
+// 500 -> "0,5 Liter" / "0.5 litres"; 1000 -> "1 Liter" / "1 litre"; unknown -> null.
+export function spokenVolume(ml, lang) {
+  if (!isValidVolume(ml)) return null;
+  const litres = trimZeros(ml / 1000);
+  if (lang === 'de') return `${litres.replace('.', ',')} Liter`;
+  return `${litres} ${litres === '1' ? 'litre' : 'litres'}`;
+}
+const spokenAmount = (n, lang) => (lang === 'de' ? Number(n).toFixed(2).replace('.', ',') : Number(n).toFixed(2));
+
+// "4,20 Euro für 0,5 Liter" (de) / "4.20 euros for 0.5 litres" (en); size unknown:
+// "4,20 Euro, Größe unbekannt". No price -> null.
+export function priceAria(beer, lang) {
+  if (!beer || !(beer.size_05 > 0)) return null;
+  const amount = spokenAmount(beer.size_05, lang);
+  const volume = spokenVolume(beer.serving_volume_ml, lang);
+  if (lang === 'de') return volume ? `${amount} Euro für ${volume}` : `${amount} Euro, Größe unbekannt`;
+  return volume ? `${amount} euros for ${volume}` : `${amount} euros, size unknown`;
+}
+
+// "ca. 5,30 Euro pro 0,5 Liter" — the per-0.5 L comparison, only when there is one (size known).
+export function normalizedAria(beer, lang) {
+  const n = beer?.normalized_500ml_price;
+  if (n == null || !(n > 0)) return null;
+  const amount = spokenAmount(n, lang);
+  return lang === 'de' ? `ca. ${amount} Euro pro 0,5 Liter` : `approx. ${amount} euros per 0.5 litres`;
+}

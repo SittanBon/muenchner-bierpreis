@@ -916,9 +916,9 @@ body{font-family:var(--font-body);background:var(--cream);color:var(--text-prima
 .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
 
 /* Visible keyboard focus on everything interactive (never removed, only restyled). */
-:where(a,button,input,select,textarea,[tabindex]):focus-visible{outline:3px solid var(--focus);outline-offset:2px}
-.navbar :where(a,button):focus-visible,.bottom-nav :where(button):focus-visible{outline-color:#fff}
-.leaflet-marker-icon:focus-visible{outline:none}
+:where(a,button,input,select,textarea,[tabindex]):focus-visible{outline:3px solid var(--focus)!important;outline-offset:2px}
+.navbar :where(a,button):focus-visible,.bottom-nav :where(button):focus-visible{outline-color:#fff!important}
+.leaflet-marker-icon:focus-visible{outline:none!important}
 .leaflet-marker-icon:focus-visible .price-pill,.leaflet-marker-icon:focus-visible .venue-cluster-circle{outline:3px solid var(--focus);outline-offset:3px}
 
 /* ── Header ───────────────────────────────────────────────────────────────── */
@@ -948,7 +948,7 @@ body{font-family:var(--font-body);background:var(--cream);color:var(--text-prima
 .search-field-input::-webkit-search-cancel-button{display:none}
 .search-field-clear{position:absolute;right:4px;width:44px;height:44px;display:flex;align-items:center;justify-content:center;background:none;border:0;border-radius:12px;color:var(--text-muted);cursor:pointer}
 .search-field:focus-within{outline:3px solid var(--focus);outline-offset:2px}
-.search-field-input:focus-visible{outline:none}
+.search-field-input:focus-visible{outline:none!important}
 .search-result-count{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;font-size:12.5px;color:var(--text-secondary);margin:8px 2px 0}
 .search-show-list{min-height:44px;padding:0 6px;background:none;border:0;color:var(--amber-800);font-weight:700;font-size:13px;text-decoration:underline;cursor:pointer;font-family:var(--font-body)}
 
@@ -972,7 +972,7 @@ body{font-family:var(--font-body);background:var(--cream);color:var(--text-prima
 .btn-outline:hover{background:var(--amber-50)}
 
 /* ── Map ──────────────────────────────────────────────────────────────────── */
-.map-container{position:relative;overflow:hidden;flex:1 1 0;min-height:max(180px,45vh);background:#f5f0e8}
+.map-container{position:relative;overflow:hidden;flex:1 1 0;min-height:max(180px,calc(45vh - var(--safe-top) - var(--safe-bottom)));background:#f5f0e8}
 @media (max-height:700px){.map-container{min-height:180px}}
 .map-skeleton{position:absolute;inset:0;background:linear-gradient(90deg,#efe8da 25%,#f7f2e8 50%,#efe8da 75%);background-size:200% 100%;animation:skeleton-shimmer 1.4s ease-in-out infinite}
 .map-empty{position:absolute;left:12px;right:12px;bottom:12px;z-index:800}
@@ -1033,7 +1033,7 @@ body{font-family:var(--font-body);background:var(--cream);color:var(--text-prima
 .filter-group select,.filter-group input{min-height:44px;font-size:16px}
 
 /* ── List + panel ─────────────────────────────────────────────────────────── */
-.stats-slot--mobile,.pub-hint{display:none}
+.pub-hint{display:none}
 .pub-panel{display:flex;flex-direction:column;background:var(--cream);min-height:0}
 .pub-list{padding:14px var(--gutter) 24px}
 .av-title{margin-bottom:10px}
@@ -1078,12 +1078,10 @@ body{font-family:var(--font-body);background:var(--cream);color:var(--text-prima
 
 /* Karte / Liste — two views of one dataset */
 [data-mtab=map] .pub-panel--list{display:none}
-[data-mtab=map] .stats-slot--mobile{display:none}
 [data-mtab=list] .pub-intro,[data-mtab=list] .pub-cta{display:none}
 /* The map is hidden on the Liste tab but stays LAID OUT (invisible, off the flow), so it
    never collapses to 0×0 — Leaflet cannot fly/fit a zero-size map. */
 [data-mtab=list] .map-container{position:absolute;left:0;top:0;width:100%;height:60vh;flex:none;min-height:0;visibility:hidden;pointer-events:none}
-[data-mtab=list] .stats-slot--mobile{display:block}
 [data-mtab=list] .pub-panel--list{flex:none}
 
 .app-footer{display:none}
@@ -1127,26 +1125,12 @@ body{font-family:var(--font-body);background:var(--cream);color:var(--text-prima
   .vm-form-grid{grid-template-columns:1fr}
   .admin-stats{grid-template-columns:repeat(2,1fr)}
 
-  /* Stats bar (now inside the Liste tab): stacked rows, no ambient horizontal scroll */
-  .stats-bar{display:flex;flex-direction:column;align-items:stretch;gap:6px;padding:8px 12px;overflow:visible}
-  .stats-tiles{display:grid;grid-template-columns:1fr 1fr;gap:6px}
-  .stat-tile{min-width:0;padding:6px 10px}
-  .stat-tile:first-child{grid-column:1 / -1;flex-direction:row;align-items:baseline;gap:6px;flex-wrap:wrap}
-  .stat-tile:first-child .stat-tile-sub::before{content:'· '}
-  .stat-tile-value{font-size:16px}
-  .stat-tile-sub{max-width:none}
-  .stats-pills{flex-wrap:nowrap;overflow-x:auto;padding-bottom:2px;-webkit-overflow-scrolling:touch}
-  .stats-pills-label{display:none}
-  .stats-pill{min-height:44px}
-  .stats-pill-trends:active{background:var(--amber-800)}
 
   .toast-container{bottom:calc(var(--bn-h) + var(--safe-bottom) + 12px)}
 
   /* While a venue / neighbourhood sheet is open the intro, search and CTA step aside so the
      map (with the selected pill) stays visible above the sheet. */
   [data-sheet=open] .pub-intro,[data-sheet=open] .pub-search,[data-sheet=open] .pub-cta{display:none}
-  /* Munich-wide stats mean nothing above a "within 1 km" list */
-  [data-nearby=on] .stats-slot--mobile{display:none!important}
 }
 
 /* ── Desktop (≥1024px): 400px left panel + map ────────────────────────────── */
@@ -1155,7 +1139,6 @@ body{font-family:var(--font-body);background:var(--cream);color:var(--text-prima
   .bottom-nav{display:none}
   .app-footer{display:flex}
   .stats-slot--desktop{display:block;flex-shrink:0}
-  .stats-slot--mobile{display:none!important}
   .sheet-handle{display:none}
   .pub{overflow-y:hidden;display:grid;grid-template-columns:400px minmax(0,1fr);grid-template-rows:auto auto auto auto minmax(0,1fr);overflow:hidden}
   .pub-intro,.pub-search,.pub-cta,.pub-filters,.pub-panel{grid-column:1;background:var(--cream)}
@@ -1374,3 +1357,61 @@ body{font-family:var(--font-body);background:var(--cream);color:var(--text-prima
 /* The location pin in the small preview maps (report confirmation, admin new-venue cards) — this
    marker had no style at all, so the preview showed a map with no pin on it. */
 .venue-pin-dot{display:block;width:22px;height:22px;border-radius:50%;background:#d97706;border:4px solid #fff;box-shadow:0 0 0 2px #92400e,0 3px 8px rgba(0,0,0,.4)}
+
+/* ═════════════════════════════════════════════════════════════════════════════
+   PHASE 7 — desktop polish
+   ═════════════════════════════════════════════════════════════════════════════ */
+@media (min-width:1024px){
+  /* Left panel: search full width of the panel (minus padding), CTA 48px directly under it,
+     chips under that (they wrap — every chip stays visible), then the list (its own scroll). */
+  .nearby-cta{height:48px;font-size:14px}
+  .pub-intro{padding:12px 20px 0}
+  .pub-intro-title{font-size:18px;line-height:1.25}
+  .pub-search{padding:8px 20px 0}
+  .search-field{height:48px}
+  .pub-cta{padding:8px 20px 10px}
+
+  /* Price-first pills: 32px tall on desktop (28px on phones) */
+  .price-pill{height:32px;font-size:14px;padding:5px 12px}
+
+  /* Stats bar: ONE compact row — three small tiles, then the neighbourhood pills as a single
+     scrolling row (was two wrapped rows, 113px tall at 1024px). */
+  .stats-bar{flex-wrap:nowrap;gap:12px;padding:6px 20px;overflow:hidden}
+  .stats-tiles{gap:8px;flex-shrink:0}
+  .stat-tile{display:grid;grid-template-columns:auto auto;grid-template-areas:'label value' 'sub sub';column-gap:8px;align-items:baseline;min-width:0;padding:3px 10px}
+  .stat-tile-label{grid-area:label;font-size:9.5px}
+  .stat-tile-value{grid-area:value;font-size:15px;line-height:1.2}
+  .stat-tile-sub{grid-area:sub;font-size:10px;max-width:130px;line-height:1.2}
+  .stats-pills{flex:1;min-width:0;flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;padding:2px 0}
+  .stats-pills::-webkit-scrollbar{display:none}
+  .stats-pills-label{display:none}
+  .stats-pill{flex:0 0 auto;padding:4px 10px;font-size:12px}
+}
+
+/* Focus lands on the dialog container itself (so screen readers announce its label); the ring
+   belongs to the controls inside it, not to the whole sheet. */
+[role=dialog]:focus,.pub-panel[tabindex="-1"]:focus,.filter-sheet:focus,[role=dialog]:focus-visible,.pub-panel[tabindex="-1"]:focus-visible,.filter-sheet:focus-visible{outline:none!important}
+
+/* prefers-reduced-motion, explicitly: the sheets appear instantly, the skeleton is a still block
+   (no shimmer), chips/cards change state without transitions. (The confirmation check keeps its
+   final drawn state — its animation is only shortened, never removed, or the tick would vanish.) */
+@media (prefers-reduced-motion:reduce){
+  .skeleton-line,.map-skeleton{animation:none}
+  .pub-panel--detail,.pub-panel--hood,.filter-sheet,.report-sheet{animation:none;transition:none}
+  .chip-btn,.chip-btn::before,.vl-item,.price-pill,.nearby-cta,.sheet-handle{transition:none}
+}
+
+/* Performance: a long list only lays out / paints the cards near the viewport. (The browser skips
+   off-screen cards entirely; scrollIntoView and find-in-page still work.) At ~180 venues this is
+   enough; a real windowed list would only pay off well beyond a thousand. */
+.vl-item{content-visibility:auto;contain-intrinsic-size:auto 118px}
+
+/* Safe areas, sideways: a notched phone held in landscape has insets left and right as well.
+   (Top/bottom insets are handled on the header, the bottom nav and the sheet heights.) */
+@media (max-width:1023px){
+  .pub{padding-left:var(--safe-left);padding-right:var(--safe-right)}
+  .pub-panel--detail,.pub-panel--hood{left:var(--safe-left);right:var(--safe-right)}
+  .filter-sheet,.report-sheet{padding-left:max(20px,var(--safe-left));padding-right:max(20px,var(--safe-right))}
+}
+/* Cards are paint-contained (content-visibility), so their focus rings are drawn INSIDE the card. */
+.vl-row:focus-visible,.vl-fix:focus-visible{outline-offset:-3px}
