@@ -822,6 +822,11 @@ body{font-family:var(--font-body);background:var(--cream);color:var(--text-prima
 .pe-notes{margin-top:10px}
 .pe-notes textarea{width:100%;padding:8px;border:1.5px solid var(--border-md);border-radius:7px;font-family:var(--font-body);font-size:13px;resize:vertical}
 .pe-hint{text-transform:none;letter-spacing:0;font-weight:400}
+/* "This serving size is correct" (Fix 3) — its own small action under the
+   size select, same look as .vm-verify but scaled to fit a .pe-field. */
+.pe-confirm-size{align-self:flex-start;margin-top:2px;padding:3px 10px;background:none;border:1.5px solid var(--amber-400);border-radius:6px;color:var(--amber-800);font-size:11px;font-weight:500;cursor:pointer;font-family:var(--font-body)}
+.pe-confirm-size:hover:not(:disabled){background:var(--amber-100)}
+.pe-confirm-size:disabled{opacity:.5;cursor:default}
 .vm-beer-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px;align-items:center}
 .vm-beer-actions .vm-save-beer{padding:8px 16px}
 .vm-beer-actions .vm-save-beer:disabled{opacity:.45;cursor:default}
@@ -872,6 +877,9 @@ body{font-family:var(--font-body);background:var(--cream);color:var(--text-prima
 
 .vm-price-cell{display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
 .vm-price-size{font-size:11px;color:var(--text-muted)}
+/* Admin-only, never shown publicly: a serving size nobody has confirmed. Grey
+   on purpose — this is a review nudge, not a data-quality severity level. */
+.vm-size-badge{display:inline-block;background:#ececec;color:#6b6b6b;padding:1px 7px;border-radius:20px;font-size:10px;font-weight:600;white-space:nowrap;cursor:help}
 
 /* -- Admin touch targets: EVERY admin button and toggle is at least 44px tall.
    One rule for the whole dashboard (tabs, Verify/Dismiss/Edit, approve/reject,
@@ -907,9 +915,9 @@ body{font-family:var(--font-body);background:var(--cream);color:var(--text-prima
   --header-h:56px;
   --bn-h:56px;
   --gutter:20px;
-  /* CTA / active-chip colours as tokens so a contrast fix is a one-line change
-     (white on #e8a020 is only ~2.1:1). */
-  --cta-bg:#e8a020;--cta-fg:#ffffff;
+  /* CTA / active-chip colours as tokens. Dark amber-brown on amber (~4.5:1,
+     passes WCAG AA) — white on #e8a020 was only ~2.2:1 and failed. */
+  --cta-bg:#e8a020;--cta-fg:#3d2200;
   --focus:#1d4ed8;
 }
 

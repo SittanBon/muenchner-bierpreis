@@ -14,7 +14,11 @@
 //   * verified_at       = NULL  (nobody has confirmed them)
 //   * updated           = the date this seed ran (a technical timestamp only)
 //   * serving_volume_ml = 500   (size_05 is, by definition, the 0.5 L price)
-//   * reports           = 1     (no community reports exist for a seeded price)
+//   * reports           = 0     (COUNT of real approved `submissions` — none
+//                                 exist yet for a freshly seeded price; kept in
+//                                 sync by resetReportCounts on every boot)
+//   * size_confirmed    = 0     (nobody has confirmed the 500 ml assumption —
+//                                 see the size_confirmed migration comment)
 // It used to spread each price's "last confirmed" date across the last year
 // (so the freshness traffic light would show a realistic green/yellow/red
 // mix) and to generate ~9 months of fake approved price submissions from a
@@ -49,10 +53,10 @@ const insertVenue = db.prepare(`
 const insertBeer = db.prepare(`
   INSERT INTO beers
     (venue_id, brand, size_05, size_mass, updated, reports,
-     serving_volume_ml, price_observed_at, verified_at)
+     serving_volume_ml, price_observed_at, verified_at, size_confirmed)
   VALUES
-    (@venue_id, @brand, @size_05, @size_mass, @updated, 1,
-     500, NULL, NULL)
+    (@venue_id, @brand, @size_05, @size_mass, @updated, 0,
+     500, NULL, NULL, 0)
 `);
 
 const seed = db.transaction(() => {

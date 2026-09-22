@@ -125,6 +125,23 @@ function migrate() {
     if (!beerColsP2.includes('source_type')) db.exec('ALTER TABLE beers ADD COLUMN source_type TEXT');
     if (!beerColsP2.includes('notes')) db.exec('ALTER TABLE beers ADD COLUMN notes TEXT');
   }
+  // Whether a HUMAN has actually looked at serving_volume_ml and confirmed
+  // it's right, as opposed to it being whatever the Phase 1 backfill guessed
+  // (every pre-existing beer, 500 ml because size_05 IS the 0.5 L price by
+  // definition — see the Phase 1 block above) or an unrelated field getting
+  // saved. DEFAULT 0 backfills every existing row — none of them have ever
+  // been confirmed under this tracking. Set to 1 only when an admin actually
+  // creates/picks a size (POST venues, POST .../beers) or edits
+  // serving_volume_ml on an existing beer (PATCH .../beers/:beerId — see
+  // updateBeerPrice); a submission-approved size is left unconfirmed, since a
+  // submitter isn't an admin review. Feeds the admin-only "Assumed 0.5L
+  // (needs review)" Data Quality flag (ASSUMED_HALF_LITRE) — never exposed on
+  // the public API.
+  const beerColsSize = db.prepare('PRAGMA table_info(beers)').all().map((c) => c.name);
+  if (!beerColsSize.includes('size_confirmed')) {
+    backupBeforeMigration('size-confirmed');
+    db.exec('ALTER TABLE beers ADD COLUMN size_confirmed INTEGER NOT NULL DEFAULT 0');
+  }
   const venueCols = db.prepare('PRAGMA table_info(venues)').all().map((c) => c.name);
   if (!venueCols.includes('active')) {
     db.exec('ALTER TABLE venues ADD COLUMN active INTEGER NOT NULL DEFAULT 1');
@@ -201,12 +218,15 @@ const beersForVenue = db.prepare(
              id ASC`
 );
 
-// The admin variant of the same query adds the two ADMIN-ONLY columns —
-// source_type and the internal notes. They are deliberately absent from
-// beersForVenue, so they can never reach a public response.
+// The admin variant of the same query adds the ADMIN-ONLY columns — source_type,
+// the internal notes, and size_confirmed (has a human actually confirmed
+// serving_volume_ml, vs it being a Phase 1 backfill guess — feeds the
+// "Assumed 0.5L (needs review)" flag and the "Größe unbestätigt" badge). They
+// are deliberately absent from beersForVenue, so they can never reach a
+// public response.
 const beersForVenueAdmin = db.prepare(
   `SELECT id, venue_id, brand, size_05, size_mass, updated, reports, serve_type,
-          serving_volume_ml, price_observed_at, verified_at, source_type, notes
+          serving_volume_ml, price_observed_at, verified_at, source_type, notes, size_confirmed
      FROM beers WHERE venue_id = ? AND active = 1
     ORDER BY CASE WHEN serving_volume_ml > 0 AND size_05 > 0 THEN 0 ELSE 1 END,
              ${BEER_PRICE_500_SQL} ASC,
@@ -222,6 +242,8 @@ function hydrateBeer(row) {
     ...row,
     normalized_500ml_price: normalizePrice(row.size_05, row.serving_volume_ml),
     freshness_state: getFreshness(row).state,
+    // Admin-only (see beersForVenueAdmin) — absent on a public row, so leave it out rather than coercing `undefined` to `false`.
+    ...('size_confirmed' in row ? { size_confirmed: !!row.size_confirmed } : {}),
   };
 }
 
@@ -734,10 +756,10 @@ function updateVenue(id, fields) {
 const insertBeerStmt = db.prepare(`
   INSERT INTO beers
     (venue_id, brand, size_05, size_mass, updated, reports, active, serve_type,
-     serving_volume_ml, price_observed_at, verified_at, source_type)
+     serving_volume_ml, price_observed_at, verified_at, source_type, size_confirmed)
   VALUES
-    (@venue_id, @brand, @size_05, @size_mass, @updated, 1, 1, @serve_type,
-     @serving_volume_ml, @price_observed_at, NULL, @source_type)
+    (@venue_id, @brand, @size_05, @size_mass, @updated, @reports, 1, @serve_type,
+     @serving_volume_ml, @price_observed_at, NULL, @source_type, @size_confirmed)
 `);
 
 const insertPriceHistoryStmt = db.prepare(`
@@ -778,6 +800,9 @@ function recordPriceHistory(entry) {
 //    or an admin entering a price right now). Scripts that insert researched
 //    prices at boot leave it NULL rather than stamping "today" on them.
 //  - `updated` is the technical modification date: the date this row was written.
+//  - `reports` defaults to 0 — creating a beer isn't itself a customer report.
+//    An approved submission that creates a new beer passes the real count
+//    (see applyApprovedPrice); an admin adding a price directly leaves it 0.
 function beerInsertParams(venue_id, b) {
   return {
     venue_id,
@@ -785,11 +810,17 @@ function beerInsertParams(venue_id, b) {
     size_05: b.size_05,
     size_mass: b.size_mass ?? null,
     updated: todayISO(),
+    reports: Number.isInteger(b.reports) ? b.reports : 0,
     serve_type: normalizeServeType(b.serve_type),
     serving_volume_ml: b.serving_volume_ml === undefined ? REFERENCE_VOLUME_ML : b.serving_volume_ml,
     price_observed_at: toDateOnly(b.price_observed_at),
     // NULL = unknown. Only a caller that knows where the price came from sets it.
     source_type: isValidSourceType(b.source_type) ? b.source_type : null,
+    // FALSE unless the caller vouches that a human actually picked this size
+    // (an admin create route passes true; a research/backfill script or an
+    // approved community submission leaves it unconfirmed — see the
+    // size_confirmed migration comment).
+    size_confirmed: b.size_confirmed ? 1 : 0,
   };
 }
 
@@ -911,12 +942,18 @@ function updateBeerPrice(venue_id, beer_id, fields, ctx = {}) {
   const nextMass = size_mass ?? null;
   const nextNotes = notes !== undefined ? (String(notes ?? '').trim() || null) : existing.notes;
   const givenObserved = toDateOnly(price_observed_at);
+  // The admin explicitly touched the serving-size field (the client only
+  // sends serving_volume_ml when it does — see BeerPriceEditor's volumeDirty)
+  // — that IS "Admin manually confirmed" / "Any admin edit of serving size",
+  // whether or not the value actually changed. Never cleared once true.
+  const nextConfirmed = serving_volume_ml !== undefined ? true : !!existing.size_confirmed;
 
   const headlineChanged = existing.size_05 !== size_05
     || (existing.serving_volume_ml ?? null) !== (nextVolume ?? null);
   const massChanged = (existing.size_mass ?? null) !== nextMass;
   const serveChanged = existing.serve_type !== nextServe;
   const notesChanged = (existing.notes ?? null) !== (nextNotes ?? null);
+  const confirmedChanged = nextConfirmed !== !!existing.size_confirmed;
 
   let nextSource = source_type !== undefined ? (isValidSourceType(source_type) ? source_type : null) : existing.source_type;
   let observed = existing.price_observed_at;
@@ -934,7 +971,7 @@ function updateBeerPrice(venue_id, beer_id, fields, ctx = {}) {
   }
   const sourceChanged = (existing.source_type ?? null) !== (nextSource ?? null);
 
-  if (!headlineChanged && !massChanged && !serveChanged && !notesChanged && !observedChanged && !sourceChanged) {
+  if (!headlineChanged && !massChanged && !serveChanged && !notesChanged && !observedChanged && !sourceChanged && !confirmedChanged) {
     return true;
   }
 
@@ -943,13 +980,13 @@ function updateBeerPrice(venue_id, beer_id, fields, ctx = {}) {
        SET size_05 = @size_05, size_mass = @size_mass, serve_type = @serve_type,
            serving_volume_ml = @serving_volume_ml, updated = @today,
            price_observed_at = @price_observed_at, verified_at = @verified_at,
-           source_type = @source_type, notes = @notes
+           source_type = @source_type, notes = @notes, size_confirmed = @size_confirmed
      WHERE id = @beer_id AND venue_id = @venue_id
   `).run({
     beer_id, venue_id, today: todayISO(),
     size_05, size_mass: nextMass, serve_type: nextServe, serving_volume_ml: nextVolume ?? null,
     price_observed_at: observed, verified_at: verified,
-    source_type: nextSource ?? null, notes: nextNotes ?? null,
+    source_type: nextSource ?? null, notes: nextNotes ?? null, size_confirmed: nextConfirmed ? 1 : 0,
   });
 
   if (headlineChanged) {
@@ -975,6 +1012,22 @@ function verifyBeerPrice(venue_id, beer_id) {
   return { brand: existing.brand, price: existing.size_05, verified_at, previous_verified_at: existing.verified_at };
 }
 
+// "This serving size is correct." Sets size_confirmed = 1 and NOTHING else —
+// deliberately its own action, not a side effect of Save (see the
+// size_confirmed migration comment / Fix 3: "Admin manually confirmed" is a
+// distinct trigger from "any admin edit of serving size", which Save already
+// covers via updateBeerPrice). Already-true is a no-op that still returns the
+// beer (idempotent). Returns 'not_found' | 'no_size' | { ... }.
+function confirmBeerSize(venue_id, beer_id) {
+  const existing = beerForVenueStmt.get(beer_id, venue_id);
+  if (!existing) return 'not_found';
+  if (existing.serving_volume_ml == null) return 'no_size'; // nothing to confirm
+  if (!existing.size_confirmed) {
+    db.prepare('UPDATE beers SET size_confirmed = 1 WHERE id = ? AND venue_id = ?').run(beer_id, venue_id);
+  }
+  return { brand: existing.brand, serving_volume_ml: existing.serving_volume_ml, already_confirmed: !!existing.size_confirmed };
+}
+
 // Marks every not-yet-verified price as verified today, in ONE transaction.
 // Deliberately the same narrow write as verifyBeerPrice — only `verified_at`;
 // no price, `updated`, `price_observed_at` or history entry changes — applied
@@ -995,6 +1048,32 @@ const bulkVerifyPrices = db.transaction(() => {
   const { changes } = bulkVerifyStmt.run({ verified_at });
   return { count: changes, verified_at };
 });
+
+// Recomputes `beers.reports` for EVERY beer from real approved submissions —
+// COUNT(*) of `submissions` matching (venue_id, brand) with status='approved'
+// (same pairing as approvedReportCount/getBeerHistory; there is no beer_id on
+// submissions). Fixes two sources of invented numbers: the seed data's
+// literal `reports: N` values, and any row a past drifted increment left
+// wrong. Idempotent and a no-op once everything already matches (checked with
+// a cheap COUNT before doing any writing or taking a backup — same shape as
+// removeSeededSubmissions). Run this AFTER removeSeededSubmissions, so the
+// fabricated "seeded price-trend history" submissions are already gone and
+// can't be counted as reports. Returns { updated, backup }.
+function resetReportCounts() {
+  const REAL_COUNT_SQL = `(SELECT COUNT(*) FROM submissions
+     WHERE submissions.venue_id = beers.venue_id
+       AND submissions.beer_brand = beers.brand
+       AND submissions.status = 'approved')`;
+  const mismatched = db.prepare(
+    `SELECT COUNT(*) AS n FROM beers WHERE COALESCE(reports, 0) != ${REAL_COUNT_SQL}`
+  ).get().n;
+  if (mismatched === 0) return { updated: 0, backup: null };
+  const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+  const backup = `${DB_PATH}.pre-reset-report-counts-${stamp}.bak`;
+  db.prepare('VACUUM INTO ?').run(backup); // throws on failure -> nothing is updated
+  const { changes } = db.prepare(`UPDATE beers SET reports = ${REAL_COUNT_SQL}`).run();
+  return { updated: changes, backup };
+}
 
 // Deletes the fabricated "seeded price-trend history" submissions that
 // early seed.js versions wrote (see SEEDED_ESTIMATE_NOTE). They were invented
@@ -1033,6 +1112,22 @@ function removeSeededSubmissions() {
 //  * An unknown beer is created. Its price is stored as reported, at the
 //    reported size — never converted to "0.5 L" and stored as if observed
 //    (a 1 L price used to be halved into size_05 as an invented 0.5 L price).
+// `reports` counts REAL customer reports, not a hand-incremented counter that
+// can drift (Fix: it used to be `reports = reports + 1` on every approval,
+// regardless of whether a matching submission actually existed). There is no
+// `beer_id` on `submissions` — like price_history/getBeerHistory, a beer is
+// matched to its submissions by (venue_id, beer_brand), the same pairing
+// `activeBeerByBrandStmt` uses. A submission is only ever counted once it is
+// marked 'approved' (the caller — the PATCH /api/admin/submissions/:id route —
+// always sets that before calling this function), so re-approving is a no-op
+// per the guard already in that route.
+const approvedReportCountStmt = db.prepare(
+  `SELECT COUNT(*) AS n FROM submissions WHERE venue_id = ? AND beer_brand = ? AND status = 'approved'`
+);
+function approvedReportCount(venueId, brand) {
+  return approvedReportCountStmt.get(venueId, brand).n;
+}
+
 const applyApprovedPrice = db.transaction((sub) => {
   const volume = volumeFromSize(sub.size);
   if (volume === null) return { applied: false, reason: 'invalid_size' };
@@ -1043,6 +1138,7 @@ const applyApprovedPrice = db.transaction((sub) => {
   const today = todayISO();
   const serveType = sub.serve_type || null;
   const existing = activeBeerByBrandStmt.get(sub.venue_id, sub.beer_brand);
+  const reports = approvedReportCount(sub.venue_id, sub.beer_brand);
 
   const submitter = sub.submitter_name || 'Anonym';
   // Every applied approval is a real observation, so it gets ONE history entry
@@ -1057,6 +1153,7 @@ const applyApprovedPrice = db.transaction((sub) => {
     const beerId = insertBeer(sub.venue_id, {
       brand: sub.beer_brand, size_05: price, size_mass: null, serve_type: serveType,
       serving_volume_ml: volume, price_observed_at: observedAt, source_type: 'COMMUNITY',
+      reports,
       record_history_by: submitter, history_submission_id: sub.id, history_event: 'approved_submission',
     });
     return { applied: true, created: true, target: 'headline', old: null, beer_id: beerId };
@@ -1066,10 +1163,10 @@ const applyApprovedPrice = db.transaction((sub) => {
 
   if (volume === 1000 && existing.serving_volume_ml !== 1000) {
     db.prepare(`
-      UPDATE beers SET size_mass = @price, updated = @today, reports = reports + 1,
+      UPDATE beers SET size_mass = @price, updated = @today, reports = @reports,
              serve_type = COALESCE(@serve_type, serve_type)
        WHERE id = @id
-    `).run({ id: existing.id, price, today, serve_type: serveType });
+    `).run({ id: existing.id, price, today, reports, serve_type: serveType });
     logObservation(existing.id);
     return { applied: true, created: false, target: 'mass', old, beer_id: existing.id };
   }
@@ -1082,13 +1179,13 @@ const applyApprovedPrice = db.transaction((sub) => {
     UPDATE beers
        SET size_05 = @price, serving_volume_ml = @volume, size_mass = @size_mass,
            price_observed_at = @price_observed_at, verified_at = @verified_at,
-           updated = @today, reports = reports + 1, source_type = 'COMMUNITY',
+           updated = @today, reports = @reports, source_type = 'COMMUNITY',
            serve_type = COALESCE(@serve_type, serve_type)
      WHERE id = @id
   `).run({
     id: existing.id, price, volume, size_mass: keepDisplacedMass ?? null,
     price_observed_at: dates.price_observed_at, verified_at: dates.verified_at,
-    today, serve_type: serveType,
+    today, reports, serve_type: serveType,
   });
   logObservation(existing.id);
   return { applied: true, created: false, target: 'headline', old, beer_id: existing.id };
@@ -1330,9 +1427,11 @@ module.exports = {
   addBeerToVenue,
   updateBeerPrice,
   verifyBeerPrice,
+  confirmBeerSize,
   bulkVerifyPrices,
   countUnverifiedPrices,
   removeSeededSubmissions,
+  resetReportCounts,
   applyApprovedPrice,
   recordPriceHistory,
   getBeerHistory,

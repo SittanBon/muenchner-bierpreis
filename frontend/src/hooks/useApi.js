@@ -149,6 +149,17 @@ export async function adminVerifyBeer(token, venueId, beerId) {
   });
 }
 
+// "This serving size is correct" (Fix 3) — sets size_confirmed only; price,
+// dates and history are left alone. Distinct from a Save that edits the size
+// (which already confirms it) — this is for the common "the assumed size was
+// right all along" case.
+export async function adminConfirmBeerSize(token, venueId, beerId) {
+  return authedFetch(`${BASE}/admin/venues/${venueId}/beers/${beerId}/confirm-size`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` }
+  });
+}
+
 // "Bulk Verify All Prices": stamps verified_at = today on every priced, live beer
 // that has none. Only verified_at changes. The server insists on confirm:true —
 // the UI asks the admin first. Resolves { count, verified_at }.

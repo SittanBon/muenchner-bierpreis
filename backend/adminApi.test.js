@@ -93,6 +93,7 @@ describe('authentication — every admin route refuses an unauthenticated caller
     ['POST', '/api/admin/data-quality/dismiss', { flag: 'STALE_PRICE', venue_id: 'x' }],
     ['GET', '/api/admin/venues/x/beers/1/history'],
     ['POST', '/api/admin/venues/x/beers/1/verify', {}],
+    ['POST', '/api/admin/venues/x/beers/1/confirm-size', {}],
     ['PATCH', '/api/admin/venues/x/beers/1', { size_05: 5 }],
     ['POST', '/api/admin/venues/x/beers', { brand: 'B', size_05: 5 }],
     ['DELETE', '/api/admin/venues/x/beers/1'],
@@ -149,6 +150,76 @@ describe('one-click verify (Task 3)', () => {
     const v = (await get('/api/admin/venues')).body[0];
     assert.equal((await post(`/api/admin/venues/${v.id}/beers/999999/verify`, {})).status, 404);
     assert.equal((await post('/api/admin/venues/no-such-venue/beers/1/verify', {})).status, 404);
+  });
+});
+
+describe('confirm size (Fix 3: serving size review helper)', () => {
+  const dqFlagsFor = (dq, venueId) => dq.venues.find((g) => g.venue_id === venueId)?.flags || [];
+
+  test('a freshly seeded beer is unconfirmed and flagged ASSUMED_HALF_LITRE', async () => {
+    const v = (await get('/api/admin/venues')).body.find((x) => x.beers.some((b) => b.size_05 > 0));
+    const b = v.beers.find((x) => x.size_05 > 0);
+    assert.equal(b.size_confirmed, false);
+    const dq = (await get('/api/admin/data-quality')).body;
+    assert.ok(dqFlagsFor(dq, v.id).some((f) => f.flag === 'ASSUMED_HALF_LITRE' && f.beer_id === b.id));
+  });
+
+  test('sets size_confirmed only — price, dates, technical `updated` and history untouched — clears the flag, and is logged', async () => {
+    const v = (await get('/api/admin/venues')).body.find((x) => x.beers.some((b) => b.size_05 > 0 && !b.size_confirmed));
+    const b = v.beers.find((x) => x.size_05 > 0 && !x.size_confirmed);
+    const histBefore = (await get(`/api/admin/venues/${v.id}/beers/${b.id}/history`)).body.entries.length;
+
+    const res = await post(`/api/admin/venues/${v.id}/beers/${b.id}/confirm-size`, {});
+    assert.equal(res.status, 200);
+    const after = res.body.beers.find((x) => x.id === b.id);
+    assert.equal(after.size_confirmed, true);
+    assert.deepEqual(
+      [after.size_05, after.price_observed_at, after.verified_at, after.updated, after.serving_volume_ml],
+      [b.size_05, b.price_observed_at, b.verified_at, b.updated, b.serving_volume_ml],
+    );
+    assert.equal((await get(`/api/admin/venues/${v.id}/beers/${b.id}/history`)).body.entries.length, histBefore, 'confirm-size must not create a history entry');
+    const dqAfter = (await get('/api/admin/data-quality')).body;
+    assert.ok(!dqFlagsFor(dqAfter, v.id).some((f) => f.beer_id === b.id && f.flag === 'ASSUMED_HALF_LITRE'));
+
+    const logs = (await get('/api/admin/logs?action_type=CONFIRM_SIZE')).body;
+    const entry = (logs.logs || logs.rows || logs.items || logs).find?.((l) => l.venue_id === v.id);
+    assert.ok(entry, 'CONFIRM_SIZE must be in the audit log');
+    assert.equal(entry.performed_by, CREDS.username);
+  });
+
+  test('confirming an already-confirmed size is a no-op and is not logged again', async () => {
+    const v = (await get('/api/admin/venues')).body.find((x) => x.beers.some((b) => b.size_confirmed));
+    const b = v.beers.find((x) => x.size_confirmed);
+    const countEntries = async () => {
+      const logs = (await get('/api/admin/logs?action_type=CONFIRM_SIZE')).body;
+      return (logs.logs || logs.rows || logs.items || logs).length;
+    };
+    const before = await countEntries();
+    const res = await post(`/api/admin/venues/${v.id}/beers/${b.id}/confirm-size`, {});
+    assert.equal(res.status, 200);
+    assert.equal(res.body.beers.find((x) => x.id === b.id).size_confirmed, true);
+    assert.equal(await countEntries(), before);
+  });
+
+  test('a beer with no serving size at all has nothing to confirm', async () => {
+    const venue = (await get('/api/admin/venues')).body.find((v) => v.beers.length);
+    const beer = venue.beers[0];
+    await patch(`/api/admin/venues/${venue.id}/beers/${beer.id}`, { size_05: beer.size_05, size_mass: beer.size_mass, serving_volume_ml: null });
+    assert.equal((await post(`/api/admin/venues/${venue.id}/beers/${beer.id}/confirm-size`, {})).status, 400);
+  });
+
+  test('a missing beer / venue is a 404', async () => {
+    const v = (await get('/api/admin/venues')).body[0];
+    assert.equal((await post(`/api/admin/venues/${v.id}/beers/999999/confirm-size`, {})).status, 404);
+    assert.equal((await post('/api/admin/venues/no-such-venue/beers/1/confirm-size', {})).status, 404);
+  });
+
+  test('PATCHing serving_volume_ml (an admin edit of the size) confirms it too — Save, not just the dedicated button', async () => {
+    const v = (await get('/api/admin/venues')).body.find((x) => x.beers.some((b) => b.size_05 > 0 && !b.size_confirmed));
+    const b = v.beers.find((x) => x.size_05 > 0 && !x.size_confirmed);
+    const res = await patch(`/api/admin/venues/${v.id}/beers/${b.id}`, { size_05: b.size_05, size_mass: b.size_mass, serving_volume_ml: b.serving_volume_ml });
+    assert.equal(res.status, 200);
+    assert.equal(res.body.beers.find((x) => x.id === b.id).size_confirmed, true);
   });
 });
 

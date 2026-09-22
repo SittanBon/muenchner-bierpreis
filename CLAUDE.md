@@ -129,10 +129,10 @@ One DOM, two layouts (`.pub` in `index.css`, "PHASE 3" block at the end):
 - Accessibility: every public control is ≥44px (chips are 44px boxes with a 36px
   painted pill; pills have a 44px hit area), visible `:focus-visible` rings, markers are
   keyboard-focusable, `prefers-reduced-motion` switches transitions/animations off.
-- **Known follow-ups**: (1) the CTA / active chips use white on #e8a020 as
-  specified — only 2.2:1 contrast (fails WCAG AA); `--cta-fg` / `--cta-bg` in
-  `:root` make the fix one line (dark brown #3d2200 on #e8a020 = 6.6:1).
-  (2) No analytics exist, so no events were added.
+- **Known follow-ups**: (1) No analytics exist, so no events were added.
+- **CTA / active-chip contrast (fixed)**: `--cta-fg` (`:root` in index.css) is
+  dark amber-brown `#3d2200` on `#e8a020` (~6.6:1, passes WCAG AA) — it used to
+  be white (~2.2:1, failed).
 
 ## Venue experience (P0 Phase 4)
 `VenueDetail.jsx` is the ONE detail view (mobile sheet and desktop left panel). Order:
@@ -298,7 +298,9 @@ fail if a copy drifts.
   (pure, tested): MISSING_SERVING_SIZE, MISSING_PRICE, MISSING_OBSERVATION_DATE,
   STALE_PRICE, INVALID_PRICE (<€0.50 or >€20), VENUE_WITHOUT_ACTIVE_PRICE,
   DUPLICATE_VENUE (same name + neighbourhood), EXTREME_NORMALIZED_PRICE (>€15
-  per 0.5 L). Only ACTIVE venues are checked. Per flag: Edit (opens the venue
+  per 0.5 L), ASSUMED_HALF_LITRE (500 ml never confirmed by an admin — see
+  "Serving size review helper" below). Only ACTIVE venues are checked. Per
+  flag: Edit (opens the venue
   editor), ✓ Verify (only offered where confirming the price resolves it),
   Dismiss (hides that one flag for 7 days via `flag_dismissals`; reappears by
   itself). Endpoints: GET /api/admin/data-quality, POST
@@ -345,6 +347,27 @@ fail if a copy drifts.
   fails) and one `DELETE_SEEDED_SUBMISSIONS` audit entry (performed_by `system`).
   Submission ids are now `s` + (highest existing s-number + 1), NOT a row count —
   the count-based id would have collided with existing ids after this delete.
+- **Serving size review helper** (post-P0 fix): `beers.size_confirmed`
+  (BOOLEAN, DEFAULT FALSE) tracks whether a HUMAN has actually looked at
+  `serving_volume_ml`, as opposed to it being the Phase 1 backfill's guess
+  (500 ml on every pre-existing priced beer, since `size_05` IS the 0.5 L
+  price by definition). Set TRUE by: the dedicated "✓ Größe bestätigen" /
+  "Confirm size" button (`POST .../beers/:beerId/confirm-size`,
+  `confirmBeerSize` — sets size_confirmed only, its own `CONFIRM_SIZE` audit
+  entry, no price/date/history change, mirrors "✓ Verify price"); an admin
+  actually editing the size in the price editor (Save only sends
+  `serving_volume_ml` when that field was touched — `volumeDirty` in
+  `BeerPriceEditor.jsx` — so an untouched size can't get silently confirmed by
+  an unrelated save); or an admin choosing a size when creating a venue/beer
+  (POST routes — an older client that omits `serving_volume_ml` still gets the
+  500 ml default, left unconfirmed). A submission-approved size is left
+  unconfirmed (a submitter isn't an admin review). ADMIN-ONLY column
+  (`beersForVenueAdmin`, never `beersForVenue`) — never in the public API.
+  Data Quality flag `ASSUMED_HALF_LITRE` (low severity, not verifiable — Edit
+  only): `serving_volume_ml === 500 && !size_confirmed` on a priced beer.
+  `VenueManager.jsx`'s venue list also shows a small grey `.vm-size-badge`
+  ("Größe unbestätigt"/"Size unconfirmed") next to any beer with a known but
+  unconfirmed size (not just the 500 ml case) — admin-only, never public.
 - **Telegram**: one-click verify sends `✓ Price verified: <venue> €<price> —
   <admin>` (`notifyPriceVerified`); audit log actions VERIFY_PRICE, DISMISS_FLAG.
   NOTE: the project `.env` configures a REAL bot. Tests and scratch servers must
@@ -475,12 +498,20 @@ Railway auto-deploys from main branch.
     viewports/touch; the safe-area insets were emulated by overriding the CSS variables)
   - "Jetzt geöffnet" is honest-but-limited: 162/181 venues carry opening_hours text, and the parser
     treats anything it can't read as UNKNOWN (never open, never closed)
-- Known remaining data-trust debt: seed-invented `reports` counts (the "N reports"
-  badge) are still in the data. Every price shows "Datum unbekannt" until
+- Known remaining data-trust debt: every price shows "Datum unbekannt" until
   verified, re-reported or bulk-verified. The fabricated Price Trends
   submissions are removed on the next boot of each environment (see
   "Seeded-submission cleanup"); the Price Trends chart then shows only real
   approved reports, so it stays sparse until people submit prices.
+- **Fixed post-P0**: the "N reports" badge used to be seed-invented numbers
+  (or a hand-incremented counter that could drift from reality). It's now
+  `COUNT(*)` of real approved `submissions` matching (venue_id, brand) —
+  recomputed live on every approval (`approvedReportCount` in
+  `backend/db/database.js`) and reset on every boot
+  (`backend/db/resetReportCounts.js`, same idempotent/backed-up pattern as
+  `removeSeededSubmissions.js`, runs right after it). An admin-created beer
+  starts at 0 (creating a price isn't itself a customer report); a new-venue
+  submission's first beer starts at 1 (that submission IS the report).
 
 ## Still To Do ❌
 - Venue descriptions DE+EN for all venues

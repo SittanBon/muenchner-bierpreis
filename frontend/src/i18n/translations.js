@@ -351,6 +351,8 @@ export const de = {
         inactive: "Inaktiv",
         outsideModelledArea: "≈ ungefähr",
         outsideModelledAreaHint: "Liegt außerhalb der 6 kartierten Stadtteile — dem nächstgelegenen Viertel zugeordnet, keine echte Polygon-Zuordnung.",
+        sizeUnconfirmed: "Größe unbestätigt",
+        sizeUnconfirmedHint: "Diese Serviergröße wurde noch nie von einem Admin bestätigt (z. B. bei der Datenmigration angenommen).",
         discard: "Verwerfen",
         descDe: "Beschreibung (Deutsch)",
         descDePlaceholder: "Schreibe eine kurze, genaue Beschreibung dieses Lokals...",
@@ -381,6 +383,7 @@ export const de = {
         venueDeleted: "🗑️ {{venue}} dauerhaft gelöscht.",
         beerDeleted: "🗑️ {{brand}} von {{venue}} entfernt.",
         priceVerified: "Preis bestätigt für {{venue}}",
+        sizeConfirmed: "Größe bestätigt für {{venue}}",
         priceSaved: "Preis für {{venue}} gespeichert",
         priceNotApplied: "Freigegeben, aber der Preis wurde NICHT übernommen (ungültige Größe).",
         toggledInactive: "👁️ {{venue}} von der Karte ausgeblendet."
@@ -423,7 +426,8 @@ export const de = {
           INVALID_PRICE: "Ungültiger Preis",
           VENUE_WITHOUT_ACTIVE_PRICE: "Kein aktiver Preis",
           DUPLICATE_VENUE: "Doppeltes Lokal",
-          EXTREME_NORMALIZED_PRICE: `Extremer Preis / ${REF_DE}`
+          EXTREME_NORMALIZED_PRICE: `Extremer Preis / ${REF_DE}`,
+          ASSUMED_HALF_LITRE: `${REF_DE} angenommen`
         },
         desc: {
           MISSING_SERVING_SIZE: `Serviergröße unbekannt — kein fairer ${REF_DE}-Vergleich möglich.`,
@@ -433,7 +437,8 @@ export const de = {
           INVALID_PRICE: "Außerhalb von €0,50–€20,00.",
           VENUE_WITHOUT_ACTIVE_PRICE: "Dieses Lokal hat kein Bier mit verwendbarem Preis.",
           DUPLICATE_VENUE: "Gleicher Name und Stadtteil wie: {{names}}.",
-          EXTREME_NORMALIZED_PRICE: `Ergibt {{price}} pro ${REF_DE} (über €15,00).`
+          EXTREME_NORMALIZED_PRICE: `Ergibt {{price}} pro ${REF_DE} (über €15,00).`,
+          ASSUMED_HALF_LITRE: `${REF_DE} wurde bei der Datenmigration angenommen, nie von einem Admin bestätigt — zu prüfen.`
         }
       },
       price: {
@@ -441,6 +446,10 @@ export const de = {
         price: "Tatsächlicher Preis (€)",
         size: "Serviergröße",
         sizeUnknown: "— unbekannt —",
+        confirmSize: "✓ Größe bestätigen",
+        sizeConfirmed: "Bestätigt",
+        confirmSizeHint: "Bestätigt, dass diese Serviergröße stimmt — ändert weder Preis noch Datum.",
+        confirmSizeSaveFirst: "Erst speichern — Bestätigen bezieht sich auf die gespeicherte Größe.",
         normalized: `≈ Vergleichspreis pro ${REF_DE}`,
         normalizedUnknown: "— (Serviergröße unbekannt: kein Vergleich)",
         normalizedHint: "Nur ein Vergleichswert, berechnet — nicht, was der Gast zahlt.",
@@ -951,6 +960,8 @@ export const en = {
         inactive: "Inactive",
         outsideModelledArea: "≈ approximate",
         outsideModelledAreaHint: "Outside the 6 mapped neighbourhoods — assigned to the nearest one, not genuine polygon containment.",
+        sizeUnconfirmed: "Size unconfirmed",
+        sizeUnconfirmedHint: "This serving size has never been confirmed by an admin (e.g. assumed by the data migration).",
         discard: "Discard",
         descDe: "Description (German)",
         descDePlaceholder: "Schreibe eine kurze, genaue Beschreibung dieses Lokals...",
@@ -981,6 +992,7 @@ export const en = {
         venueDeleted: "🗑️ {{venue}} permanently deleted.",
         beerDeleted: "🗑️ {{brand}} removed from {{venue}}.",
         priceVerified: "Price verified for {{venue}}",
+        sizeConfirmed: "Size confirmed for {{venue}}",
         priceSaved: "Price saved for {{venue}}",
         priceNotApplied: "Approved, but the price was NOT applied (invalid serving size).",
         toggledInactive: "👁️ {{venue}} hidden from map."
@@ -1023,7 +1035,8 @@ export const en = {
           INVALID_PRICE: "Invalid price",
           VENUE_WITHOUT_ACTIVE_PRICE: "No active price",
           DUPLICATE_VENUE: "Duplicate venue",
-          EXTREME_NORMALIZED_PRICE: `Extreme price / ${REF_EN}`
+          EXTREME_NORMALIZED_PRICE: `Extreme price / ${REF_EN}`,
+          ASSUMED_HALF_LITRE: `Assumed ${REF_EN}`
         },
         desc: {
           MISSING_SERVING_SIZE: `Serving size unknown — no fair ${REF_EN} comparison possible.`,
@@ -1033,7 +1046,8 @@ export const en = {
           INVALID_PRICE: "Outside €0.50–€20.00.",
           VENUE_WITHOUT_ACTIVE_PRICE: "This venue has no beer with a usable price.",
           DUPLICATE_VENUE: "Same name and neighbourhood as: {{names}}.",
-          EXTREME_NORMALIZED_PRICE: `Comes to {{price}} per ${REF_EN} (above €15.00).`
+          EXTREME_NORMALIZED_PRICE: `Comes to {{price}} per ${REF_EN} (above €15.00).`,
+          ASSUMED_HALF_LITRE: `${REF_EN} was assumed by the data migration, never confirmed by an admin — needs review.`
         }
       },
       price: {
@@ -1041,6 +1055,10 @@ export const en = {
         price: "Actual price (€)",
         size: "Serving size",
         sizeUnknown: "— unknown —",
+        confirmSize: "✓ Confirm size",
+        sizeConfirmed: "Confirmed",
+        confirmSizeHint: "Confirms this serving size is correct — changes neither price nor date.",
+        confirmSizeSaveFirst: "Save first — Confirm applies to the saved size.",
         normalized: `≈ Comparison price per ${REF_EN}`,
         normalizedUnknown: "— (serving size unknown: no comparison)",
         normalizedHint: "A calculated comparison figure only — not what the guest pays.",

@@ -62,14 +62,15 @@ CREATE TABLE IF NOT EXISTS beers (
   size_05    REAL,            -- the headline price, EUR, for serving_volume_ml (0.5 L unless that says otherwise)
   size_mass  REAL,            -- price for 1 L (Maß), EUR, nullable — secondary price, no timestamps of its own
   updated    TEXT,            -- TECHNICAL modification date (YYYY-MM-DD) — NOT price freshness
-  reports    INTEGER NOT NULL DEFAULT 1,
+  reports    INTEGER NOT NULL DEFAULT 0,  -- COUNT(*) of real approved `submissions` matching (venue_id, brand) — kept in sync by applyApprovedPrice/resetReportCounts, never hand-incremented
   active     INTEGER NOT NULL DEFAULT 1,  -- 0 = delisted; kept for price history, hidden from the menu
   serve_type TEXT NOT NULL DEFAULT 'unknown',  -- 'tap' | 'bottle' | 'can' | 'unknown'
   price_observed_at TEXT,     -- when size_05 was actually seen/reported (YYYY-MM-DD); NULL = unknown
   verified_at       TEXT,     -- when someone confirmed size_05 is still correct; NULL = never verified
   serving_volume_ml INTEGER,  -- serving size size_05 is quoted for: 250|330|400|500|1000; NULL = unknown
   source_type TEXT,           -- where the CURRENT price came from: ADMIN|COMMUNITY|VENUE|MENU_PHOTO|OTHER; NULL = unknown (ADMIN-ONLY, never in the public API)
-  notes       TEXT            -- internal admin note on this price (ADMIN-ONLY, never in the public API)
+  notes       TEXT,           -- internal admin note on this price (ADMIN-ONLY, never in the public API)
+  size_confirmed INTEGER NOT NULL DEFAULT 0  -- has a HUMAN (admin) actually confirmed serving_volume_ml, vs it being a Phase 1 backfill guess? ADMIN-ONLY, never in the public API
 );
 
 -- One row per real price observation/change for a beer: a price an admin

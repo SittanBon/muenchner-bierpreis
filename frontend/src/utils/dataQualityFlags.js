@@ -15,12 +15,13 @@ export const FLAG_SEVERITY = {
   MISSING_SERVING_SIZE: 'medium',
   DUPLICATE_VENUE: 'medium',
   MISSING_OBSERVATION_DATE: 'low',
+  ASSUMED_HALF_LITRE: 'low',
 };
 
 // Display order for the filter chips (worst first).
 export const FLAG_ORDER = [
   'MISSING_PRICE', 'INVALID_PRICE', 'VENUE_WITHOUT_ACTIVE_PRICE', 'EXTREME_NORMALIZED_PRICE',
-  'STALE_PRICE', 'MISSING_SERVING_SIZE', 'DUPLICATE_VENUE', 'MISSING_OBSERVATION_DATE',
+  'STALE_PRICE', 'MISSING_SERVING_SIZE', 'DUPLICATE_VENUE', 'MISSING_OBSERVATION_DATE', 'ASSUMED_HALF_LITRE',
 ];
 
 // Extra words that find a flag in the admin search, on top of its code
@@ -35,6 +36,7 @@ export const FLAG_ALIASES = {
   MISSING_SERVING_SIZE: ['no size', 'size missing', 'größe fehlt', 'groesse fehlt', 'unknown size'],
   DUPLICATE_VENUE: ['duplicate', 'dupe', 'doppelt'],
   MISSING_OBSERVATION_DATE: ['no date', 'date unknown', 'unverified', 'datum unbekannt', 'never verified'],
+  ASSUMED_HALF_LITRE: ['assumed', 'unconfirmed size', 'größe unbestätigt', 'groesse unbestaetigt', 'needs review'],
 };
 
 export function flagSeverity(code) {

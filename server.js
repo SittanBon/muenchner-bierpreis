@@ -28,6 +28,7 @@ const {
   addBeerToVenue,
   updateBeerPrice,
   verifyBeerPrice,
+  confirmBeerSize,
   bulkVerifyPrices,
   countUnverifiedPrices,
   applyApprovedPrice,
@@ -144,6 +145,14 @@ require('./backend/db/reassignVenues').runReassignment();
 // takes its own backup first when it has something to delete. See
 // removeSeededSubmissions in backend/db/database.js.
 require('./backend/db/removeSeededSubmissions').run();
+
+// Recomputes the "N reports" badge from real approved submissions (COUNT(*)
+// matched by venue_id + brand) instead of trusting a hand-incremented counter
+// that could drift — also fixes the seed data's invented `reports: N` values.
+// Idempotent, its own backup first, runs AFTER the seeded-submission cleanup
+// above so fabricated submissions are already gone and can't be counted. See
+// resetReportCounts in backend/db/database.js.
+require('./backend/db/resetReportCounts').run();
 
 const app = express();
 app.set('etag', false); // API responses are always regenerated from the live DB
@@ -617,9 +626,12 @@ app.patch('/api/admin/submissions/:id', authMiddleware, (req, res) => {
         },
         // A new-venue proposal's prices are 0.5 L prices seen on the
         // submitter's visit — that visit date is the observation date.
+        // reports: 1 — this exact approval IS the one real report that brought
+        // the venue in; `submissions.venue_id` isn't set until just below, so
+        // the usual COUNT(*)-of-approved-submissions can't see it yet.
         [{
           brand: sub.beer_brand, size_05: sub.price, size_mass: sub.size_mass, serve_type: sub.serve_type,
-          serving_volume_ml: volumeFromSize(sub.size) ?? 500, price_observed_at: sub.visit_date, ...communitySource,
+          serving_volume_ml: volumeFromSize(sub.size) ?? 500, price_observed_at: sub.visit_date, reports: 1, ...communitySource,
         }],
       );
       if (sub.extra_beers) {
@@ -756,6 +768,9 @@ app.post('/api/admin/venues', authMiddleware, (req, res) => {
         // from the admin; that creation is the price's first history entry.
         price_observed_at: todayISO(),
         source_type: 'ADMIN',
+        // A size the admin actually sent (vs the 500 ml default for an older
+        // client that omitted it) is a real, deliberate choice, not a backfill guess.
+        size_confirmed: b.serving_volume_ml !== undefined,
         record_history_by: req.user?.username || 'admin',
       })),
     );
@@ -897,6 +912,9 @@ app.post('/api/admin/venues/:id/beers', authMiddleware, (req, res) => {
     serving_volume_ml: volume.value,
     price_observed_at: todayISO(),
     source_type: 'ADMIN',
+    // A size the admin actually sent (vs the 500 ml default for an older
+    // client that omitted it) is a real, deliberate choice, not a backfill guess.
+    size_confirmed: serving_volume_ml !== undefined,
     record_history_by: req.user?.username || 'admin',
   });
   logAdminAction('ADD_BEER', {
@@ -974,7 +992,7 @@ app.patch('/api/admin/venues/:id/beers/:beerId', authMiddleware, (req, res) => {
   // no-op save leaves no entry and every real change lists exactly its fields.
   const beerAfter = getVenueAdmin(req.params.id)?.beers.find((b) => b.id === Number(req.params.beerId));
   if (beerBefore && beerAfter) {
-    const TRACKED = ['size_05', 'size_mass', 'serve_type', 'serving_volume_ml', 'price_observed_at', 'verified_at', 'source_type', 'notes'];
+    const TRACKED = ['size_05', 'size_mass', 'serve_type', 'serving_volume_ml', 'price_observed_at', 'verified_at', 'source_type', 'notes', 'size_confirmed'];
     const changedFields = TRACKED.filter((f) => (beerBefore[f] ?? null) !== (beerAfter[f] ?? null));
     if (changedFields.length) {
       logAdminAction('EDIT_BEER', {
@@ -1098,6 +1116,30 @@ app.post('/api/admin/venues/:id/beers/:beerId/verify', authMiddleware, (req, res
   // Fire-and-forget: sendTelegramMessage swallows its own errors, so a Telegram
   // outage can never fail (or slow) the verification itself.
   notifyPriceVerified({ venueName: venueBefore.name, price: result.price, admin: req.user?.username || 'admin' });
+  res.json(attachFlags(getVenueAdmin(req.params.id)));
+});
+
+// "This serving size is correct." Sets size_confirmed and nothing else — its
+// own action (Fix 3), distinct from Save, which already confirms a size the
+// admin actually edits (see updateBeerPrice). Clears the admin-only
+// "Größe unbestätigt" badge / ASSUMED_HALF_LITRE flag without touching price,
+// dates or history.
+app.post('/api/admin/venues/:id/beers/:beerId/confirm-size', authMiddleware, (req, res) => {
+  const venueBefore = getVenueAdmin(req.params.id);
+  if (!venueBefore) return res.status(404).json({ error: 'Venue not found' });
+
+  const result = confirmBeerSize(req.params.id, Number(req.params.beerId));
+  if (result === 'not_found') return res.status(404).json({ error: 'Beer not found for this venue' });
+  if (result === 'no_size') return res.status(400).json({ error: 'This beer has no serving size to confirm' });
+
+  if (!result.already_confirmed) {
+    logAdminAction('CONFIRM_SIZE', {
+      venueId: req.params.id,
+      venueName: venueBefore.name,
+      performedBy: req.user?.username || 'admin',
+      details: { brand: result.brand, serving_volume_ml: result.serving_volume_ml },
+    });
+  }
   res.json(attachFlags(getVenueAdmin(req.params.id)));
 });
 

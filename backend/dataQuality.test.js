@@ -10,12 +10,12 @@ const {
 } = require('./dataQuality');
 
 let beerSeq = 0;
-// A healthy beer: real price, known size, freshly observed.
+// A healthy beer: real price, known + confirmed size, freshly observed.
 const beer = (over = {}) => {
   beerSeq += 1;
   return {
     id: beerSeq, brand: `Brand ${beerSeq}`, size_05: 5.0, serving_volume_ml: 500, normalized_500ml_price: 5.0,
-    price_observed_at: '2026-09-10', verified_at: null, freshness_state: 'FRESH', ...over,
+    price_observed_at: '2026-09-10', verified_at: null, freshness_state: 'FRESH', size_confirmed: true, ...over,
   };
 };
 const venue = (id, over = {}) => ({
@@ -36,6 +36,29 @@ describe('MISSING_SERVING_SIZE', () => {
     assert.ok(flagsOf([v]).includes('MISSING_SERVING_SIZE'));
   });
   test('a known size is not', () => assert.ok(!flagsOf([venue('a')]).includes('MISSING_SERVING_SIZE')));
+});
+
+describe('ASSUMED_HALF_LITRE (Fix 3: serving size review helper)', () => {
+  test('a 500 ml size nobody has confirmed is flagged', () => {
+    const v = venue('a', { beers: [beer({ size_confirmed: false })] });
+    assert.ok(flagsOf([v]).includes('ASSUMED_HALF_LITRE'));
+  });
+  test('a confirmed 500 ml size is not flagged', () => {
+    assert.ok(!flagsOf([venue('a')]).includes('ASSUMED_HALF_LITRE')); // default beer() is confirmed
+  });
+  test('an unconfirmed size that is NOT 500 ml is not flagged — only the backfill\'s specific guess is', () => {
+    const v = venue('a', { beers: [beer({ serving_volume_ml: 330, normalized_500ml_price: 7.6, size_confirmed: false })] });
+    assert.ok(!flagsOf([v]).includes('ASSUMED_HALF_LITRE'));
+  });
+  test('an unconfirmed 500 ml beer with no price is not flagged (MISSING_PRICE covers it instead)', () => {
+    const v = venue('a', { beers: [beer({ size_05: null, normalized_500ml_price: null, size_confirmed: false })] });
+    const f = flagsOf([v]);
+    assert.ok(!f.includes('ASSUMED_HALF_LITRE'));
+    assert.ok(f.includes('MISSING_PRICE'));
+  });
+  test('not verifiable — confirming the PRICE says nothing about the SIZE', () => {
+    assert.equal(FLAG_TYPES.ASSUMED_HALF_LITRE.verifiable, false);
+  });
 });
 
 describe('MISSING_PRICE vs INVALID_PRICE', () => {
@@ -192,7 +215,7 @@ describe('groupFlagsByVenue', () => {
     assert.equal(FLAG_TYPES.MISSING_OBSERVATION_DATE.verifiable, true);
     assert.equal(FLAG_TYPES.EXTREME_NORMALIZED_PRICE.verifiable, true);
     // Verifying can't fix any of these — it would only "confirm" a bad record.
-    for (const c of ['MISSING_PRICE', 'INVALID_PRICE', 'MISSING_SERVING_SIZE', 'VENUE_WITHOUT_ACTIVE_PRICE', 'DUPLICATE_VENUE']) {
+    for (const c of ['MISSING_PRICE', 'INVALID_PRICE', 'MISSING_SERVING_SIZE', 'VENUE_WITHOUT_ACTIVE_PRICE', 'DUPLICATE_VENUE', 'ASSUMED_HALF_LITRE']) {
       assert.equal(FLAG_TYPES[c].verifiable, false, c);
     }
   });

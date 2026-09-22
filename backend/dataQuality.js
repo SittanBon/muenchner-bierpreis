@@ -31,6 +31,12 @@ const FLAG_TYPES = {
   MISSING_SERVING_SIZE:        { severity: 'medium', scope: 'beer',  verifiable: false },
   DUPLICATE_VENUE:             { severity: 'medium', scope: 'venue', verifiable: false },
   MISSING_OBSERVATION_DATE:    { severity: 'low',    scope: 'beer',  verifiable: true  },
+  // The Phase 1 migration set serving_volume_ml = 500 for every priced beer
+  // (size_05 IS the 0.5 L price by definition) — a fact about the COLUMN, not
+  // a confirmation that 0.5 L is actually right. size_confirmed tracks whether
+  // a human has ever looked (see the migration comment in database.js).
+  // Verifying the PRICE doesn't verify the SIZE, so this isn't `verifiable`.
+  ASSUMED_HALF_LITRE:          { severity: 'low',    scope: 'beer',  verifiable: false },
 };
 const FLAG_CODES = Object.keys(FLAG_TYPES);
 const SEVERITY_RANK = { high: 0, medium: 1, low: 2 };
@@ -81,6 +87,9 @@ function computeFlags(venues, dismissed = new Set()) {
       }
 
       if (beer.serving_volume_ml == null) push('MISSING_SERVING_SIZE', venue, beer);
+      if (hasPrice(beer) && beer.serving_volume_ml === 500 && !beer.size_confirmed) {
+        push('ASSUMED_HALF_LITRE', venue, beer);
+      }
       if (beer.price_observed_at == null && beer.verified_at == null) push('MISSING_OBSERVATION_DATE', venue, beer);
       if (beer.freshness_state === 'STALE') push('STALE_PRICE', venue, beer);
       if (beer.normalized_500ml_price != null && beer.normalized_500ml_price > THRESHOLDS.MAX_NORMALIZED_PRICE) {

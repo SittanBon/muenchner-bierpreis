@@ -546,6 +546,13 @@ export default function VenueManager({ token, initialQuery = '', initialEditVenu
                         <span className="vm-price-cell">
                           {formatEuro(v.beers[0].size_05, i18n.language)}
                           <small className="vm-price-size">{formatVolume(v.beers[0].serving_volume_ml, i18n.language) || t('price.sizeUnknown')}</small>
+                          {/* Admin-only — never shown on the public site. A known size nobody has
+                              confirmed yet (e.g. the Phase 1 backfill's 500 ml guess). */}
+                          {v.beers[0].serving_volume_ml != null && !v.beers[0].size_confirmed && (
+                            <span className="vm-size-badge" title={t('admin.venues.sizeUnconfirmedHint')}>
+                              {t('admin.venues.sizeUnconfirmed')}
+                            </span>
+                          )}
                           <FreshnessLight beer={v.beers[0]} compact />
                         </span>
                       ) : '—'}

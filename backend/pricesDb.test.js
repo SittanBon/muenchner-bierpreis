@@ -272,13 +272,39 @@ describe('creating beers — no invented observation dates', () => {
 });
 
 describe('approving a submission (Task 3)', () => {
+  let fixtureSeq = 0;
   function fixture() {
+    fixtureSeq += 1;
     const vid = makeVenue([{ brand: 'Approve', size_05: 4.5, size_mass: null, serve_type: 'unknown' }]);
     const id = beerId(vid, 'Approve');
-    db.prepare(`UPDATE beers SET updated = '2025-06-01', reports = 4, price_observed_at = '2026-07-01', verified_at = '2026-08-01' WHERE id = ?`).run(id);
+    db.prepare(`UPDATE beers SET updated = '2025-06-01', price_observed_at = '2026-07-01', verified_at = '2026-08-01' WHERE id = ?`).run(id);
+    // `reports` is no longer a stored counter (see database.js's Fix 2): it's
+    // COUNT(*) of approved `submissions` matching this venue+brand. 4 prior
+    // real reports here, so the next approval below derives 5.
+    const priorReport = db.prepare(`
+      INSERT INTO submissions (id, report_type, venue_id, beer_brand, size, price, visit_date, status)
+      VALUES (?, 'price_change', ?, 'Approve', '0.5L', 4.5, '2026-01-01', 'approved')
+    `);
+    for (let i = 1; i <= 4; i += 1) priorReport.run(`t-prior-${fixtureSeq}-${i}`, vid);
     return { vid, id };
   }
   const sub = (vid, over) => ({ venue_id: vid, beer_brand: 'Approve', price: 4.9, size: '0.5L', visit_date: '2026-09-10', serve_type: null, ...over });
+
+  // Mirrors the real flow (POST /api/submissions, then the PATCH .../:id
+  // route marking it approved before calling applyApprovedPrice): `reports`
+  // is derived from a real, already-approved `submissions` row, not from
+  // calling applyApprovedPrice in isolation.
+  let approveSeq = 0;
+  function approve(vid, over) {
+    approveSeq += 1;
+    const s = sub(vid, over);
+    const id = `t-approve-${approveSeq}`;
+    db.prepare(`
+      INSERT INTO submissions (id, report_type, venue_id, beer_brand, size, price, visit_date, serve_type, status)
+      VALUES (@id, 'price_change', @venue_id, @beer_brand, @size, @price, @visit_date, @serve_type, 'approved')
+    `).run({ id, ...s });
+    return database.applyApprovedPrice({ id, ...s });
+  }
 
   test('an unrecognised size writes NOTHING — no price, no `updated`, no `reports`', () => {
     for (const size of ['0.3L', '2L', '', null, undefined, 'abc']) {
@@ -301,7 +327,7 @@ describe('approving a submission (Task 3)', () => {
 
   test('0.5 L: updates the headline; price_observed_at = the visit date; the old verification is cleared', () => {
     const { vid, id } = fixture();
-    const out = database.applyApprovedPrice(sub(vid, { serve_type: 'tap' }));
+    const out = approve(vid, { serve_type: 'tap' });
     assert.equal(out.applied, true);
     const r = beer(id);
     assert.equal(r.size_05, 4.9);
@@ -315,14 +341,14 @@ describe('approving a submission (Task 3)', () => {
 
   test('the visit date — not today — is what freshness is based on', () => {
     const { vid, id } = fixture();
-    database.applyApprovedPrice(sub(vid, { price: 4.9, visit_date: '2026-01-15' }));
+    approve(vid, { price: 4.9, visit_date: '2026-01-15' });
     assert.equal(beer(id).price_observed_at, '2026-01-15');
     assert.equal(database.getVenue(vid).beers[0].freshness_state, 'STALE');
   });
 
   test('an unusable stored visit date leaves the observation date unchanged (never invented)', () => {
     const { vid, id } = fixture();
-    database.applyApprovedPrice(sub(vid, { price: 4.9, visit_date: 'garbage' }));
+    approve(vid, { price: 4.9, visit_date: 'garbage' });
     const r = beer(id);
     assert.equal(r.size_05, 4.9);
     assert.equal(r.price_observed_at, '2026-07-01');
@@ -330,7 +356,7 @@ describe('approving a submission (Task 3)', () => {
 
   test('0.5 L, same price, later date: a confirmation — observation moves forward, older verification superseded', () => {
     const { vid, id } = fixture();
-    database.applyApprovedPrice(sub(vid, { price: 4.5, visit_date: '2026-09-10' }));
+    approve(vid, { price: 4.5, visit_date: '2026-09-10' });
     const r = beer(id);
     assert.equal(r.price_observed_at, '2026-09-10');
     assert.equal(r.verified_at, null);
@@ -339,7 +365,7 @@ describe('approving a submission (Task 3)', () => {
 
   test('1 L (Maß): stored as size_mass; the headline price and its dates are untouched', () => {
     const { vid, id } = fixture();
-    const out = database.applyApprovedPrice(sub(vid, { price: 9.6, size: '1L' }));
+    const out = approve(vid, { price: 9.6, size: '1L' });
     assert.deepEqual([out.applied, out.target], [true, 'mass']);
     const r = beer(id);
     assert.equal(r.size_mass, 9.6);
@@ -351,7 +377,7 @@ describe('approving a submission (Task 3)', () => {
 
   test('0.33 L: replaces the headline at that serving size and reports what it displaced', () => {
     const { vid, id } = fixture();
-    const out = database.applyApprovedPrice(sub(vid, { price: 3.5, size: '0.33L' }));
+    const out = approve(vid, { price: 3.5, size: '0.33L' });
     assert.equal(out.applied, true);
     assert.equal(out.old.size_05, 4.5);
     assert.equal(out.old.serving_volume_ml, 500);
@@ -362,7 +388,7 @@ describe('approving a submission (Task 3)', () => {
 
   test('a new beer: stored as reported at its reported size — a 1 L price is NOT halved into a 0.5 L price', () => {
     const { vid } = fixture();
-    const out = database.applyApprovedPrice(sub(vid, { beer_brand: 'Brandneu', price: 9.0, size: '1L', serve_type: 'tap' }));
+    const out = approve(vid, { beer_brand: 'Brandneu', price: 9.0, size: '1L', serve_type: 'tap' });
     assert.deepEqual([out.applied, out.created], [true, true]);
     const r = beer(beerId(vid, 'Brandneu'));
     assert.equal(r.size_05, 9.0);
@@ -387,6 +413,27 @@ describe('approving a submission (Task 3)', () => {
     const r = beer(beerId(vid, 'Maß'));
     assert.deepEqual([r.size_05, r.serving_volume_ml, r.size_mass], [4.6, 500, 9.0]);
   });
+
+  test('`reports` is DERIVED, not blindly incremented: a stored value with no matching approved submissions is corrected downward, not bumped by one', () => {
+    // No prior submissions row is inserted here on purpose — this fixture's
+    // beer has 4 stale `reports` from a raw UPDATE, but the `submissions`
+    // table has nothing approved for it. A real customer report is then
+    // approved (through `approve()`, which inserts + approves a submissions
+    // row), so afterwards there is exactly ONE real matching submission —
+    // the old "reports + 1" logic would have produced 5; the fix produces 1.
+    const vid = makeVenue([{ brand: 'Drift', size_05: 4.0, size_mass: null }]);
+    const id = beerId(vid, 'Drift');
+    db.prepare(`UPDATE beers SET reports = 4 WHERE id = ?`).run(id);
+    approve(vid, { beer_brand: 'Drift', price: 4.1 });
+    assert.equal(beer(id).reports, 1);
+  });
+
+  test('a second approval for the same venue+brand raises the count to 2 (real reports accumulate)', () => {
+    const vid = makeVenue([{ brand: 'Zweimal', size_05: 4.0, size_mass: null }]);
+    approve(vid, { beer_brand: 'Zweimal', price: 4.1 });
+    approve(vid, { beer_brand: 'Zweimal', price: 4.2 });
+    assert.equal(beer(beerId(vid, 'Zweimal')).reports, 2);
+  });
 });
 
 describe('aggregates compare normalized prices', () => {
@@ -399,6 +446,35 @@ describe('aggregates compare normalized prices', () => {
     const hood = database.getNeighbourhoods().find((n) => n.id === 'hood2');
     assert.equal(hood.avg_price, 4.5);          // not (4 + 3.3 + 1) / 3
     assert.equal(hood.venue_count, 2);
+  });
+});
+
+describe('resetReportCounts (Fix: reset invented report counts)', () => {
+  test('sets reports to the real approved-submission count, 0 when there are none, and leaves already-correct rows alone', () => {
+    const vid = makeVenue([
+      { brand: 'Invented', size_05: 4.0, size_mass: null },   // stale seed-style number, no real submissions
+      { brand: 'AlreadyRight', size_05: 4.2, size_mass: null }, // reports already matches reality
+      { brand: 'Reported', size_05: 4.4, size_mass: null },     // 2 real approved submissions
+    ]);
+    db.prepare(`UPDATE beers SET reports = 11 WHERE id = ?`).run(beerId(vid, 'Invented'));
+    db.prepare(`UPDATE beers SET reports = 0 WHERE id = ?`).run(beerId(vid, 'AlreadyRight'));
+    db.prepare(`
+      INSERT INTO submissions (id, report_type, venue_id, beer_brand, size, price, visit_date, status)
+      VALUES ('t-reset-1', 'price_change', ?, 'Reported', '0.5L', 4.4, '2026-08-01', 'approved'),
+             ('t-reset-2', 'price_change', ?, 'Reported', '0.5L', 4.45, '2026-09-01', 'approved'),
+             ('t-reset-3', 'price_change', ?, 'Reported', '0.5L', 4.5, '2026-09-05', 'pending')
+    `).run(vid, vid, vid);
+
+    const result = database.resetReportCounts();
+    assert.ok(result.updated >= 1);
+    assert.ok(result.backup && fs.existsSync(result.backup));
+
+    assert.equal(beer(beerId(vid, 'Invented')).reports, 0);
+    assert.equal(beer(beerId(vid, 'AlreadyRight')).reports, 0);
+    assert.equal(beer(beerId(vid, 'Reported')).reports, 2); // the pending one doesn't count
+
+    // Idempotent: nothing left to fix, so a second call is a silent no-op.
+    assert.deepEqual(database.resetReportCounts(), { updated: 0, backup: null });
   });
 });
 

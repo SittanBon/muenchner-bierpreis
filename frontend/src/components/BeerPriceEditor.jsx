@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { adminUpdateBeerPrice, adminVerifyBeer } from '../hooks/useApi';
+import { adminUpdateBeerPrice, adminVerifyBeer, adminConfirmBeerSize } from '../hooks/useApi';
 import { parsePrice, pricePlaceholder } from '../utils/price';
 import { SOURCE_TYPES, NOTES_MAX_LENGTH, normalizePrice, formatPrice } from '../utils/priceUtils';
 import { todayISO } from '../utils/freshness';
@@ -32,6 +32,11 @@ export default function BeerPriceEditor({
 
   const [price, setPrice] = useState(String(beer.size_05 ?? ''));
   const [volume, setVolume] = useState(beer.serving_volume_ml == null ? '' : String(beer.serving_volume_ml));
+  // Only sent to the server when the admin actually touches the size select
+  // (same "only what was touched" convention as observedDirty/sourceDirty) —
+  // that touch is itself what confirms the size (Fix 3), so an untouched
+  // field must not silently re-confirm whatever was already stored.
+  const [volumeDirty, setVolumeDirty] = useState(false);
   const [serve, setServe] = useState(beer.serve_type || 'unknown');
   const [observed, setObserved] = useState(beer.price_observed_at || '');
   const [observedDirty, setObservedDirty] = useState(false);
@@ -40,6 +45,7 @@ export default function BeerPriceEditor({
   const [notes, setNotes] = useState(beer.notes || '');
   const [saving, setSaving] = useState(false);
   const [verifying, setVerifying] = useState(false);
+  const [confirmingSize, setConfirmingSize] = useState(false);
   const [error, setError] = useState('');
   const [historyKey, setHistoryKey] = useState(0);
 
@@ -63,13 +69,15 @@ export default function BeerPriceEditor({
         size_05: parsed,
         size_mass: beer.size_mass,
         serve_type: serve,
-        serving_volume_ml: volumeMl,
         notes,
         // Only what the admin actually touched: an untouched date/source must
         // not be re-sent, or a price change would keep the OLD observation
-        // date instead of getting "today" and the ADMIN source.
+        // date instead of getting "today" and the ADMIN source. Same for the
+        // serving size — sending it unconditionally would confirm a size the
+        // admin never actually looked at (Fix 3).
         ...(observedDirty && observed ? { price_observed_at: observed } : {}),
         ...(sourceDirty ? { source_type: source } : {}),
+        ...(volumeDirty ? { serving_volume_ml: volumeMl } : {}),
       });
       showToast('success', t('admin.toast.priceSaved', { venue: venue.name }));
       setHistoryKey((k) => k + 1);
@@ -78,6 +86,7 @@ export default function BeerPriceEditor({
       // clear our own busy/dirty flags either way.
       setObservedDirty(false);
       setSourceDirty(false);
+      setVolumeDirty(false);
       setSaving(false);
       onUpdated(updated);
     } catch (err) {
@@ -101,6 +110,24 @@ export default function BeerPriceEditor({
     }
   };
 
+  // "This serving size is correct" (Fix 3) — its own action, distinct from
+  // Save, for the common case where the admin reviews an ASSUMED_HALF_LITRE
+  // flag and the assumed size turns out to be right. Disabled while there are
+  // unsaved edits, same reasoning as Verify: it confirms the SAVED size.
+  const confirmSize = async () => {
+    setError('');
+    setConfirmingSize(true);
+    try {
+      const updated = await adminConfirmBeerSize(token, venue.id, beer.id);
+      showToast('success', t('admin.toast.sizeConfirmed', { venue: venue.name }));
+      setConfirmingSize(false);
+      onUpdated(updated);
+    } catch (err) {
+      setError(err.message);
+      setConfirmingSize(false);
+    }
+  };
+
   const id = `pe-${beer.id}`;
   return (
     <div className="vm-beer-card">
@@ -120,7 +147,17 @@ export default function BeerPriceEditor({
 
         <div className="pe-field">
           <label htmlFor={`${id}-size`}>{t('admin.price.size')}</label>
-          <ServingSizeSelect id={`${id}-size`} className="vm-serve-select" value={volume} onChange={setVolume} allowUnknown />
+          <ServingSizeSelect
+            id={`${id}-size`} className="vm-serve-select" value={volume}
+            onChange={(v) => { setVolume(v); setVolumeDirty(true); }} allowUnknown
+          />
+          <button
+            type="button" className="pe-confirm-size" onClick={confirmSize}
+            disabled={confirmingSize || dirty || volume === '' || beer.size_confirmed}
+            title={dirty ? t('admin.price.confirmSizeSaveFirst') : t('admin.price.confirmSizeHint')}
+          >
+            {confirmingSize ? '...' : beer.size_confirmed ? `✓ ${t('admin.price.sizeConfirmed')}` : t('admin.price.confirmSize')}
+          </button>
         </div>
 
         <div className="pe-field">
