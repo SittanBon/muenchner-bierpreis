@@ -1,96 +1,57 @@
-# 🍺 Bierpreis — v3
+# Bierpreis
 
-**Find your Helles. Know what you pay.**
+**Faires Bier für Alle.** A bilingual (German/English) map of Helles beer prices across Munich.
 
-A full-stack web app showing Helles beer prices across Munich's key neighbourhoods.
-v3 adds a real SQLite database, a city-wide stats bar, price-freshness traffic
-lights, and a mobile bottom-sheet layout.
+**Live: [bierpreis.beer](https://bierpreis.beer/)**
 
-## Quick Start
+![Bierpreis on a phone and desktop](https://sittanbon.github.io/bierpreis-live-screenshot.jpg)
+
+## What it does
+
+- **Price-first map and list.** Markers show the actual menu price, coloured by how recently it was confirmed. The map and list are two views of the same data, so filters, search and sorting carry over.
+- **Around 180 venues across six Munich districts**, drawn from official OpenStreetMap district boundaries, with neighbourhood averages and a price-level legend.
+- **Honest data.** A price's age comes only from when it was observed or verified. Unknown dates and unknown serving sizes are shown as unknown, never guessed. Prices for other sizes are converted to a per-0.5 L comparison but never shown as what you pay.
+- **Community reports.** A stepped form for price changes, new beers, closed venues and other corrections, plus "Missing a bar?" with a duplicate check.
+- **Admin tools.** Review queue for reports, price editor with history, one-click price verification, a data-quality dashboard that flags issues for human review, an audit log and Telegram notifications.
+- **Mobile-first and accessible.** Draggable bottom sheet, 44 px touch targets, keyboard and screen-reader support, reduced-motion support and self-hosted fonts.
+
+## Tech stack
+
+| Layer | Tools |
+| --- | --- |
+| Frontend | React, Vite, Leaflet with OpenStreetMap, i18next, Recharts |
+| Backend | Node.js, Express, JWT admin auth |
+| Database | SQLite (better-sqlite3) |
+| Tests | Node test runner (backend), Vitest (frontend) |
+| Hosting | Railway, auto-deployed from `main`, persistent volume for the database |
+
+## Run it locally
 
 ```bash
-# 1. Install dependencies (once)
 npm install
 cd frontend && npm install && cd ..
+cp .env.example .env      # then set your own admin password and JWT secret
 
-# 2. Backend  →  http://localhost:3001
-node server.js
-
-# 3. Frontend →  http://localhost:5173
-cd frontend && npm run dev
+node server.js            # API on http://localhost:3001 (creates and seeds the database)
+cd frontend && npm run dev   # app on http://localhost:5173
 ```
 
-`node server.js` creates `backend/db/bierpreis.db` and seeds it automatically on
-first run. Nothing else to do.
+Run the tests with `npm test`.
 
-## Configuration — `.env`
+## Project structure
 
-Copy `.env.example` to `.env` (a working `.env` is already included). Keys:
-
-| Key              | Default                    | Purpose                              |
-| ---------------- | -------------------------- | ------------------------------------ |
-| `PORT`           | `3001`                     | API port                            |
-| `JWT_SECRET`     | dev placeholder            | signs admin JWTs — change for prod  |
-| `ADMIN_USERNAME` | `admin`                    | admin dashboard login               |
-| `ADMIN_PASSWORD` | `bierpreis2025`            | admin dashboard login               |
-| `DATABASE_PATH`  | `./backend/db/bierpreis.db`| SQLite file (relative to repo root) |
-
-The frontend API base can be overridden with `VITE_API_URL`.
-
-## Database
-
-SQLite via **better-sqlite3**. Schema in `backend/db/schema.sql`:
-
-- **neighbourhoods** — id, names (de/en), centre coords, descriptions
-- **venues** — id, name, type, neighbourhood_id, address, coords, hours, website, descriptions
-- **beers** — one row per beer at a venue; `size_05` / `size_mass` prices, `updated` (last confirmed), `reports`
-- **submissions** — community price reports; `status` (pending/approved/rejected), `is_outlier`
-
-Seed / re-seed manually:
-
-```bash
-npm run seed          # seed only if empty
-npm run seed:force    # wipe and re-seed
+```
+server.js            Express API
+backend/             data-quality rules, notifications, tests
+backend/db/          schema, migrations, seed and data scripts
+frontend/src/        React app (components, hooks, shared constants, utils)
 ```
 
-Seed data: 13 venues across **Altstadt, Maxvorstadt, Schwabing, Isarvorstadt**
-with their 2025 Helles prices. Each price's "last confirmed" date is spread
-across recent months so the freshness traffic light shows a realistic mix.
+## Roadmap
 
-## Features (v3)
+- More districts (Haidhausen, Neuhausen, Bogenhausen, Sendling)
+- Privacy-friendly analytics and error monitoring
+- One-tap "still correct?" confirmation and photo upload for reports
+- Other cities (Berlin, Hamburg, Vienna)
 
-- 🗺️ Interactive Munich map with 4 Stadtteile, price-coloured polygons
-- 📊 **Stats bar** — city-wide average, cheapest & most-expensive venue,
-  per-neighbourhood average toggle pills (click to focus a neighbourhood)
-- 🚦 **Price-freshness traffic light** on every venue card —
-  🟢 &lt; 3 months · 🟡 3–6 months · 🔴 &gt; 6 months
-- 📱 **Mobile** — full-screen map with a draggable bottom sheet for the venue list
-- 🔍 Search + filters (type, brand, price range, neighbourhood)
-- 💬 Community price reporting with outlier detection
-- 🔒 Admin dashboard: review / approve / reject submissions
-- 🌐 Bilingual: German & English
-
-## Admin Dashboard
-
-Click **Admin** in the nav bar. Credentials come from `.env`
-(`admin` / `bierpreis2025` by default).
-
-## API
-
-| Method | Route                        | Notes                              |
-| ------ | ---------------------------- | ---------------------------------- |
-| GET    | `/api/neighbourhoods`        | with `avg_price`, `venue_count`   |
-| GET    | `/api/stats`                 | powers the stats bar              |
-| GET    | `/api/venues`                | filters: `neighbourhood,type,brand,min_price,max_price,q` |
-| GET    | `/api/venues/:id`            | includes approved `price_history` |
-| POST   | `/api/submissions`           | community price report            |
-| POST   | `/api/admin/login`           | → `{ token }`                     |
-| GET    | `/api/admin/submissions`     | auth; `?status=`                  |
-| PATCH  | `/api/admin/submissions/:id` | auth; `{ status }`                |
-| GET    | `/api/admin/stats`           | auth                              |
-
-## Next Steps
-
-- Add Haidhausen, Neuhausen, Bogenhausen, Sendling
-- Photo upload for price reports
-- Hash the admin password (bcryptjs is already a dependency)
+Built by [Sittan (Bon) Charoensuwan](https://sittanbon.github.io/).
